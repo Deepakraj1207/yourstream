@@ -88,6 +88,8 @@ class PlayerDebugViewModel @Inject constructor(
     factory: TelegramPlaybackControllerFactory,
     private val history: WatchHistoryRepository,
     private val trackPrefs: dev.yourstream.playback.tracks.TrackPreferenceStore,
+    private val session: dev.yourstream.core.diagnostics.PlaybackSessionStore,
+    private val journal: dev.yourstream.core.diagnostics.EventJournal,
 ) : ViewModel() {
     val languagePrefs = MutableStateFlow(dev.yourstream.playback.tracks.LanguagePreferences())
 
@@ -115,9 +117,15 @@ class PlayerDebugViewModel @Inject constructor(
         if (started) return
         started = true
         viewModelScope.launch {
-            // Continue where the user stopped (unless finished).
-            val resume = history.progress(target).first()?.takeIf { !it.completed }?.positionMs
-            controller.open(target, mediaId, resume)
+            // Continue where the user stopped (unless finished). After process death the session
+            // saved every few seconds is newer than the watch history (saved every ~10 s).
+            val saved = session.read()?.takeIf { it.itemId == target.itemId && it.episodeId == target.episodeId }
+            val resume = saved?.positionMs ?: history.progress(target).first()?.takeIf { !it.completed }?.positionMs
+            val r = controller.open(target, mediaId ?: saved?.mediaId, resume)
+            if (r is dev.yourstream.core.common.AppResult.Err) {
+                journal.warn(dev.yourstream.core.diagnostics.DiagnosticCategory.PLAYBACK, "Cannot play ${target}: ${r.error.message}")
+            }
+            trackSession(target)
         }
     }
 
@@ -145,7 +153,28 @@ class PlayerDebugViewModel @Inject constructor(
 
     fun toggleFastSeek() { fastSeek = !fastSeek; controller.setFastSeeking(fastSeek) }
 
-    override fun onCleared() = controller.release()
+    /** Saves the session every 5 s while playing (process-death recovery); errors go to the journal. */
+    private fun trackSession(target: PlaybackTarget) = viewModelScope.launch {
+        var lastSave = 0L
+        var lastError: String? = null
+        controller.state.collect { s ->
+            val now = System.currentTimeMillis()
+            if (s.status == dev.yourstream.playback.media3.PlaybackStatus.ENDED) { session.clear(); return@collect }
+            if (s.isPlaying && now - lastSave >= 5_000) {
+                lastSave = now
+                session.save(dev.yourstream.core.diagnostics.PlaybackSession(target.itemId, target.episodeId, s.media?.mediaId, s.media?.title ?: "", s.positionMs, s.durationMs ?: 0, now))
+            }
+            val e = s.error?.let { "${it.kind}: ${it.message}" }
+            if (e != null && e != lastError) journal.warn(dev.yourstream.core.diagnostics.DiagnosticCategory.PLAYBACK, "Playback error $e" + (s.recovery?.let { " — $it" } ?: ""))
+            lastError = e
+        }
+    }
+
+    /** Leaving the player normally: nothing to recover. (Not called when Android kills the process.) */
+    override fun onCleared() {
+        session.clear()
+        controller.release()
+    }
 }
 
 @Composable
@@ -159,6 +188,9 @@ private fun PlayerScreen(vm: PlayerDebugViewModel) {
         )
         Text(state.line(), fontSize = 12.sp)
         state.error?.let { Text("ERROR ${it.kind}: ${it.message}${if (it.retryable) " (retryable)" else ""}", color = Color(0xFFB00020), fontSize = 12.sp) }
+        state.recovery?.let { Text("recovery: $it", fontSize = 12.sp) }
+        val recoveryLog by vm.controller.recoveryLog.collectAsStateWithLifecycle()
+        recoveryLog.takeLast(3).forEach { Text(it, fontSize = 10.sp) }
         metrics.lines().forEach { Text(it, fontSize = 11.sp) }
         vm.controller.adaptive?.let { a -> a.lines(state).forEach { Text(it, fontSize = 10.sp) } } ?: Text("adaptive streaming off", fontSize = 10.sp)
         TrackSection(vm)

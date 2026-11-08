@@ -34,8 +34,40 @@ class LibraryMediaSourceResolver @Inject constructor(
 
     override suspend fun resolve(target: PlaybackTarget, mediaId: Long?): AppResult<PlayableMedia> {
         val versions = target.episodeId?.let { episodes.versions(it) } ?: media.versions(target)
-        val version = (if (mediaId != null) versions.firstOrNull { it.mediaId == mediaId } else chooseVersion(versions))
-            ?: return AppResult.Err(AppError.NotFound("No playable file for this title"))
+        if (mediaId != null) {
+            val version = versions.firstOrNull { it.mediaId == mediaId } ?: return AppResult.Err(AppError.NotFound("No playable file for this title"))
+            return resolveVersion(target, version)
+        }
+        return firstPlayable(target, versions, emptySet())
+    }
+
+    override suspend fun resolveExcluding(target: PlaybackTarget, excludedMediaIds: Set<Long>): AppResult<PlayableMedia> {
+        val versions = target.episodeId?.let { episodes.versions(it) } ?: media.versions(target)
+        return firstPlayable(target, versions, excludedMediaIds)
+    }
+
+    /**
+     * Tries versions best first: a file whose message was deleted since indexing, or that
+     * Telegram can no longer download, falls through to the next version instead of failing.
+     */
+    private suspend fun firstPlayable(target: PlaybackTarget, versions: List<MediaVersion>, excluded: Set<Long>): AppResult<PlayableMedia> {
+        val candidates = rank(versions).filter { it.mediaId !in excluded }
+        if (candidates.isEmpty()) return AppResult.Err(AppError.NotFound(if (excluded.isEmpty()) "No playable file for this title" else "No other version of this title"))
+        var last: AppResult.Err? = null
+        for (v in candidates) {
+            when (val r = resolveVersion(target, v)) {
+                is AppResult.Ok -> return r
+                is AppResult.Err -> {
+                    last = r
+                    // Offline / Telegram unreachable: other versions will fail the same way.
+                    if (r.error !is AppError.NotFound) return r
+                }
+            }
+        }
+        return last!!
+    }
+
+    private suspend fun resolveVersion(target: PlaybackTarget, version: MediaVersion): AppResult<PlayableMedia> {
         if (version.isDeleted) return AppResult.Err(AppError.NotFound("The Telegram message of ${version.fileName} was deleted"))
 
         val (file, mime) = when (val r = currentFile(version)) {
@@ -74,9 +106,11 @@ class LibraryMediaSourceResolver @Inject constructor(
 
     companion object {
         /** Best version: not deleted/excluded, an original before a duplicate, then highest resolution, then largest. */
-        fun chooseVersion(versions: List<MediaVersion>): MediaVersion? = versions
+        fun chooseVersion(versions: List<MediaVersion>): MediaVersion? = rank(versions).firstOrNull()
+
+        /** All usable versions, best first. */
+        fun rank(versions: List<MediaVersion>): List<MediaVersion> = versions
             .filter { !it.isDeleted && !it.isExcluded }
             .sortedWith(compareBy<MediaVersion> { it.isDuplicate }.thenByDescending { it.resolution ?: 0 }.thenByDescending { it.sizeBytes })
-            .firstOrNull()
     }
 }

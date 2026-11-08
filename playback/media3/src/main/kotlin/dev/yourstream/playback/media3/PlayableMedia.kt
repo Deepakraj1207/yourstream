@@ -53,6 +53,10 @@ data class PlayableMedia(
  */
 interface MediaSourceResolver {
     suspend fun resolve(target: PlaybackTarget, mediaId: Long? = null): AppResult<PlayableMedia>
+
+    /** The best playable version other than [excludedMediaIds] (recovery after a file failed). */
+    suspend fun resolveExcluding(target: PlaybackTarget, excludedMediaIds: Set<Long>): AppResult<PlayableMedia> =
+        AppResult.Err(dev.yourstream.core.common.AppError.NotFound("No other version"))
 }
 
 /** Where playback reports watch progress (the library's watch history in the app). */

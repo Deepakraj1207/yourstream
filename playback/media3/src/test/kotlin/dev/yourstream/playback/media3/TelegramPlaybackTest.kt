@@ -86,7 +86,8 @@ class TelegramPlaybackTest {
 
     private fun controller(
         streamer: TelegramFileStreamer = streamer(),
-        config: PlaybackConfig = PlaybackConfig(loadRetries = 1, retryBaseDelayMs = 100, retryMaxDelayMs = 200),
+        // Automatic recovery off: these tests exercise the manual paths; recovery has its own tests.
+        config: PlaybackConfig = PlaybackConfig(loadRetries = 1, retryBaseDelayMs = 100, retryMaxDelayMs = 200, recovery = null),
         resolver: MediaSourceResolver? = null,
         network: MutableStateFlow<Boolean>? = null,
     ) = TelegramPlaybackController(
@@ -390,6 +391,51 @@ class TelegramPlaybackTest {
         assertTrue(r is AppResult.Err)
         assertEquals(PlaybackStatus.ERROR, failing.state.value.status)
         assertEquals(PlaybackErrorKind.FILE_UNAVAILABLE, failing.state.value.error!!.kind)
+    }
+
+    @Test
+    fun fileThatDisappearsSwitchesToAnotherVersion() {
+        val first = add(1, TestMedia.SMALL_360P)
+        val second = add(2, TestMedia.SMALL_360P)
+        sim.makeUnavailable(1) // message deleted after indexing
+        val asked = mutableListOf<Set<Long>>()
+        val resolver = object : MediaSourceResolver {
+            override suspend fun resolve(target: PlaybackTarget, mediaId: Long?) = AppResult.Ok(media(1, first))
+            override suspend fun resolveExcluding(target: PlaybackTarget, excludedMediaIds: Set<Long>): AppResult<PlayableMedia> {
+                asked += excludedMediaIds
+                return if (2L in excludedMediaIds) AppResult.Err(AppError.NotFound("none left"))
+                else AppResult.Ok(media(2, second).copy(target = PlaybackTarget(1), mediaId = 2))
+            }
+        }
+        val c = controller(resolver = resolver, config = PlaybackConfig(loadRetries = 1, retryBaseDelayMs = 100, retryMaxDelayMs = 200))
+        c.play(media(1, first).copy(target = PlaybackTarget(1)))
+        val deadline = nowMs() + 30_000
+        while (c.snapshot().media?.fileId != 2 && nowMs() < deadline) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Thread.sleep(10) }
+        c.player.awaitState(Player.STATE_ENDED, retriedErrorsExpected = true)
+        assertEquals(2, c.snapshot().media!!.fileId, "continued with the other version")
+        assertEquals(listOf(setOf(1L)), asked)
+        assertTrue(c.recoveryLog.value.first().contains("SwitchVersion"))
+        assertEquals(null, c.snapshot().error)
+    }
+
+    @Test
+    fun networkErrorsAreRetriedAutomaticallyWithBackoff() {
+        sim.partSize = 16 * 1024
+        val file = add(1, TestMedia.SMALL_360P)
+        sim.bandwidthBytesPerSecond = 64 * 1024
+        val c = controller(
+            streamer(stallMs = 1_500),
+            config = PlaybackConfig(loadRetries = 1, retryBaseDelayMs = 100, retryMaxDelayMs = 200, recovery = PlaybackRecoveryPolicy(baseDelayMs = 1_000)),
+        )
+        c.play(media(1, file))
+        c.player.awaitState(Player.STATE_READY)
+        sim.online = false
+        run(c.player).withTimeoutMs(30_000).ignoringNonFatalErrors().untilPlayerError()
+        assertTrue(c.snapshot().recovery!!.startsWith("retry 1"), c.snapshot().recovery)
+        sim.online = true // back before the retry fires: no manual retry needed
+        c.player.awaitState(Player.STATE_ENDED, retriedErrorsExpected = true)
+        assertTrue(c.metrics.value.retries >= 1)
+        assertEquals(null, c.snapshot().recovery)
     }
 
     @Test

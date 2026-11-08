@@ -48,6 +48,8 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
     /** Re-parses stored names after a parser upgrade (no network needed). */
     fun scheduleReparse() {
         val request = OneTimeWorkRequestBuilder<ReparseWorker>()
+            // CPU-only bulk work: not on a low battery.
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
             .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
             .addTag(TAG)
             .build()

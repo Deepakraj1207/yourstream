@@ -22,7 +22,7 @@ import javax.inject.Singleton
 class SearchIndexer @Inject constructor(private val db: YourStreamDatabase) {
     private val dao = db.searchDao()
     private val lock = Mutex()
-    private var vocabulary: TermIndex? = null
+    @Volatile private var vocabulary: TermIndex? = null
     private var genreNames: Set<String>? = null
 
     /** Bumped whenever the index changes (invalidates cached result lists). */
@@ -56,7 +56,11 @@ class SearchIndexer @Inject constructor(private val db: YourStreamDatabase) {
         return flush()
     }
 
+    /** Frees the in-memory vocabulary (memory pressure); rebuilt on next use. */
+    fun dropVocabulary() { vocabulary = null }
+
     /** The library's vocabulary (loaded on first use, then kept up to date by [flush]). */
+
     suspend fun terms(): TermIndex = lock.withLock {
         vocabulary ?: TermIndex().also { index ->
             var offset = 0

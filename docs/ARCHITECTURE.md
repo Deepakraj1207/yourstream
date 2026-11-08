@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–12 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks; offline search; local media assistant; watch intelligence). This document is the reference
+Status: **Phases 1–13 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks; offline search; local media assistant; watch intelligence; real-world robustness). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -21,6 +21,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P10 Search | **done** | `:search:core` (normalization, query interpretation, fuzzy/transliteration term index, ranking), `:search:engine` (trigger-maintained denormalized index + FTS4 in DB v7, filters, sorting, pagination), `:core:language`. Benchmarked to 50k items. See [SEARCH.md](SEARCH.md) |
 | P11 Local assistant | **done** | `:assistant:core` (deterministic intent detection + entity extraction → query plan; optional on-device `IntentModel`, validated and merged, never required), `:assistant:engine` (plans run against the library: search, episodes, continue watching, recommendations, play). No cloud AI. See [ASSISTANT.md](ASSISTANT.md) |
 | P12 Watch intelligence | **done** | `:watch:core` (pure next-episode, completion, abandonment and Continue Watching ordering policies), `:watch:engine` (live Continue Watching / Next Episode / Recently Watched / Recently Added / Favorites / Abandoned, per-item watch facts), DB v8 (`watch_dismissal`). See [WATCH.md](WATCH.md) |
+| P13 Robustness | **done** | `:core:diagnostics` (redaction, persistent rotating log, event journal, crash reports, crash-loop safe mode, health checks, report, playback session), `core:common` retry/guard/memory pressure, safe database opening (backup → open → salvage, integrity check/repair), playback recovery (backoff retries, version switching), battery-conscious maintenance work, Diagnostics screen. See [ROBUSTNESS.md](ROBUSTNESS.md) |
 
 ---
 

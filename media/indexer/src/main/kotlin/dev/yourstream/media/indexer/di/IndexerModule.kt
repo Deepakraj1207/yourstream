@@ -9,6 +9,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.yourstream.core.common.Clock
+import dev.yourstream.core.common.Logger
+import dev.yourstream.core.database.DatabaseOpener
+import dev.yourstream.core.database.OpenedDatabase
 import dev.yourstream.core.database.YourStreamDatabase
 import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.media.api.MediaIndexRepository
@@ -34,8 +37,17 @@ abstract class IndexerModule {
     @Multibinds abstract fun indexListeners(): Set<MediaIndexListener>
 
     companion object {
+        /** Opened eagerly and safely: backup before upgrades, salvage instead of crashing (DatabaseOpener). */
         @Provides @Singleton
-        fun database(@ApplicationContext context: Context): YourStreamDatabase = YourStreamDatabase.create(context)
+        fun openedDatabase(@ApplicationContext context: Context, logger: Logger): OpenedDatabase {
+            val (db, report) = DatabaseOpener.open(context) { message, error ->
+                if (error == null) logger.i("Database", message) else logger.e("Database", message, error)
+            }
+            return OpenedDatabase(db, report, context.getDatabasePath(YourStreamDatabase.NAME))
+        }
+
+        @Provides @Singleton
+        fun database(opened: OpenedDatabase): YourStreamDatabase = opened.db
 
         @Provides @Singleton
         fun normalizer(): MediaNormalizer = MediaNormalizer(IndexingPolicy())

@@ -40,7 +40,13 @@ class FakeProvider(
         imdb?.let { imdbIndex[it] = id }
     }
 
-    private fun fail(): AppError? = errors.removeFirstOrNull()
+    /** Thrown by the next call (a provider whose mapping breaks on a changed response). */
+    var throwNext: Throwable? = null
+
+    private fun fail(): AppError? {
+        throwNext?.let { throwNext = null; throw it }
+        return errors.removeFirstOrNull()
+    }
 
     override suspend fun search(query: MetadataQuery): AppResult<List<MetadataCandidate>> {
         calls += "search:${query.title}:${query.year}:${query.type}"

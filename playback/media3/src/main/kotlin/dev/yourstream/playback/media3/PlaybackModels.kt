@@ -28,6 +28,8 @@ data class PlaybackState(
     val videoWidth: Int? = null,
     val videoHeight: Int? = null,
     val seeking: Boolean = false,
+    /** Automatic recovery in progress ("retry 2 in 4 s", "switching to another version", "waiting for network"). */
+    val recovery: String? = null,
 )
 
 /** What the test player shows and the tests assert on. Times are wall-clock milliseconds. */
@@ -71,5 +73,7 @@ data class PlaybackConfig(
     /** Retry automatically when Telegram reconnects after a network error. */
     val autoRetryOnReconnect: Boolean = true,
     val maxAutoRetries: Int = 3,
+    /** Automatic recovery from playback errors (retries, version switches). Null = off. */
+    val recovery: PlaybackRecoveryPolicy? = PlaybackRecoveryPolicy(),
     val metricsSampleIntervalMs: Long = 500,
 )

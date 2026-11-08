@@ -37,7 +37,9 @@ class MetadataSyncWorker @AssistedInject constructor(
     companion object {
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<MetadataSyncWorker>(12, TimeUnit.HOURS)
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                // Battery-conscious: background refresh waits for a healthy battery and free storage.
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).build())
+                .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("metadata-sync", ExistingPeriodicWorkPolicy.KEEP, request)
         }

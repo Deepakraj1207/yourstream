@@ -67,6 +67,7 @@ fun DebugApp(
     searchVm: SearchDebugViewModel,
     assistantVm: AssistantDebugViewModel,
     watchVm: WatchDebugViewModel,
+    diagnosticsVm: DiagnosticsDebugViewModel,
     onPlay: (dev.yourstream.library.api.PlaybackTarget, Long?) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(0) }
@@ -89,13 +90,16 @@ fun DebugApp(
                     TextButton(onClick = vm::toggleLogs) { Text(if (showLogs) "Hide logs" else "Logs") }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    listOf("Telegram", "Index & search", "Library", "Catalogs", "Search", "Assistant", "Watch").forEachIndexed { i, name ->
+                    listOf("Telegram", "Index & search", "Library", "Catalogs", "Search", "Assistant", "Watch", "Diagnostics").forEachIndexed { i, name ->
                         TextButton(onClick = { tab = i }) { Text(if (tab == i) "[$name]" else name) }
                     }
                 }
                 message?.let {
                     Text("Error: $it", color = Color(0xFFB00020), modifier = Modifier.clickable { vm.dismissMessage() })
                 }
+                if (diagnosticsVm.safeMode) Text("Safe mode (see Diagnostics): the local library works; Telegram was not started.", color = Color(0xFFB00020), fontSize = 12.sp,
+                    modifier = Modifier.clickable { tab = 7 })
+                InterruptedPlaybackBanner(diagnosticsVm, onPlay)
                 HorizontalDivider()
                 Spacer(Modifier.height(8.dp))
 
@@ -110,6 +114,7 @@ fun DebugApp(
                     tab == 4 -> SearchPane(searchVm) { id -> libraryVm.open(id); tab = 2 }
                     tab == 5 -> AssistantPane(assistantVm, { id -> libraryVm.open(id); tab = 2 }, onPlay)
                     tab == 6 -> WatchPane(watchVm, { id -> libraryVm.open(id); tab = 2 }, onPlay)
+                    tab == 7 -> DiagnosticsPane(diagnosticsVm)
                     selected != null -> {
                         BackHandler { vm.clearSelection() }
                         ChatDetailsPane(vm, indexVm)

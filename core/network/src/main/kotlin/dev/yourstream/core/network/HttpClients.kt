@@ -71,6 +71,9 @@ suspend fun <T> HttpClient.getJson(
     AppResult.Err(AppError.Network(e.message ?: "Network error"))
 } catch (e: CancellationException) {
     throw e
+} catch (e: Exception) {
+    // Anything else (malformed URL, unresolvable address, engine bugs): an error, not a crash.
+    AppResult.Err(AppError.Unknown("Request to ${url.substringBefore('?')} failed: ${e::class.simpleName}: ${e.message}", e))
 }
 
 private fun retryAfterSeconds(response: HttpResponse): Int =

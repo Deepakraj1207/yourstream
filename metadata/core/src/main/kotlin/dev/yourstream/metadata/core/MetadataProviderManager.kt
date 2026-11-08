@@ -203,7 +203,7 @@ class MetadataProviderManager(
             return AppResult.Err(AppError.RateLimited(wait.toInt().coerceAtLeast(1)))
         }
         val now = clock.nowMillis()
-        return when (val r = fetch()) {
+        return when (val r = dev.yourstream.core.common.guarded("${provider.id} request") { fetch() }) {
             is AppResult.Ok -> {
                 health.onSuccess(provider.id)
                 val payload = json.encodeToString(serializer, r.value)

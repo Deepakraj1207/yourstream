@@ -46,11 +46,19 @@ interface LibrarySearch {
 class LibrarySearchEngine @Inject constructor(
     db: YourStreamDatabase,
     private val indexer: SearchIndexer,
-) : LibrarySearch {
+) : LibrarySearch, dev.yourstream.core.common.MemoryTrimmable {
     private val dao = db.searchDao()
     var candidateCap = 1_500
     private val cache = object : LinkedHashMap<String, List<SearchHit>>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<SearchHit>>?) = size > 8
+    }
+
+    init { dev.yourstream.core.common.MemoryPressure.register(this) }
+
+    /** Cached rankings are rebuilt on the next search; the vocabulary reloads lazily. */
+    override fun trimMemory(critical: Boolean) {
+        synchronized(cache) { cache.clear() }
+        if (critical) indexer.dropVocabulary()
     }
 
     override suspend fun suggest(prefix: String, limit: Int): List<String> {

@@ -39,7 +39,12 @@ object AppModule {
     @Provides
     @Singleton
     @ApplicationScope
-    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun applicationScope(diagnostics: dev.yourstream.robust.AppDiagnostics, logger: AppLogger): CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, error ->
+            // A failure in background work is recorded, never a crash of the whole app.
+            logger.e("AppScope", "Uncaught failure in background work", error)
+        },
+    )
 
     @Provides
     @Singleton

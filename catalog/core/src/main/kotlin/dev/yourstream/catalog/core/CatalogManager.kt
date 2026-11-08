@@ -137,7 +137,7 @@ class CatalogManager(
             }
         }
         if (!health.canCall(p.id.value)) return infos[p.id] ?: decode(cached?.payload, CatalogProviderInfo.serializer())
-        return when (val r = p.describe()) {
+        return when (val r = dev.yourstream.core.common.guarded("${p.id} manifest") { p.describe() }) {
             is AppResult.Ok -> {
                 health.onSuccess(p.id.value)
                 cache.put(p.id.value, MANIFEST, CatalogCacheEntry(json.encodeToString(CatalogProviderInfo.serializer(), r.value), now, now + policy.manifestTtlMillis))
@@ -313,7 +313,7 @@ class CatalogManager(
         if (!health.canCall(p.id.value)) {
             return hit?.let { fromEntry(p, it, serializer, stale = true) } ?: AppResult.Err(AppError.RateLimited(health.waitSeconds(p.id.value)))
         }
-        return when (val r = fetch()) {
+        return when (val r = dev.yourstream.core.common.guarded("${p.id} request") { fetch() }) {
             is AppResult.Ok -> {
                 health.onSuccess(p.id.value)
                 cache.put(p.id.value, key, CatalogCacheEntry(json.encodeToString(serializer, r.value), now, now + ttl))

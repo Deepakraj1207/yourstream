@@ -41,6 +41,13 @@ class ProviderManagerTest {
     }
 
     @Test
+    fun aProviderThatThrowsIsAnErrorNotACrash() = runTest {
+        primary.throwNext = NullPointerException("field 'results' missing")
+        assertEquals("cinemeta", manager.search(q).ok().provider.value, "falls back")
+        assertTrue(manager.status().first { it.provider.value == "tmdb" }.lastError!!.contains("NullPointerException"))
+    }
+
+    @Test
     fun emptyResultsFallBackToo() = runTest {
         primary.catalogue.clear()
         assertEquals("cinemeta", manager.search(q).ok().provider.value)

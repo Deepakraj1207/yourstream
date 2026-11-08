@@ -107,6 +107,17 @@ class TmdbProviderTest {
     }
 
     @Test
+    fun changedResponseFormatsAreErrorsNotCrashes() = runTest {
+        // The provider changes its JSON: wrong types, an HTML error page, an empty body, a truncated answer.
+        for (body in listOf("""{"results":"maintenance"}""", """{"results":[{"id":"not-a-number","title":7}]}""",
+            "<html><body>502 Bad Gateway</body></html>", "", """{"id":1,"title":"Leo",""")) {
+            val p = provider { HttpStatusCode.OK to body }
+            assertTrue(p.search(MetadataQuery("leo")) is AppResult.Err, "search with $body")
+            assertTrue(p.movie("1", null) is AppResult.Err || p.movie("1", null) is AppResult.Ok, "movie with $body never throws")
+        }
+    }
+
+    @Test
     fun withoutKeysNothingIsSent() = runTest {
         val p = provider(TmdbConfig()) { HttpStatusCode.OK to "{}" }
         assertFalse(p.isConfigured)

@@ -122,6 +122,15 @@ class TelegramPlaybackController(
     private var pendingSeekStartNanos: Long? = null
     private var rebufferStartNanos: Long? = null
     private var autoRetries = 0
+    private var recoveryRetries = 0
+    private var versionSwitches = 0
+    private val failedMediaIds = mutableSetOf<Long>()
+    private var recovery: String? = null
+    private var recoveryJob: Job? = null
+    private var networkUp: Boolean? = null
+    /** Errors and the recovery chosen for them, newest last (diagnostics). */
+    private val _recoveryLog = MutableStateFlow<List<String>>(emptyList())
+    val recoveryLog: StateFlow<List<String>> = _recoveryLog.asStateFlow()
     private var lastProgressSaveNanos = 0L
     private var released = false
     private var samplerJob: Job? = null
@@ -166,6 +175,8 @@ class TelegramPlaybackController(
                         updateMetrics { it.copy(rebufferMs = it.rebufferMs + ms(now - start)) }
                     }
                     autoRetries = 0
+                    recoveryRetries = 0
+                    recovery = null
                 }
                 Player.STATE_BUFFERING -> if (everReady && pendingSeekStartNanos == null && rebufferStartNanos == null) {
                     rebufferStartNanos = now
@@ -187,6 +198,7 @@ class TelegramPlaybackController(
         override fun onPlayerError(error: PlaybackException) {
             pendingSeekStartNanos = null
             rebufferStartNanos = null
+            recover(error.toPlaybackError())
             publish()
         }
 
@@ -216,6 +228,7 @@ class TelegramPlaybackController(
         networkAvailable?.let { flow ->
             scope.launch {
                 flow.distinctUntilChanged().collect { available ->
+                    networkUp = available
                     val error = _state.value.error
                     if (available && config.autoRetryOnReconnect && error?.retryable == true && autoRetries < config.maxAutoRetries) {
                         autoRetries++
@@ -230,6 +243,7 @@ class TelegramPlaybackController(
 
     /** Resolves a library title and starts it. Availability problems come back as errors, without touching the player. */
     suspend fun open(target: PlaybackTarget, mediaId: Long? = null, startPositionMs: Long? = null, playWhenReady: Boolean = true): AppResult<PlayableMedia> {
+        resetRecovery()
         val r = (resolver ?: error("no resolver")).resolve(target, mediaId)
         when (r) {
             is AppResult.Ok -> play(prepareTracks(r.value), startPositionMs, playWhenReady)
@@ -364,6 +378,51 @@ class TelegramPlaybackController(
      */
     fun setFastSeeking(enabled: Boolean) = player.setSeekParameters(if (enabled) SeekParameters.CLOSEST_SYNC else SeekParameters.EXACT)
 
+    private fun resetRecovery() {
+        recoveryJob?.cancel(); recoveryJob = null
+        recoveryRetries = 0; versionSwitches = 0; failedMediaIds.clear(); recovery = null
+    }
+
+    /** Applies [PlaybackConfig.recovery] to an error: retry later, wait for the network, or switch to another version. */
+    private fun recover(error: PlaybackError) {
+        val policy = config.recovery ?: return
+        val m = media ?: return
+        val canSwitch = resolver != null && m.target != null && m.mediaId != null
+        val action = policy.decide(error, recoveryRetries, versionSwitches, networkUp, canSwitch)
+        _recoveryLog.value = (_recoveryLog.value + "${error.kind}: ${error.message.take(120)} → $action").takeLast(20)
+        recoveryJob?.cancel()
+        when (action) {
+            is RecoveryAction.Retry -> {
+                recoveryRetries = action.attempt
+                recovery = "retry ${action.attempt} in ${action.delayMs / 1000} s"
+                recoveryJob = scope.launch(Dispatchers.Main) { delay(action.delayMs); if (!released) retry() }
+            }
+            RecoveryAction.WaitForNetwork -> recovery = "waiting for network"
+            RecoveryAction.SwitchVersion -> {
+                versionSwitches++
+                m.mediaId?.let { failedMediaIds += it }
+                recovery = "switching to another version"
+                val position = player.currentPosition.coerceAtLeast(0)
+                val playWhenReady = player.playWhenReady
+                // Posted, never run inside the player's own error callback.
+                recoveryJob = scope.launch(Dispatchers.Main) {
+                    when (val r = resolver!!.resolveExcluding(m.target!!, failedMediaIds)) {
+                        is AppResult.Ok -> if (!released) {
+                            updateMetrics { it.copy(retries = it.retries + 1) }
+                            val switches = versionSwitches; val failed = failedMediaIds.toSet()
+                            play(prepareTracks(r.value), position, playWhenReady)
+                            versionSwitches = switches; failedMediaIds += failed
+                            recovery = "switched to ${r.value.fileName}"
+                            publish()
+                        }
+                        is AppResult.Err -> { recovery = null; _recoveryLog.value = _recoveryLog.value + "no other version: ${r.error.message}"; publish() }
+                    }
+                }
+            }
+            is RecoveryAction.GiveUp -> recovery = null
+        }
+    }
+
     /** Re-prepares after an error; playback continues from the current position. */
     fun retry() {
         if (player.playerError == null && _state.value.status != PlaybackStatus.ERROR) return
@@ -423,6 +482,7 @@ class TelegramPlaybackController(
             videoWidth = video.width.takeIf { it > 0 } ?: format?.width?.takeIf { it > 0 },
             videoHeight = video.height.takeIf { it > 0 } ?: format?.height?.takeIf { it > 0 },
             seeking = pendingSeekStartNanos != null,
+            recovery = recovery,
         )
     }
 
