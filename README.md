@@ -12,10 +12,12 @@ Catalog) for discovery, and Telegram media playback with Media3 that streams whi
 seeking and next-episode prefetch under strict download limits, and preference-based audio/subtitle
 selection remembered per movie and series, and a fast offline library search (fuzzy, transliteration-aware,
 filters, sorting, paging) with an offline natural-language assistant ("show Telugu movies I haven't
-watched", "what should I watch next?") that needs no AI service, all with plain debug screens and a minimal
+watched", "what should I watch next?") that needs no AI service, and watch intelligence (continue watching, automatic next episode, recently
+watched/added, favorites, abandoned content), all with plain debug screens and a minimal
 test player. Catalogs are information only; what you can watch is always your own Telegram media.
 
 - Architecture, roadmap and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Watch intelligence (progress, next-episode rules, continue watching, abandonment): [docs/WATCH.md](docs/WATCH.md)
 - Local assistant (intents, entities, query plans, optional on-device model): [docs/ASSISTANT.md](docs/ASSISTANT.md)
 - Library search (matching, query interpretation, ranking, benchmark): [docs/SEARCH.md](docs/SEARCH.md)
 - Audio & subtitle tracks (detection, preferences, fallback, memory, external subtitles): [docs/TRACKS.md](docs/TRACKS.md)

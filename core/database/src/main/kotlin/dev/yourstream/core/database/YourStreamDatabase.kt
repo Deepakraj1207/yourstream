@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.AutoMigrationSpec
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.yourstream.core.database.dao.AssistantDao
+import dev.yourstream.core.database.dao.WatchIntelligenceDao
 import dev.yourstream.core.database.dao.CatalogDao
 import dev.yourstream.core.database.dao.IndexRunDao
 import dev.yourstream.core.database.dao.IndexedChatDao
@@ -18,6 +19,7 @@ import dev.yourstream.core.database.dao.ScanCursorDao
 import dev.yourstream.core.database.dao.SearchDao
 import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
+import dev.yourstream.core.database.entity.WatchDismissalEntity
 import dev.yourstream.core.database.entity.AudioTrackEntity
 import dev.yourstream.core.database.entity.CatalogCacheEntity
 import dev.yourstream.core.database.entity.LanguageSettingsEntity
@@ -57,7 +59,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
  * data (favorites, watch state/history, track preferences) · v4 external metadata ·
- * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index.
+ * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index · v8 Continue Watching dismissals.
  */
 @Database(
     entities = [
@@ -92,8 +94,9 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         SearchDocEntity::class,
         SearchFtsEntity::class,
         SearchDirtyEntity::class,
+        WatchDismissalEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -109,6 +112,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 5, to = 6),
         // v7: search index (rebuildable) + its dirty queue; every existing item is queued for indexing.
         AutoMigration(from = 6, to = 7, spec = YourStreamDatabase.V7::class),
+        // v8: "removed from Continue Watching" marks (user data). Adds one table only.
+        AutoMigration(from = 7, to = 8),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
@@ -123,6 +128,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao
     abstract fun searchDao(): SearchDao
     abstract fun assistantDao(): AssistantDao
+    abstract fun watchIntelligenceDao(): WatchIntelligenceDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {

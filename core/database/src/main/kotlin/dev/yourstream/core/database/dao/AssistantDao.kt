@@ -19,6 +19,8 @@ data class AssistantEpisodeRow(
     @ColumnInfo(name = "duration_ms") val durationMs: Long?,
     val completed: Boolean,
     @ColumnInfo(name = "last_watched_at") val lastWatchedAt: Long?,
+    @ColumnInfo(name = "play_count") val playCount: Int = 0,
+    @ColumnInfo(name = "latest_added_at") val latestAddedAt: Long? = null,
 )
 
 /** A library item as the assistant ranks it (from the search index + live watch state). */

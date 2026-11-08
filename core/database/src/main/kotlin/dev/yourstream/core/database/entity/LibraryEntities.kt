@@ -326,3 +326,16 @@ data class AudioTrackEntity(
     val label: String?,
     @ColumnInfo(name = "is_default") val isDefault: Boolean,
 )
+
+/**
+ * "Remove from Continue Watching" (v8). User data: the item stays out of Continue Watching and
+ * counts as abandoned until it is played again after [dismissedAt].
+ */
+@Entity(
+    tableName = "watch_dismissal",
+    foreignKeys = [ForeignKey(LibraryItemEntity::class, ["id"], ["item_id"], onDelete = ForeignKey.CASCADE)],
+)
+data class WatchDismissalEntity(
+    @PrimaryKey @ColumnInfo(name = "item_id") val itemId: Long,
+    @ColumnInfo(name = "dismissed_at") val dismissedAt: Long,
+)

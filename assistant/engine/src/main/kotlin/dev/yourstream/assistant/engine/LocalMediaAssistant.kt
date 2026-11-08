@@ -13,6 +13,8 @@ import dev.yourstream.core.database.dao.AssistantEpisodeRow
 import dev.yourstream.core.database.dao.AssistantItemRow
 import dev.yourstream.core.database.dao.WatchEntryRow
 import dev.yourstream.search.core.ItemKind
+import dev.yourstream.watch.core.EpisodeProgress
+import dev.yourstream.watch.core.NextEpisodePolicy
 import dev.yourstream.search.core.SearchFilters
 import dev.yourstream.search.core.SearchHit
 import dev.yourstream.search.core.SearchRequest
@@ -160,7 +162,8 @@ class LocalMediaAssistant @Inject constructor(
 
         fun query(tail: String) = SimpleSQLiteQuery(
             """SELECT e.id AS episode_id, e.series_id, i.title AS series_title, e.season_number, e.number, e.title, e.available_count,
-                ws.position_ms, ws.duration_ms, IFNULL(ws.completed, 0) AS completed, ws.last_watched_at $from $tail""",
+                ws.position_ms, ws.duration_ms, IFNULL(ws.completed, 0) AS completed, ws.last_watched_at,
+                IFNULL(ws.play_count, 0) AS play_count, e.latest_added_at $from $tail""",
             args.toTypedArray(),
         )
 
@@ -170,13 +173,15 @@ class LocalMediaAssistant @Inject constructor(
     private suspend fun seriesEpisodes(seriesId: Long) =
         dao.episodes(EpisodeWhere(seriesId, null, null, WatchState.ANY, emptySet()).query("ORDER BY e.season_number < 0, e.season_number, e.number"))
 
-    /** The episode to watch next: the one in progress, else the one after the last finished, else the first unwatched. */
+    /** The episode to watch next, by the shared watch-intelligence policy (Phase 12). */
     private suspend fun nextEpisode(seriesId: Long): AssistantEpisodeRow? {
         val eps = seriesEpisodes(seriesId)
-        eps.filter { !it.completed && (it.positionMs ?: 0) > 0 }.maxByOrNull { it.lastWatchedAt ?: 0 }?.let { return it }
-        val last = eps.withIndex().filter { it.value.completed }.maxByOrNull { it.value.lastWatchedAt ?: 0 }
-        if (last != null) eps.drop(last.index + 1).firstOrNull { !it.completed }?.let { return it }
-        return eps.firstOrNull { !it.completed }
+        val byId = eps.associateBy { it.episodeId }
+        val decision = NextEpisodePolicy.decide(eps.map {
+            EpisodeProgress(it.episodeId, it.seasonNumber, it.number, title = it.title, available = it.availableCount > 0, addedAt = it.latestAddedAt,
+                positionMs = it.positionMs ?: 0, durationMs = it.durationMs ?: 0, completed = it.completed, playCount = it.playCount, lastWatchedAt = it.lastWatchedAt)
+        })
+        return decision.episode?.let { byId[it.episodeId] }
     }
 
     // ------------------------------------------------------------------ continue watching

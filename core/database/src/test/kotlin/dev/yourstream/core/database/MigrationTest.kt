@@ -171,4 +171,22 @@ class MigrationTest {
         assertEquals(listOf(1L), db.searchDao().dirty(10))
         db.close()
     }
+
+    @Test
+    fun v7ToV8KeepsWatchDataAndAddsDismissals() = runTest {
+        helper.createDatabase(name, 7).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'MOVIE', 'movie:vikram', 'Vikram', 'vikram', 'vikram', 2022, 'vikram', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, 5)")
+            execSQL("INSERT INTO watch_state VALUES (1, 0, 600000, 6000000, 0, NULL, 0, 5, NULL)")
+            execSQL("INSERT INTO favorite VALUES (1, 3)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 8, true).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        val row = db.watchIntelligenceDao().items(listOf(1L)).single()
+        assertEquals(600000L, row.positionMs, "progress survives")
+        assertEquals(3L, row.favoriteAt, "favorite survives")
+        assertEquals(null, row.dismissedAt)
+        db.close()
+    }
 }

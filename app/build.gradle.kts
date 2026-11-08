@@ -110,6 +110,7 @@ dependencies {
     implementation(projects.playback.media3)
     implementation(projects.search.engine)
     implementation(projects.assistant.engine)
+    implementation(projects.watch.engine)
     implementation(libs.androidx.media3.ui)
     implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)

@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–11 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks; offline search; local media assistant). This document is the reference
+Status: **Phases 1–12 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks; offline search; local media assistant; watch intelligence). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -20,6 +20,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P9 Audio & subtitle tracks | **done** | `:playback:tracks` (language normalization, evidence-based detection that distrusts metadata, preference/fallback selection, remembered per-movie/per-series choices), Media3 glue + external subtitle sideloading, DB v6. See [TRACKS.md](TRACKS.md) |
 | P10 Search | **done** | `:search:core` (normalization, query interpretation, fuzzy/transliteration term index, ranking), `:search:engine` (trigger-maintained denormalized index + FTS4 in DB v7, filters, sorting, pagination), `:core:language`. Benchmarked to 50k items. See [SEARCH.md](SEARCH.md) |
 | P11 Local assistant | **done** | `:assistant:core` (deterministic intent detection + entity extraction → query plan; optional on-device `IntentModel`, validated and merged, never required), `:assistant:engine` (plans run against the library: search, episodes, continue watching, recommendations, play). No cloud AI. See [ASSISTANT.md](ASSISTANT.md) |
+| P12 Watch intelligence | **done** | `:watch:core` (pure next-episode, completion, abandonment and Continue Watching ordering policies), `:watch:engine` (live Continue Watching / Next Episode / Recently Watched / Recently Added / Favorites / Abandoned, per-item watch facts), DB v8 (`watch_dismissal`). See [WATCH.md](WATCH.md) |
 
 ---
 

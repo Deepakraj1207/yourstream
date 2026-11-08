@@ -20,6 +20,7 @@ android {
 dependencies {
     api(projects.assistant.core)
     api(projects.search.engine)
+    implementation(projects.watch.core)
     implementation(projects.core.database)
     implementation(projects.core.common)
     implementation(libs.kotlinx.coroutines.android)
