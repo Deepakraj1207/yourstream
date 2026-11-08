@@ -4,6 +4,7 @@ import dev.yourstream.core.common.AppError
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
+import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.media.api.model.IndexMode
 import dev.yourstream.media.api.model.IndexPhase
 import dev.yourstream.media.api.model.IndexProgress
@@ -51,6 +52,7 @@ class IndexingEngine @Inject constructor(
     private val clock: Clock,
     private val logger: Logger,
     private val config: EngineConfig,
+    private val listeners: Set<@JvmSuppressWildcards MediaIndexListener>,
 ) {
     private val concurrency = Semaphore(config.maxConcurrentChats)
 
@@ -142,6 +144,7 @@ class IndexingEngine @Inject constructor(
         if (result.outcome == Outcome.COMPLETED) store.markIndexed(result.chatId)
         store.setState(result.chatId, state, result.error.takeIf { state == IndexState.FAILED || state == IndexState.CANCELLED })
         tracker.clear(result.chatId)
+        if (result.mediaAdded + result.mediaUpdated + result.mediaDeleted > 0) listeners.forEach { it.onIndexChanged() }
     }
 
     // ---------------- scanning ----------------

@@ -4,11 +4,13 @@ import android.content.Context
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.Multibinds
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.database.YourStreamDatabase
+import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.media.api.MediaIndexRepository
 import dev.yourstream.media.api.MediaIndexer
 import dev.yourstream.media.indexer.DefaultMediaIndexer
@@ -27,6 +29,9 @@ abstract class IndexerModule {
     @Binds abstract fun store(impl: RoomIndexStore): IndexStore
     @Binds abstract fun repository(impl: RoomMediaIndexRepository): MediaIndexRepository
     @Binds abstract fun indexer(impl: DefaultMediaIndexer): MediaIndexer
+
+    /** Other modules (the library) add themselves; empty is fine. */
+    @Multibinds abstract fun indexListeners(): Set<MediaIndexListener>
 
     companion object {
         @Provides @Singleton

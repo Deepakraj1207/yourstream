@@ -2,6 +2,7 @@ package dev.yourstream.media.indexer.reparse
 
 import androidx.room.withTransaction
 import dev.yourstream.core.common.Logger
+import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.core.database.YourStreamDatabase
 import dev.yourstream.media.indexer.store.toEntity
 import dev.yourstream.media.parser.MediaNormalizer
@@ -19,6 +20,7 @@ import javax.inject.Singleton
 class MediaReparser @Inject constructor(
     private val db: YourStreamDatabase,
     private val logger: Logger,
+    private val listeners: Set<@JvmSuppressWildcards MediaIndexListener>,
 ) {
     private val media = db.mediaDao()
 
@@ -43,7 +45,10 @@ class MediaReparser @Inject constructor(
             done += rows.size
             yield()
         }
-        if (done > 0) logger.i(TAG, "re-parsed $done records with parser v$version")
+        if (done > 0) {
+            logger.i(TAG, "re-parsed $done records with parser v$version")
+            listeners.forEach { it.onIndexChanged() }
+        }
         return done
     }
 

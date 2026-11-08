@@ -68,7 +68,7 @@ class SearchAndLiveTest {
     @Test
     fun liveUpdatesInsertAndDeleteForEnabledChatsOnly() = runTest {
         indexSample()
-        val live = LiveIndexUpdater(env.telegram, NoFiles, env.store, env.normalizer, NoOpLogger)
+        val live = LiveIndexUpdater(env.telegram, NoFiles, env.store, env.normalizer, NoOpLogger, emptySet())
 
         live.handle(TelegramMessageEvent.NewMediaMessage(mediaMessage(chat, 50, "Leo.2023.720p.mkv")))
         assertEquals(listOf(50L), searchIds("leo"))

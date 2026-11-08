@@ -75,7 +75,7 @@ class ParsedMetadataTest {
         env.db.mediaDao().setSearchTitle(id, "garbage")
         env.telegram.calls.clear()
 
-        val reparser = MediaReparser(env.db, NoOpLogger)
+        val reparser = MediaReparser(env.db, NoOpLogger, emptySet())
         assertEquals(1, reparser.outdatedCount())
         assertEquals(1, reparser.run(batchSize = 1))
 
@@ -96,7 +96,7 @@ class ParsedMetadataTest {
         val dao = env.db.mediaDao()
         (1..450L).forEach { m -> val key = dao.findKey(chat, m)!!; dao.upsertParsed(dao.getWithParsed(key.id)!!.parsed!!.copy(parserVersion = 1)) }
 
-        assertEquals(450, MediaReparser(env.db, NoOpLogger).run(batchSize = 100))
+        assertEquals(450, MediaReparser(env.db, NoOpLogger, emptySet()).run(batchSize = 100))
         assertEquals(0, dao.countOutdatedParses(MediaFilenameParser.VERSION))
     }
 }

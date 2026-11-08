@@ -1,6 +1,7 @@
 package dev.yourstream.media.indexer
 
 import dev.yourstream.core.database.YourStreamDatabase
+import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.media.api.model.IndexState
 import dev.yourstream.media.indexer.live.LiveIndexUpdater
 import dev.yourstream.media.indexer.reparse.MediaReparser
@@ -16,6 +17,7 @@ class IndexerInitializer @Inject constructor(
     private val live: LiveIndexUpdater,
     private val scheduler: IndexScheduler,
     private val reparser: MediaReparser,
+    private val listeners: Set<@JvmSuppressWildcards MediaIndexListener>,
 ) {
     suspend fun start(scope: CoroutineScope) {
         // A process that died mid-run left RUNNING behind; WorkManager will run that work again.
@@ -23,5 +25,7 @@ class IndexerInitializer @Inject constructor(
         live.start(scope)
         scheduler.ensurePeriodicSync()
         if (reparser.outdatedCount() > 0) scheduler.scheduleReparse()
+        // Let listeners (the library) catch up with anything queued before this start.
+        listeners.forEach { it.onIndexChanged() }
     }
 }

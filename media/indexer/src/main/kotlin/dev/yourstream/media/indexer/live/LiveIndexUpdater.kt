@@ -2,6 +2,7 @@ package dev.yourstream.media.indexer.live
 
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.core.common.Logger
+import dev.yourstream.media.api.MediaIndexListener
 import dev.yourstream.media.indexer.store.IndexStore
 import dev.yourstream.media.parser.MediaNormalizer
 import dev.yourstream.telegram.api.TelegramFileRepository
@@ -29,6 +30,7 @@ class LiveIndexUpdater @Inject constructor(
     private val store: IndexStore,
     private val normalizer: MediaNormalizer,
     private val logger: Logger,
+    private val listeners: Set<@JvmSuppressWildcards MediaIndexListener>,
 ) {
     private var jobs: List<Job> = emptyList()
 
@@ -43,6 +45,11 @@ class LiveIndexUpdater @Inject constructor(
     suspend fun handle(event: TelegramMessageEvent) {
         val chat = store.chat(event.chatId) ?: return
         if (!chat.enabled) return
+        apply(event, chat)
+        listeners.forEach { it.onIndexChanged() }
+    }
+
+    private suspend fun apply(event: TelegramMessageEvent, chat: dev.yourstream.media.indexer.store.ChatRecord) {
         when (event) {
             is TelegramMessageEvent.NewMediaMessage -> {
                 val item = normalizer.normalize(event.message, chat.title) ?: return

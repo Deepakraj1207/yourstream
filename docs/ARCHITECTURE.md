@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–3 implemented** (Telegram layer; media discovery and indexing; filename parsing). This document is the reference
+Status: **Phases 1–4 implemented** (Telegram layer; indexing; filename parsing; local library). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -12,6 +12,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P1 Telegram core | **done** | `:core:common`, `:telegram:api`, `:telegram:core`, `:telegram:tdlib`, debug UI in `:app`. See §14 |
 | P2 (= roadmap P3 + basic P4) Indexing | **done** | `:core:database`, `:media:api`, `:media:parser`, `:media:indexer`. See [INDEXING.md](INDEXING.md) |
 | P3 (= roadmap P4) Filename parsing | **done** | Standalone `:media:filename`, DB v2, re-parse worker. See [PARSER.md](PARSER.md) |
+| P4 (= roadmap P7 + parts of P9) Library | **done** | `:library`, DB v3: items/seasons/episodes/versions, watch state & history, favorites, tracks. See [LIBRARY.md](LIBRARY.md) |
 
 ---
 

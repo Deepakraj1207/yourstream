@@ -1,6 +1,5 @@
 package dev.yourstream.media.indexer
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import dev.yourstream.core.common.AppError
 import dev.yourstream.core.common.AppResult
@@ -116,15 +115,14 @@ fun mediaMessage(
 /** Real Room (in memory) + real engine + fake Telegram. */
 class IndexerTestEnv {
     val clock = TestClock()
-    val db: YourStreamDatabase = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java)
-        .allowMainThreadQueries()
-        .build()
+    val db: YourStreamDatabase = YourStreamDatabase.inMemory(ApplicationProvider.getApplicationContext())
     val telegram = FakeMessageRepository(clock)
     val tracker = IndexProgressTracker()
     val store = RoomIndexStore(db, clock)
     val normalizer = MediaNormalizer()
     val config = EngineConfig(pageSize = 3, pageDelay = 0.milliseconds, retryBaseDelay = 10.milliseconds, verifyBatch = 2)
-    val engine = IndexingEngine(telegram, store, normalizer, tracker, clock, NoOpLogger, config)
+    var indexChanges = 0
+    val engine = IndexingEngine(telegram, store, normalizer, tracker, clock, NoOpLogger, config, setOf(dev.yourstream.media.api.MediaIndexListener { indexChanges++ }))
     val repository = RoomMediaIndexRepository(db, tracker)
 
     suspend fun enable(chatId: Long, title: String = "Chat $chatId") {

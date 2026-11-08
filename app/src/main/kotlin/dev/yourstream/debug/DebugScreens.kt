@@ -58,7 +58,7 @@ import java.util.Date
 // Stage-1 debug UI: plain, functional, intentionally unstyled. Do not polish; Stage 2 replaces it.
 
 @Composable
-fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel) {
+fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: LibraryDebugViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     val status by vm.status.collectAsStateWithLifecycle()
     val connection by vm.connection.collectAsStateWithLifecycle()
@@ -79,7 +79,7 @@ fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel) {
                     TextButton(onClick = vm::toggleLogs) { Text(if (showLogs) "Hide logs" else "Logs") }
                 }
                 Row {
-                    listOf("Telegram", "Index & search").forEachIndexed { i, name ->
+                    listOf("Telegram", "Index & search", "Library").forEachIndexed { i, name ->
                         TextButton(onClick = { tab = i }) { Text(if (tab == i) "[$name]" else name) }
                     }
                 }
@@ -95,6 +95,7 @@ fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel) {
                         LogsPane(vm)
                     }
                     tab == 1 -> IndexPane(indexVm)
+                    tab == 2 -> LibraryPane(libraryVm)
                     selected != null -> {
                         BackHandler { vm.clearSelection() }
                         ChatDetailsPane(vm, indexVm)
