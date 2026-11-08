@@ -26,6 +26,16 @@ import dev.yourstream.library.usecase.SearchMedia
 import dev.yourstream.library.usecase.SyncLibrary
 import dev.yourstream.library.usecase.ToggleFavorite
 import dev.yourstream.library.usecase.UpdateWatchProgress
+import dev.yourstream.metadata.api.MetadataRef
+import dev.yourstream.metadata.core.match.ScoredCandidate
+import dev.yourstream.metadata.sync.ConfirmMetadataMatch
+import dev.yourstream.metadata.sync.ItemMatch
+import dev.yourstream.metadata.sync.ItemMetadata
+import dev.yourstream.metadata.sync.MatchLibraryMetadata
+import dev.yourstream.metadata.sync.MetadataRepository
+import dev.yourstream.metadata.sync.RejectMetadataMatch
+import dev.yourstream.metadata.sync.RematchItem
+import dev.yourstream.metadata.sync.SearchMetadataCandidates
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +65,12 @@ class LibraryDebugViewModel @Inject constructor(
     private val media: MediaRepository,
     private val episodesRepo: EpisodeRepository,
     continueWatching: GetContinueWatching,
+    private val metadataRepo: MetadataRepository,
+    private val matchMetadata: MatchLibraryMetadata,
+    private val searchCandidates: SearchMetadataCandidates,
+    private val confirmMatch: ConfirmMetadataMatch,
+    private val rejectMatch: RejectMetadataMatch,
+    private val rematchItem: RematchItem,
 ) : ViewModel() {
 
     private val _query = MutableStateFlow(LibraryQuery())
@@ -73,6 +89,29 @@ class LibraryDebugViewModel @Inject constructor(
     val episodes: Flow<PagingData<Episode>> = _details.flatMapLatest { d ->
         if (d == null || d.summary.kind != LibraryKind.SERIES) emptyFlow() else _seasonId.flatMapLatest { getEpisodes(d.summary.id, it) }
     }.cachedIn(viewModelScope)
+
+    // ---- metadata (Phase 5) ----
+    val itemMetadata: StateFlow<ItemMetadata?> = _details.flatMapLatest { d -> d?.let { metadataRepo.itemMetadata(it.summary.id) } ?: kotlinx.coroutines.flow.flowOf(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val itemMatch: StateFlow<ItemMatch?> = _details.flatMapLatest { d -> d?.let { metadataRepo.match(it.summary.id) } ?: kotlinx.coroutines.flow.flowOf(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val matchCounts: StateFlow<Map<String, Int>> = metadataRepo.statusCounts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    private val _searchResults = MutableStateFlow<List<ScoredCandidate>>(emptyList())
+    val searchResults: StateFlow<List<ScoredCandidate>> = _searchResults.asStateFlow()
+
+    fun providersLine(): String = "providers: " + metadataRepo.configuredProviders().joinToString().ifEmpty { "none configured" } + " · " +
+        metadataRepo.providerStatus().joinToString { "${it.provider}=${it.state}" }
+
+    fun runMetadata() = viewModelScope.launch { _message.value = "Metadata: ${matchMetadata()}" }
+    fun rematch(itemId: Long) = viewModelScope.launch { _message.value = "Rematch: ${rematchItem(itemId)?.decision}"; refresh() }
+    fun reject(itemId: Long) = viewModelScope.launch { rejectMatch(itemId); _message.value = "Rejected" }
+    fun confirm(itemId: Long, ref: MetadataRef) = viewModelScope.launch {
+        _message.value = when (val r = confirmMatch(itemId, ref)) { is AppResult.Ok -> "Confirmed ${ref.provider}:${ref.id}"; is AppResult.Err -> r.error.message }
+        _searchResults.value = emptyList(); refresh()
+    }
+    fun searchMetadata(itemId: Long, title: String) = viewModelScope.launch {
+        _searchResults.value = searchCandidates(itemId, title.ifBlank { null })?.candidates.orEmpty()
+    }
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()

@@ -11,6 +11,7 @@ import androidx.room.Upsert
 import androidx.sqlite.db.SupportSQLiteQuery
 import dev.yourstream.core.database.entity.EpisodeEntity
 import dev.yourstream.core.database.entity.FavoriteEntity
+import dev.yourstream.core.database.entity.ItemMetadataEntity
 import dev.yourstream.core.database.entity.LibraryAliasEntity
 import dev.yourstream.core.database.entity.LibraryItemEntity
 import dev.yourstream.core.database.entity.LibraryItemLanguageEntity
@@ -295,13 +296,13 @@ interface LibraryDao {
     // ================================================================ lists
 
     /** Filtered/sorted lists are built by LibraryQueryBuilder (whitelisted SQL, bound arguments). */
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     fun itemsPaged(query: SupportSQLiteQuery): PagingSource<Int, LibraryItemRow>
 
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     suspend fun items(query: SupportSQLiteQuery): List<LibraryItemRow>
 
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     fun count(query: SupportSQLiteQuery): Flow<Int>
 
     // ================================================================ favorites

@@ -21,7 +21,8 @@ object LibraryQueryBuilder {
 
     private const val COLUMNS = """i.id, i.kind, i.title, i.year, i.available_count, i.season_count, i.episode_count, i.watched_count,
         i.max_resolution, i.total_size, i.added_at, i.latest_added_at, i.last_watched_at,
-        (f.item_id IS NOT NULL) AS is_favorite, ws.position_ms, ws.duration_ms, COALESCE(ws.completed, 0) AS completed"""
+        (f.item_id IS NOT NULL) AS is_favorite, ws.position_ms, ws.duration_ms, COALESCE(ws.completed, 0) AS completed,
+        im.poster_url, im.title AS metadata_title"""
 
     private const val SERIES_WATCHED = "(i.kind = 'SERIES' AND i.episode_count > 0 AND i.watched_count >= i.episode_count)"
     private const val ITEM_WATCHED = "(i.kind != 'SERIES' AND ws.completed = 1)"
@@ -31,6 +32,7 @@ object LibraryQueryBuilder {
         val where = mutableListOf<String>()
         val joins = StringBuilder("LEFT JOIN favorite f ON f.item_id = i.id ")
         joins.append("LEFT JOIN watch_state ws ON ws.item_id = i.id AND ws.episode_key = 0 ")
+        joins.append("LEFT JOIN item_metadata im ON im.item_id = i.id ")
 
         val match = ftsMatch(q.text)
         if (match != null) {
@@ -64,7 +66,7 @@ object LibraryQueryBuilder {
     /** One item by id, unfiltered (details screens). */
     fun byId(id: Long): Sql = Sql(
         "SELECT $COLUMNS FROM library_item i LEFT JOIN favorite f ON f.item_id = i.id " +
-            "LEFT JOIN watch_state ws ON ws.item_id = i.id AND ws.episode_key = 0 WHERE i.id = ?",
+            "LEFT JOIN watch_state ws ON ws.item_id = i.id AND ws.episode_key = 0 LEFT JOIN item_metadata im ON im.item_id = i.id WHERE i.id = ?",
         listOf(id),
     )
 

@@ -33,6 +33,14 @@ val telegramApiId = secret("telegram.apiId", "TELEGRAM_API_ID").ifEmpty { "0" }
 val telegramApiHash = secret("telegram.apiHash", "TELEGRAM_API_HASH")
 val telegramUseTestDc = secret("telegram.useTestDc", "TELEGRAM_USE_TEST_DC").ifEmpty { "false" }
 
+// Metadata providers (docs/METADATA.md). TMDB is optional: without a key, Cinemeta alone is used.
+val tmdbApiKey = secret("tmdb.apiKey", "TMDB_API_KEY")
+val tmdbReadToken = secret("tmdb.readToken", "TMDB_READ_TOKEN")
+val metadataProviders = secret("metadata.providers", "METADATA_PROVIDERS").ifEmpty { "tmdb,cinemeta" }
+val metadataLanguage = secret("metadata.language", "METADATA_LANGUAGE").ifEmpty { "en" }
+
+fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 require(telegramApiId.toIntOrNull() != null) { "telegram.apiId must be an integer, got '$telegramApiId'" }
 require(telegramApiHash.matches(Regex("[0-9a-fA-F]*"))) { "telegram.apiHash must be hexadecimal" }
 
@@ -50,6 +58,10 @@ android {
         buildConfigField("int", "TELEGRAM_API_ID", telegramApiId)
         buildConfigField("String", "TELEGRAM_API_HASH", "\"$telegramApiHash\"")
         buildConfigField("boolean", "TELEGRAM_USE_TEST_DC", telegramUseTestDc.toBoolean().toString())
+        buildConfigField("String", "TMDB_API_KEY", quoted(tmdbApiKey))
+        buildConfigField("String", "TMDB_READ_TOKEN", quoted(tmdbReadToken))
+        buildConfigField("String", "METADATA_PROVIDERS", quoted(metadataProviders))
+        buildConfigField("String", "METADATA_LANGUAGE", quoted(metadataLanguage))
     }
 
     buildFeatures {
@@ -78,6 +90,8 @@ dependencies {
     implementation(projects.media.indexer)
     implementation(projects.media.filename)
     implementation(projects.library)
+    implementation(projects.metadata.sync)
+    implementation(projects.metadata.tmdb)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.paging.compose)

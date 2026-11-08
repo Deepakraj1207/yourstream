@@ -64,6 +64,10 @@ data class LibraryItemSummary(
     val isFavorite: Boolean,
     /** Movie/video progress (series: null; see watchedEpisodeCount). */
     val progress: WatchProgress?,
+    /** From matched external metadata (Phase 5), when available. */
+    val posterUrl: String? = null,
+    /** Official title from external metadata, when matched (title stays the library's own). */
+    val metadataTitle: String? = null,
 ) {
     val isAvailable: Boolean get() = availableCount > 0
     val unwatchedEpisodeCount: Int get() = (episodeCount - watchedEpisodeCount).coerceAtLeast(0)

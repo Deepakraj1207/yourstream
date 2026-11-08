@@ -29,6 +29,8 @@ class YourStreamApp : Application(), Configuration.Provider {
             telegram.start()
             // Live index updates + periodic background sync.
             indexer.start(appScope)
+            // External metadata: periodic retries/refresh; matching also follows index changes.
+            dev.yourstream.metadata.sync.MetadataSyncWorker.schedule(this@YourStreamApp)
         }
     }
 }

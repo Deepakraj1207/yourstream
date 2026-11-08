@@ -100,4 +100,20 @@ class MigrationTest {
         assertEquals(listOf(9L), db.libraryDao().pendingMedia(10))
         db.close()
     }
+
+    @Test
+    fun v3ToV4AddsMetadataTablesWithoutTouchingTheLibrary() = runTest {
+        helper.createDatabase(name, 3).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'MOVIE', 'movie:leo:2023', 'Leo', 'leo', 'leo', 2023, 'leo', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, NULL)")
+            execSQL("INSERT INTO favorite VALUES (1, 5)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 4, true).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        assertEquals("Leo", db.libraryDao().item(1)!!.title)
+        assertEquals(true, db.libraryDao().isFavorite(1))
+        assertEquals(listOf(1L), db.metadataDao().matchWork(now = 0, limit = 10).map { it.id }, "existing items are queued for matching")
+        db.close()
+    }
 }

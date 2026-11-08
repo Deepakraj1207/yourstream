@@ -32,6 +32,8 @@ internal fun LibraryItemRow.toModel() = LibraryItemSummary(
     episodeCount = episodeCount, watchedEpisodeCount = watchedCount, maxResolution = maxResolution, totalSize = totalSize,
     addedAt = addedAt, latestAddedAt = latestAddedAt, lastWatchedAt = lastWatchedAt, isFavorite = isFavorite,
     progress = positionMs?.let { WatchProgress(it, durationMs ?: 0, completed, lastWatchedAt) },
+    posterUrl = posterUrl,
+    metadataTitle = metadataTitle,
 )
 
 internal fun EpisodeRow.toModel() = Episode(

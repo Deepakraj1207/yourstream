@@ -55,6 +55,8 @@ data class LibraryItemRow(
     @ColumnInfo(name = "position_ms") val positionMs: Long?,
     @ColumnInfo(name = "duration_ms") val durationMs: Long?,
     val completed: Boolean,
+    @ColumnInfo(name = "poster_url") val posterUrl: String?,
+    @ColumnInfo(name = "metadata_title") val metadataTitle: String?,
 )
 
 data class EpisodeRow(

@@ -10,6 +10,9 @@ import dagger.hilt.components.SingletonComponent
 import dev.yourstream.BuildConfig
 import dev.yourstream.core.common.Logger
 import dev.yourstream.log.AppLogger
+import dev.yourstream.metadata.sync.MetadataProviderOrder
+import dev.yourstream.metadata.sync.MetadataSettings
+import dev.yourstream.metadata.tmdb.TmdbConfig
 import dev.yourstream.telegram.api.model.TelegramConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +38,19 @@ object AppModule {
     @Provides
     @Singleton
     fun logger(appLogger: AppLogger): Logger = appLogger
+
+    /** TMDB credentials from BuildConfig (local/secrets properties or env); never in source. */
+    @Provides
+    @Singleton
+    fun tmdbConfig(): TmdbConfig = TmdbConfig(apiKey = BuildConfig.TMDB_API_KEY, readToken = BuildConfig.TMDB_READ_TOKEN)
+
+    @Provides
+    @Singleton
+    fun metadataOrder(): MetadataProviderOrder = MetadataProviderOrder(BuildConfig.METADATA_PROVIDERS.split(',').map { it.trim() }.filter { it.isNotEmpty() })
+
+    @Provides
+    @Singleton
+    fun metadataSettings(): MetadataSettings = MetadataSettings(language = BuildConfig.METADATA_LANGUAGE.ifBlank { null })
 
     /**
      * Telegram configuration. API id/hash come from BuildConfig, which the build fills from

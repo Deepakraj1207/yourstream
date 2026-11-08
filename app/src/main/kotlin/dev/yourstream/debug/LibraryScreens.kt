@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -81,8 +82,11 @@ private fun ListPane(vm: LibraryDebugViewModel) {
             TextButton(onClick = vm::toggleUnavailable) { Text(if (query.includeUnavailable) "[unavailable]" else "unavailable", fontSize = 12.sp) }
             TextButton(onClick = { vm.setLanguage(if (query.language == "ta") null else "ta") }) { Text(if (query.language == "ta") "[ta]" else "ta", fontSize = 12.sp) }
             TextButton(onClick = vm::syncNow) { Text("sync now", fontSize = 12.sp) }
+            TextButton(onClick = vm::runMetadata) { Text("match metadata", fontSize = 12.sp) }
         }
-        Text("$count items", fontSize = 12.sp)
+        val counts by vm.matchCounts.collectAsStateWithLifecycle()
+        Text("$count items · metadata: ${counts.entries.joinToString { "${it.key} ${it.value}" }.ifEmpty { "none yet" }}", fontSize = 12.sp)
+        Text(vm.providersLine(), fontSize = 10.sp)
         LazyColumn(Modifier.weight(1f)) {
             items(count = items.itemCount, key = items.itemKey { it.id }) { i -> items[i]?.let { ItemRow(it) { vm.open(it.id) } } }
         }
@@ -95,7 +99,8 @@ private fun LibraryDebugViewModel.results() = items.collectAsLazyPagingItems()
 @Composable
 private fun ItemRow(item: LibraryItemSummary, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 5.dp)) {
-        Text((if (item.isFavorite) "★ " else "") + item.title + (item.year?.let { " ($it)" } ?: ""), fontSize = 13.sp)
+        Text((if (item.isFavorite) "★ " else "") + item.title + (item.year?.let { " ($it)" } ?: "") +
+            (item.metadataTitle?.takeIf { it != item.title }?.let { "  → $it" } ?: "") + (if (item.posterUrl != null) "  🖼" else ""), fontSize = 13.sp)
         Text(
             listOfNotNull(
                 "#${item.id}", item.kind.name,
@@ -134,6 +139,7 @@ private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails) {
                 singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
             TextButton(onClick = { mergeTarget.toLongOrNull()?.let(vm::mergeInto) }) { Text("Merge") }
         }
+        MetadataSection(vm, s.id)
         if (d.versions.isNotEmpty()) {
             Text("Versions", fontSize = 12.sp)
             Column(Modifier.heightIn(max = 160.dp)) {
@@ -175,3 +181,47 @@ private fun size(n: Long): String = when {
     n >= 1L shl 30 -> String.format(Locale.US, "%.2f GB", n / (1L shl 30).toDouble())
     else -> String.format(Locale.US, "%.0f MB", n / (1L shl 20).toDouble())
 }
+
+@Composable
+private fun MetadataSection(vm: LibraryDebugViewModel, itemId: Long) {
+    val meta by vm.itemMetadata.collectAsStateWithLifecycle()
+    val match by vm.itemMatch.collectAsStateWithLifecycle()
+    val results by vm.searchResults.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
+    HorizontalDivider()
+    Column(Modifier.heightIn(max = 260.dp).verticalScrollCompat()) {
+        Text("Metadata: ${match?.status ?: "not matched yet"}" + (match?.let { m -> " · ${m.provider ?: "—"}:${m.externalId ?: "—"} · confidence ${"%.2f".format(Locale.US, m.confidence)}" } ?: "") +
+            (match?.lastError?.let { " · error: $it" } ?: ""), fontSize = 12.sp)
+        meta?.let { m ->
+            Text("${m.title}${m.originalTitle?.takeIf { o -> o != m.title }?.let { " / $it" } ?: ""} (${m.year ?: "?"}) · ${m.genres.joinToString()} · lang ${m.originalLanguage ?: "?"}" +
+                (m.runtimeMinutes?.let { " · ${it}min" } ?: "") + (m.rating?.let { " · ★$it" } ?: "") + (m.imdbId?.let { " · $it" } ?: ""), fontSize = 11.sp)
+            m.overview?.let { Text(it.take(300), fontSize = 11.sp) }
+            Text("poster: ${m.posterUrl ?: "—"}", fontSize = 10.sp)
+            Text("backdrop: ${m.backdropUrl ?: "—"}", fontSize = 10.sp)
+            if (m.cast.isNotEmpty()) Text("cast: ${m.cast.take(6).joinToString { c -> c.name + (c.character?.let { " ($it)" } ?: "") }}", fontSize = 10.sp)
+        }
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            TextButton(onClick = { vm.rematch(itemId) }) { Text("Rematch", fontSize = 12.sp) }
+            TextButton(onClick = { vm.reject(itemId) }) { Text("Reject / no metadata", fontSize = 12.sp) }
+        }
+        val candidates = results.ifEmpty { match?.candidates.orEmpty() }
+        candidates.forEach { c ->
+            Row {
+                Text(
+                    "${"%.2f".format(Locale.US, c.confidence)} ${c.candidate.title} (${c.candidate.year ?: "?"}) ${c.candidate.ref.type} " +
+                        "[${c.candidate.ref.provider}:${c.candidate.ref.id}] t=${"%.2f".format(Locale.US, c.breakdown.title)} y=${c.breakdown.year} l=${c.breakdown.language}" +
+                        (if (c.breakdown.ambiguityPenalty > 0) " ambiguous" else "") + (c.breakdown.capped?.let { " ($it)" } ?: ""),
+                    fontSize = 10.sp, modifier = Modifier.weight(1f).padding(top = 10.dp),
+                )
+                TextButton(onClick = { vm.confirm(itemId, c.candidate.ref) }) { Text("Use this", fontSize = 11.sp) }
+            }
+        }
+        Row {
+            OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("search metadata as…") }, singleLine = true, modifier = Modifier.weight(1f))
+            TextButton(onClick = { vm.searchMetadata(itemId, query) }) { Text("Search") }
+        }
+    }
+}
+
+@Composable
+private fun Modifier.verticalScrollCompat(): Modifier = this.then(Modifier.verticalScroll(rememberScrollState()))

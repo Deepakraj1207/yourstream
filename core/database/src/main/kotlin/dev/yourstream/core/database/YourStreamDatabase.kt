@@ -10,11 +10,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.yourstream.core.database.dao.IndexRunDao
 import dev.yourstream.core.database.dao.IndexedChatDao
 import dev.yourstream.core.database.dao.LibraryDao
+import dev.yourstream.core.database.dao.MetadataDao
 import dev.yourstream.core.database.dao.MediaDao
 import dev.yourstream.core.database.dao.ScanCursorDao
 import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
 import dev.yourstream.core.database.entity.AudioTrackEntity
+import dev.yourstream.core.database.entity.EpisodeMetadataEntity
+import dev.yourstream.core.database.entity.ItemMetadataEntity
+import dev.yourstream.core.database.entity.MetadataCacheEntity
+import dev.yourstream.core.database.entity.MetadataMatchEntity
+import dev.yourstream.core.database.entity.SeasonMetadataEntity
 import dev.yourstream.core.database.entity.EpisodeEntity
 import dev.yourstream.core.database.entity.FavoriteEntity
 import dev.yourstream.core.database.entity.IndexRunEntity
@@ -42,7 +48,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  * missing migration fails loudly instead of wiping user data.
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
- * data (favorites, watch state/history, track preferences).
+ * data (favorites, watch state/history, track preferences) · v4 external metadata.
  */
 @Database(
     entities = [
@@ -67,14 +73,21 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         TrackPreferenceEntity::class,
         SubtitleTrackEntity::class,
         AudioTrackEntity::class,
+        MetadataCacheEntity::class,
+        MetadataMatchEntity::class,
+        ItemMetadataEntity::class,
+        SeasonMetadataEntity::class,
+        EpisodeMetadataEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
         AutoMigration(from = 1, to = 2),
         // v3: library + user data tables. Only adds tables; existing rows are untouched.
         AutoMigration(from = 2, to = 3, spec = YourStreamDatabase.V3::class),
+        // v4: external metadata (cache, matches, applied item/season/episode metadata). Adds tables only.
+        AutoMigration(from = 3, to = 4),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
@@ -85,6 +98,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun libraryDao(): LibraryDao
     abstract fun watchDao(): WatchDao
     abstract fun trackDao(): TrackDao
+    abstract fun metadataDao(): MetadataDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {

@@ -36,5 +36,10 @@ public sealed interface AppError {
         override val message: String get() = "Telegram error $code: $rawMessage"
     }
 
+    /** A remote service answered with an error status (HTTP 4xx/5xx other than the above). */
+    public data class Remote(val status: Int, override val message: String) : AppError {
+        val isServerError: Boolean get() = status >= 500
+    }
+
     public data class Unknown(override val message: String, val cause: Throwable? = null) : AppError
 }
