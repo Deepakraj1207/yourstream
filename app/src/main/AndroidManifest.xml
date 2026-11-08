@@ -28,6 +28,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Stage-1 test player. Handles rotation itself so playback is not interrupted. -->
+        <activity
+            android:name=".debug.PlayerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="false" />
+
         <!-- WorkManager is initialised by YourStreamApp (Hilt worker factory), not by App Startup. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

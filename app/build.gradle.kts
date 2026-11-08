@@ -100,6 +100,8 @@ dependencies {
     implementation(projects.metadata.tmdb)
     implementation(projects.catalog.sync)
     implementation(projects.catalog.indian)
+    implementation(projects.playback.media3)
+    implementation(libs.androidx.media3.ui)
     implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)

@@ -19,6 +19,8 @@ class DebugActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel, catalogViewModel) }
+        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel, catalogViewModel) { target, mediaId ->
+            startActivity(PlayerActivity.intent(this, target, mediaId))
+        } }
     }
 }

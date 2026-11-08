@@ -38,14 +38,14 @@ import java.util.Locale
 // Stage-1 debug UI for the library. Plain on purpose.
 
 @Composable
-fun LibraryPane(vm: LibraryDebugViewModel) {
+fun LibraryPane(vm: LibraryDebugViewModel, onPlay: (PlaybackTarget, Long?) -> Unit) {
     val details by vm.details.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     message?.let { Text(it, fontSize = 12.sp, modifier = Modifier.clickable { vm.dismissMessage() }) }
     val d = details
     if (d != null) {
         BackHandler { vm.close() }
-        ItemPane(vm, d)
+        ItemPane(vm, d, onPlay)
     } else {
         ListPane(vm)
     }
@@ -116,7 +116,7 @@ private fun ItemRow(item: LibraryItemSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails) {
+private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails, onPlay: (PlaybackTarget, Long?) -> Unit) {
     val s = d.summary
     val seasonId by vm.seasonId.collectAsStateWithLifecycle()
     val episodes = vm.episodes.collectAsLazyPagingItems()
@@ -126,6 +126,7 @@ private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails) {
         Text("#${s.id} ${s.kind}: ${s.title}${s.year?.let { " ($it)" } ?: ""}${if (d.locked) " [locked]" else ""}${if (d.hidden) " [hidden]" else ""}")
         Text("key: ${d.normalizedTitle} · languages: ${d.languages.joinToString().ifEmpty { "—" }} · files: ${s.availableCount} · ${size(s.totalSize)}", fontSize = 11.sp)
         Row(Modifier.horizontalScroll(rememberScrollState())) {
+            if (s.kind != LibraryKind.SERIES) TextButton(onClick = { onPlay(PlaybackTarget(s.id), null) }) { Text("▶ Play") }
             TextButton(onClick = { vm.favorite(s.id, !s.isFavorite) }) { Text(if (s.isFavorite) "Unfavorite" else "Favorite") }
             if (s.kind != LibraryKind.SERIES) {
                 TextButton(onClick = { vm.simulatePlayback(PlaybackTarget(s.id), s.progress?.positionMs) }) { Text("Play +20%") }
@@ -144,8 +145,12 @@ private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails) {
             Text("Versions", fontSize = 12.sp)
             Column(Modifier.heightIn(max = 160.dp)) {
                 d.versions.forEach { v ->
-                    Text("• ${v.fileName} · ${v.resolution?.let { "${it}p" } ?: "?"} · ${size(v.sizeBytes)}" +
-                        (if (v.isDuplicate) " · dup" else "") + (if (v.isDeleted) " · DELETED" else "") + (if (v.isManual) " · manual" else ""), fontSize = 11.sp)
+                    Row {
+                        Text("• ${v.fileName} · ${v.resolution?.let { "${it}p" } ?: "?"} · ${size(v.sizeBytes)}" +
+                            (if (v.isDuplicate) " · dup" else "") + (if (v.isDeleted) " · DELETED" else "") + (if (v.isManual) " · manual" else ""),
+                            fontSize = 11.sp, modifier = Modifier.weight(1f).padding(top = 10.dp))
+                        TextButton(onClick = { onPlay(PlaybackTarget(s.id, v.episodeId), v.mediaId) }) { Text("▶", fontSize = 11.sp) }
+                    }
                 }
             }
         }
@@ -167,6 +172,7 @@ private fun ItemPane(vm: LibraryDebugViewModel, d: LibraryItemDetails) {
                                     (e.progress?.let { if (it.completed) "✓" else "${(it.fraction * 100).toInt()}%" } ?: ""),
                                 fontSize = 12.sp, modifier = Modifier.weight(1f).padding(top = 12.dp),
                             )
+                            TextButton(onClick = { onPlay(e.target, null) }) { Text("▶", fontSize = 11.sp) }
                             TextButton(onClick = { vm.simulatePlayback(e.target, e.progress?.positionMs) }) { Text("+20%", fontSize = 11.sp) }
                             TextButton(onClick = { vm.markWatched(e.target, e.progress?.completed != true) }) { Text("✓", fontSize = 11.sp) }
                         }

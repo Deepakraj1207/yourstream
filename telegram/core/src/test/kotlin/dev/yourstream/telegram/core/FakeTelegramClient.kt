@@ -244,6 +244,18 @@ class FakeTelegramClient : TelegramClient {
 
     override suspend fun cancelDownloadFile(fileId: Int): AppResult<Unit> = Unit.ok()
 
+    override suspend fun getFileDownloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long> {
+        calls += "getFileDownloadedPrefixSize:$fileId:$offset"
+        return 0L.ok()
+    }
+
+    override suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray> = ByteArray(0).ok()
+
+    override suspend fun deleteFile(fileId: Int): AppResult<Unit> {
+        calls += "deleteFile:$fileId"
+        return Unit.ok()
+    }
+
     companion object {
         fun user(id: Long, first: String, username: String? = null) = TelegramUser(
             id = id, firstName = first, lastName = "", username = username, phoneNumber = "",

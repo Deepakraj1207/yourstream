@@ -256,6 +256,15 @@ class TdlibTelegramClient @Inject constructor(
     override suspend fun cancelDownloadFile(fileId: Int): AppResult<Unit> =
         request("cancelDownloadFile") { cancelDownloadFile(fileId, false) }.unit()
 
+    // Local file-cache queries: answered from TDLib's file database, never wait for the network.
+    override suspend fun getFileDownloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long> =
+        request("getFileDownloadedPrefixSize", LOCAL_TIMEOUT) { getFileDownloadedPrefixSize(fileId, offset) }.mapValue { it.size }
+
+    override suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray> =
+        request("readFilePart", LOCAL_TIMEOUT) { readFilePart(fileId, offset, count) }.mapValue { it.data }
+
+    override suspend fun deleteFile(fileId: Int): AppResult<Unit> = request("deleteFile") { deleteFile(fileId) }.unit()
+
     // ---- plumbing ----
 
     private suspend fun <T> request(
@@ -312,6 +321,7 @@ class TdlibTelegramClient @Inject constructor(
         const val TAG = "TdClient"
         const val EVENT_BUFFER = 4_096
         val DEFAULT_TIMEOUT = 30.seconds
+        val LOCAL_TIMEOUT = 10.seconds
         val AUTH_TIMEOUT = 60.seconds
         val LOAD_TIMEOUT = 60.seconds
         val CLOSE_TIMEOUT = 15.seconds

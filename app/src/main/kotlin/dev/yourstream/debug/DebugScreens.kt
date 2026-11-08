@@ -59,7 +59,13 @@ import java.util.Date
 // Stage-1 debug UI: plain, functional, intentionally unstyled. Do not polish; Stage 2 replaces it.
 
 @Composable
-fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: LibraryDebugViewModel, catalogVm: CatalogDebugViewModel) {
+fun DebugApp(
+    vm: DebugViewModel,
+    indexVm: IndexDebugViewModel,
+    libraryVm: LibraryDebugViewModel,
+    catalogVm: CatalogDebugViewModel,
+    onPlay: (dev.yourstream.library.api.PlaybackTarget, Long?) -> Unit,
+) {
     var tab by rememberSaveable { mutableStateOf(0) }
     val status by vm.status.collectAsStateWithLifecycle()
     val connection by vm.connection.collectAsStateWithLifecycle()
@@ -96,7 +102,7 @@ fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: Librar
                         LogsPane(vm)
                     }
                     tab == 1 -> IndexPane(indexVm)
-                    tab == 2 -> LibraryPane(libraryVm)
+                    tab == 2 -> LibraryPane(libraryVm, onPlay)
                     tab == 3 -> CatalogPane(catalogVm) { id -> libraryVm.open(id); tab = 2 }
                     selected != null -> {
                         BackHandler { vm.clearSelection() }

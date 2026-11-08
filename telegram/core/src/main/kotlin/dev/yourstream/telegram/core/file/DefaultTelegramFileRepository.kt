@@ -47,4 +47,16 @@ class DefaultTelegramFileRepository @Inject constructor(
     }
 
     override suspend fun cancelDownload(fileId: Int): AppResult<Unit> = client.cancelDownloadFile(fileId)
+
+    override suspend fun downloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long> {
+        if (offset < 0) return AppError.InvalidInput("RANGE", "offset must be >= 0").err()
+        return client.getFileDownloadedPrefixSize(fileId, offset)
+    }
+
+    override suspend fun readPart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray> {
+        if (offset < 0 || count < 0) return AppError.InvalidInput("RANGE", "offset and count must be >= 0").err()
+        return client.readFilePart(fileId, offset, count)
+    }
+
+    override suspend fun deleteLocalCopy(fileId: Int): AppResult<Unit> = client.deleteFile(fileId)
 }

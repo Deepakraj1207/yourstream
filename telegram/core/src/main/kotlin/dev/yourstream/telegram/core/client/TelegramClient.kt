@@ -69,6 +69,9 @@ interface TelegramClient {
     suspend fun getFile(fileId: Int): AppResult<TelegramFile>
     suspend fun downloadFile(fileId: Int, priority: Int, offset: Long, limit: Long): AppResult<TelegramFile>
     suspend fun cancelDownloadFile(fileId: Int): AppResult<Unit>
+    suspend fun getFileDownloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long>
+    suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray>
+    suspend fun deleteFile(fileId: Int): AppResult<Unit>
 }
 
 enum class LoadChatsResult {

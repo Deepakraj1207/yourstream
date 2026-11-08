@@ -115,5 +115,8 @@ class SearchAndLiveTest {
         override fun observeFile(fileId: Int) = emptyFlow<dev.yourstream.telegram.api.model.TelegramFile>()
         override suspend fun download(fileId: Int, priority: Int, offset: Long, limit: Long) = throw UnsupportedOperationException()
         override suspend fun cancelDownload(fileId: Int) = throw UnsupportedOperationException()
+        override suspend fun downloadedPrefixSize(fileId: Int, offset: Long) = throw UnsupportedOperationException()
+        override suspend fun readPart(fileId: Int, offset: Long, count: Long) = throw UnsupportedOperationException()
+        override suspend fun deleteLocalCopy(fileId: Int) = throw UnsupportedOperationException()
     }
 }

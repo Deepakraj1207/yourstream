@@ -1,0 +1,82 @@
+package dev.yourstream.playback.media3
+
+import dev.yourstream.core.common.AppError
+import dev.yourstream.core.common.AppResult
+import dev.yourstream.core.database.YourStreamDatabase
+import dev.yourstream.library.api.EpisodeRepository
+import dev.yourstream.library.api.MediaRepository
+import dev.yourstream.library.api.MediaVersion
+import dev.yourstream.library.api.PlaybackTarget
+import dev.yourstream.telegram.api.TelegramFileRepository
+import dev.yourstream.telegram.api.TelegramMessageRepository
+import dev.yourstream.telegram.api.model.MessageLookup
+import dev.yourstream.telegram.api.model.TelegramFile
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Resolves a library target to the Telegram file to stream.
+ *
+ * File availability is checked here, before the player starts:
+ *  - the message is looked up again (file ids are only valid for the current Telegram session,
+ *    and the message may have been deleted since indexing);
+ *  - offline, the stored file id is used if Telegram still knows it with the same unique id;
+ *  - a file Telegram cannot download (and that is not on the device) is reported unavailable.
+ */
+@Singleton
+class LibraryMediaSourceResolver @Inject constructor(
+    private val media: MediaRepository,
+    private val episodes: EpisodeRepository,
+    private val db: YourStreamDatabase,
+    private val messages: TelegramMessageRepository,
+    private val files: TelegramFileRepository,
+) : MediaSourceResolver {
+
+    override suspend fun resolve(target: PlaybackTarget, mediaId: Long?): AppResult<PlayableMedia> {
+        val versions = target.episodeId?.let { episodes.versions(it) } ?: media.versions(target)
+        val version = (if (mediaId != null) versions.firstOrNull { it.mediaId == mediaId } else chooseVersion(versions))
+            ?: return AppResult.Err(AppError.NotFound("No playable file for this title"))
+        if (version.isDeleted) return AppResult.Err(AppError.NotFound("The Telegram message of ${version.fileName} was deleted"))
+
+        val (file, mime) = when (val r = currentFile(version)) {
+            is AppResult.Ok -> r.value
+            is AppResult.Err -> return r
+        }
+        if (!file.isDownloadingCompleted && !file.canBeDownloaded) {
+            return AppResult.Err(AppError.NotFound("Telegram can no longer download ${version.fileName}"))
+        }
+        val title = media.getItem(target.itemId)?.summary?.title ?: version.fileName
+        return AppResult.Ok(
+            PlayableMedia(
+                title = title, fileName = version.fileName, fileId = file.id, remoteUniqueId = file.remoteUniqueId,
+                sizeBytes = file.size.takeIf { it > 0 } ?: version.sizeBytes, durationMs = version.durationSeconds?.let { it * 1000L },
+                mimeType = mime, width = null, height = version.resolution, alreadyDownloaded = file.isDownloadingCompleted,
+                target = target, mediaId = version.mediaId,
+            ),
+        )
+    }
+
+    private suspend fun currentFile(v: MediaVersion): AppResult<Pair<TelegramFile, String?>> =
+        when (val r = messages.lookupMessages(v.chatId, listOf(v.messageId))) {
+            is AppResult.Ok -> when (val found = r.value.firstOrNull()) {
+                is MessageLookup.Found -> AppResult.Ok(found.message.media.file to found.message.media.mimeType)
+                else -> AppResult.Err(AppError.NotFound("The Telegram message of ${v.fileName} no longer exists"))
+            }
+            is AppResult.Err -> storedFile(v.mediaId) ?: r
+        }
+
+    /** Offline fallback: the file id saved at indexing time, if Telegram still maps it to the same file. */
+    private suspend fun storedFile(mediaId: Long): AppResult<Pair<TelegramFile, String?>>? {
+        val row = db.mediaDao().getWithParsed(mediaId)?.media ?: return null
+        val file = (files.getFile(row.fileId) as? AppResult.Ok)?.value ?: return null
+        return if (file.remoteUniqueId == row.fileUniqueId) AppResult.Ok(file to row.mimeType) else null
+    }
+
+    companion object {
+        /** Best version: not deleted/excluded, an original before a duplicate, then highest resolution, then largest. */
+        fun chooseVersion(versions: List<MediaVersion>): MediaVersion? = versions
+            .filter { !it.isDeleted && !it.isExcluded }
+            .sortedWith(compareBy<MediaVersion> { it.isDuplicate }.thenByDescending { it.resolution ?: 0 }.thenByDescending { it.sizeBytes })
+            .firstOrNull()
+    }
+}
