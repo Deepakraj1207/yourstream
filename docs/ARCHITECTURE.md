@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–9 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks). This document is the reference
+Status: **Phases 1–10 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming; audio/subtitle tracks; offline search). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -18,6 +18,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P7 Playback engine | **done** | `:playback:{stream,media3,testing}`: Media3/ExoPlayer over a custom `TelegramMediaDataSource` with range reads while downloading (sliding download window, seek re-points the Telegram download), retry/stall handling, state + metrics controller, minimal test player. Telegram range primitives added to `:telegram:api`. See [PLAYBACK.md](PLAYBACK.md) |
 | P8 Adaptive streaming | **done** | `:playback:adaptive`: NetworkMonitor (bandwidth EWMA, connectivity, outages), BufferManager (adaptive RAM/disk buffering, rebuffer prediction, device/memory bounds), SeekManager (coalescing, transfer cancellation, ramping window), PrefetchManager (next-episode head+tail), DownloadGovernor (concurrency limits). Media3 AdaptiveLoadControl; benchmarks. See [ADAPTIVE_STREAMING.md](ADAPTIVE_STREAMING.md) |
 | P9 Audio & subtitle tracks | **done** | `:playback:tracks` (language normalization, evidence-based detection that distrusts metadata, preference/fallback selection, remembered per-movie/per-series choices), Media3 glue + external subtitle sideloading, DB v6. See [TRACKS.md](TRACKS.md) |
+| P10 Search | **done** | `:search:core` (normalization, query interpretation, fuzzy/transliteration term index, ranking), `:search:engine` (trigger-maintained denormalized index + FTS4 in DB v7, filters, sorting, pagination), `:core:language`. Benchmarked to 50k items. See [SEARCH.md](SEARCH.md) |
 
 ---
 

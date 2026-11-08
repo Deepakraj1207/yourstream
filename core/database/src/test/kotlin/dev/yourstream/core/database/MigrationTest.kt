@@ -153,4 +153,22 @@ class MigrationTest {
         assertNull(db.trackDao().languageSettings(), "no settings until the user sets them (defaults apply)")
         db.close()
     }
+
+    @Test
+    fun v6ToV7AddsTheSearchIndexAndQueuesEveryItem() = runTest {
+        helper.createDatabase(name, 6).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'SERIES', 'series:doraemon', 'Doraemon', 'doraemon', 'doraemon', NULL, 'doraemon', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, NULL)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 7, true).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        assertEquals(listOf(1L), db.searchDao().dirty(10), "existing items wait for indexing")
+        assertEquals("Doraemon", db.libraryDao().item(1)!!.title)
+        // Triggers are live: a metadata change re-queues the item.
+        db.searchDao().clearDirty(listOf(1L))
+        db.openHelper.writableDatabase.execSQL("UPDATE library_item SET title = 'Doraemon (2005)' WHERE id = 1")
+        assertEquals(listOf(1L), db.searchDao().dirty(10))
+        db.close()
+    }
 }

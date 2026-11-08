@@ -18,6 +18,7 @@ kotlin {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    api(projects.core.language)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

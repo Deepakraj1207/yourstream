@@ -15,11 +15,12 @@ class DebugActivity : ComponentActivity() {
     private val indexViewModel: IndexDebugViewModel by viewModels()
     private val libraryViewModel: LibraryDebugViewModel by viewModels()
     private val catalogViewModel: CatalogDebugViewModel by viewModels()
+    private val searchViewModel: SearchDebugViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel, catalogViewModel) { target, mediaId ->
+        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel, catalogViewModel, searchViewModel) { target, mediaId ->
             startActivity(PlayerActivity.intent(this, target, mediaId))
         } }
     }

@@ -108,6 +108,7 @@ dependencies {
     implementation(projects.catalog.sync)
     implementation(projects.catalog.indian)
     implementation(projects.playback.media3)
+    implementation(projects.search.engine)
     implementation(libs.androidx.media3.ui)
     implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)

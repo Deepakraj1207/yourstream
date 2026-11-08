@@ -1,4 +1,4 @@
-package dev.yourstream.playback.tracks
+package dev.yourstream.core.language
 
 import java.text.Normalizer
 import java.util.Locale

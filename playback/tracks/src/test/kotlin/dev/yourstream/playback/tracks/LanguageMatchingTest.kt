@@ -1,5 +1,7 @@
 package dev.yourstream.playback.tracks
 
+import dev.yourstream.core.language.LanguageCatalog
+
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals

@@ -3,17 +3,19 @@
 An open-source Android media player for your own Telegram media, with a real media library:
 indexing, metadata matching, catalogs, smart playback, search and watch history.
 
-Status: **Phase 9 done**: Telegram connection layer, media indexing, a standalone filename
+Status: **Phase 10 done**: Telegram connection layer, media indexing, a standalone filename
 parser, the local library (movies, series → seasons → episodes, versions, watch progress,
 favorites, tracks), provider-based external metadata (TMDB, Cinemeta) with confidence-scored
 matching, and optional Indian-language catalog providers (IndiaStreams, Indian Regional
 Catalog) for discovery, and Telegram media playback with Media3 that streams while downloading
 (seeking jumps the download to the new position) with network-aware adaptive buffering, smart
 seeking and next-episode prefetch under strict download limits, and preference-based audio/subtitle
-selection remembered per movie and series, all with plain debug screens and a minimal
+selection remembered per movie and series, and a fast offline library search (fuzzy, transliteration-aware,
+filters, sorting, paging), all with plain debug screens and a minimal
 test player. Catalogs are information only; what you can watch is always your own Telegram media.
 
 - Architecture, roadmap and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Library search (matching, query interpretation, ranking, benchmark): [docs/SEARCH.md](docs/SEARCH.md)
 - Audio & subtitle tracks (detection, preferences, fallback, memory, external subtitles): [docs/TRACKS.md](docs/TRACKS.md)
 - Adaptive streaming (algorithms, trade-offs, benchmarks): [docs/ADAPTIVE_STREAMING.md](docs/ADAPTIVE_STREAMING.md)
 - Playback engine (Media3, Telegram streaming, seeking, buffering, errors, metrics): [docs/PLAYBACK.md](docs/PLAYBACK.md)

@@ -14,11 +14,15 @@ import dev.yourstream.core.database.dao.LibraryDao
 import dev.yourstream.core.database.dao.MetadataDao
 import dev.yourstream.core.database.dao.MediaDao
 import dev.yourstream.core.database.dao.ScanCursorDao
+import dev.yourstream.core.database.dao.SearchDao
 import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
 import dev.yourstream.core.database.entity.AudioTrackEntity
 import dev.yourstream.core.database.entity.CatalogCacheEntity
 import dev.yourstream.core.database.entity.LanguageSettingsEntity
+import dev.yourstream.core.database.entity.SearchDirtyEntity
+import dev.yourstream.core.database.entity.SearchDocEntity
+import dev.yourstream.core.database.entity.SearchFtsEntity
 import dev.yourstream.core.database.entity.EpisodeMetadataEntity
 import dev.yourstream.core.database.entity.ItemMetadataEntity
 import dev.yourstream.core.database.entity.MetadataCacheEntity
@@ -52,7 +56,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
  * data (favorites, watch state/history, track preferences) · v4 external metadata ·
- * v5 catalog provider cache · v6 language settings and remembered track choices.
+ * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index.
  */
 @Database(
     entities = [
@@ -84,8 +88,11 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         EpisodeMetadataEntity::class,
         CatalogCacheEntity::class,
         LanguageSettingsEntity::class,
+        SearchDocEntity::class,
+        SearchFtsEntity::class,
+        SearchDirtyEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -99,6 +106,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         // v6: language settings table + remembered track signatures on track_preference (nullable
         // columns: existing preferences keep working unchanged).
         AutoMigration(from = 5, to = 6),
+        // v7: search index (rebuildable) + its dirty queue; every existing item is queued for indexing.
+        AutoMigration(from = 6, to = 7, spec = YourStreamDatabase.V7::class),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
@@ -111,6 +120,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun metadataDao(): MetadataDao
     abstract fun catalogDao(): CatalogDao
+    abstract fun searchDao(): SearchDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {
@@ -120,12 +130,23 @@ abstract class YourStreamDatabase : RoomDatabase() {
         }
     }
 
+    /** After creating the v7 search tables: triggers, and every existing item queued for indexing. */
+    class V7 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            SearchTriggers.create(db)
+            db.execSQL("INSERT OR IGNORE INTO search_dirty (item_id) SELECT id FROM library_item")
+        }
+    }
+
     companion object {
         const val NAME = "yourstream.db"
 
         /** Triggers are not part of Room's schema model; make sure they exist on every open. */
         val CALLBACK: Callback = object : Callback() {
-            override fun onOpen(db: SupportSQLiteDatabase) = LibraryTriggers.create(db)
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                LibraryTriggers.create(db)
+                SearchTriggers.create(db)
+            }
         }
 
         fun create(context: Context): YourStreamDatabase =

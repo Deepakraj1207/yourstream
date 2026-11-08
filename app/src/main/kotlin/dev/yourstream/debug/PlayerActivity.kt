@@ -250,7 +250,7 @@ private fun TrackSection(vm: PlayerDebugViewModel) {
 }
 
 private fun dev.yourstream.playback.tracks.AnalyzedTrack.describe(): String = buildString {
-    append(dev.yourstream.playback.tracks.LanguageCatalog.displayName(language.code))
+    append(dev.yourstream.core.language.LanguageCatalog.displayName(language.code))
     track.label?.let { append(" \"$it\"") }
     append(" (${language.source.name.lowercase()} ${"%.1f".format(Locale.US, language.confidence)})")
     if (track.origin != dev.yourstream.playback.tracks.TrackOrigin.EMBEDDED) append(" ${track.origin.name.lowercase()}")

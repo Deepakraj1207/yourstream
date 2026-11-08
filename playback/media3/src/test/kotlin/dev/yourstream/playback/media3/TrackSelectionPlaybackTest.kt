@@ -81,7 +81,7 @@ class TrackSelectionPlaybackTest {
         player.currentTracks.groups.firstOrNull { it.type == type && it.isSelected }?.let { g -> (0 until g.length).firstOrNull(g::isTrackSelected)?.let(g::getTrackFormat) }
 
     /** Media3 normalizes tags ("tam" → "ta"); compare canonical codes. */
-    private fun lang(f: Format?) = dev.yourstream.playback.tracks.LanguageCatalog.normalizeCode(f?.language)
+    private fun lang(f: Format?) = dev.yourstream.core.language.LanguageCatalog.normalizeCode(f?.language)
 
     private val tamilFirst = LanguagePreferences(audio = listOf("ta", "en", "hi"), subtitles = listOf("ta", "en"), fallbackLanguage = null)
 

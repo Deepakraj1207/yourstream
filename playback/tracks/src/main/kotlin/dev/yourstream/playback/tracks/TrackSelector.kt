@@ -1,5 +1,7 @@
 package dev.yourstream.playback.tracks
 
+import dev.yourstream.core.language.LanguageCatalog
+
 import java.util.Locale
 
 enum class SubtitleMode {
