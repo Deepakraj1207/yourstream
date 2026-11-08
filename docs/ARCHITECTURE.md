@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phase 1 (Telegram connection layer) implemented.** This document is the reference
+Status: **Phases 1–2 implemented** (Telegram layer; media discovery and indexing). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -10,6 +10,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 |---|---|---|
 | P0 Foundation | partial | Version catalog, Gradle 9.8.1 wrapper, AGP 9.4.1, Kotlin 2.4.21, Hilt. `build-logic` convention plugins and CI are not added yet |
 | P1 Telegram core | **done** | `:core:common`, `:telegram:api`, `:telegram:core`, `:telegram:tdlib`, debug UI in `:app`. See §14 |
+| P2 (= roadmap P3 + basic P4) Indexing | **done** | `:core:database`, `:media:api`, `:media:parser`, `:media:indexer`. See [INDEXING.md](INDEXING.md) |
 
 ---
 

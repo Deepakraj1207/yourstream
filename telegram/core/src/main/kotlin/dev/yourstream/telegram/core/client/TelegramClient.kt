@@ -3,6 +3,9 @@ package dev.yourstream.telegram.core.client
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.telegram.api.model.AuthState
 import dev.yourstream.telegram.api.model.ChatListType
+import dev.yourstream.telegram.api.model.MediaMessagePage
+import dev.yourstream.telegram.api.model.MediaSearchFilter
+import dev.yourstream.telegram.api.model.MessageLookup
 import dev.yourstream.telegram.api.model.NetworkType
 import dev.yourstream.telegram.api.model.TelegramChat
 import dev.yourstream.telegram.api.model.TelegramConfig
@@ -56,6 +59,12 @@ interface TelegramClient {
     suspend fun getSupergroupFullInfo(supergroupId: Long): AppResult<TgSupergroupFullInfo>
     suspend fun getBasicGroup(basicGroupId: Long): AppResult<TgBasicGroup>
     suspend fun getBasicGroupFullInfo(basicGroupId: Long): AppResult<TgBasicGroupFullInfo>
+
+    /** searchChatMessages with a media filter. Messages without a supported file are dropped. */
+    suspend fun searchChatMedia(chatId: Long, filter: MediaSearchFilter, fromMessageId: Long, limit: Int): AppResult<MediaMessagePage>
+
+    /** getMessages: one [MessageLookup] per requested id, same order. */
+    suspend fun getMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>>
 
     suspend fun getFile(fileId: Int): AppResult<TelegramFile>
     suspend fun downloadFile(fileId: Int, priority: Int, offset: Long, limit: Long): AppResult<TelegramFile>

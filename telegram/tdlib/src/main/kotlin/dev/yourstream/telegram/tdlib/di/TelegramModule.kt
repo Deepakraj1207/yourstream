@@ -10,6 +10,7 @@ import dev.yourstream.telegram.api.TelegramAuthManager
 import dev.yourstream.telegram.api.TelegramChatRepository
 import dev.yourstream.telegram.api.TelegramFileRepository
 import dev.yourstream.telegram.api.TelegramManager
+import dev.yourstream.telegram.api.TelegramMessageRepository
 import dev.yourstream.telegram.api.TelegramUserRepository
 import dev.yourstream.telegram.core.TelegramScope
 import dev.yourstream.telegram.core.auth.DefaultTelegramAuthManager
@@ -17,6 +18,7 @@ import dev.yourstream.telegram.core.chat.DefaultTelegramChatRepository
 import dev.yourstream.telegram.core.client.TelegramClient
 import dev.yourstream.telegram.core.file.DefaultTelegramFileRepository
 import dev.yourstream.telegram.core.manager.DefaultTelegramManager
+import dev.yourstream.telegram.core.message.DefaultTelegramMessageRepository
 import dev.yourstream.telegram.core.user.DefaultTelegramUserRepository
 import dev.yourstream.telegram.tdlib.TdlibTelegramClient
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -39,6 +41,7 @@ abstract class TelegramModule {
     @Binds abstract fun chats(impl: DefaultTelegramChatRepository): TelegramChatRepository
     @Binds abstract fun users(impl: DefaultTelegramUserRepository): TelegramUserRepository
     @Binds abstract fun files(impl: DefaultTelegramFileRepository): TelegramFileRepository
+    @Binds abstract fun messages(impl: DefaultTelegramMessageRepository): TelegramMessageRepository
 
     companion object {
         @Provides

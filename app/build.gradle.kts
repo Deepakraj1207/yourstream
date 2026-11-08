@@ -75,6 +75,10 @@ android {
 
 dependencies {
     implementation(projects.telegram.tdlib)
+    implementation(projects.media.indexer)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

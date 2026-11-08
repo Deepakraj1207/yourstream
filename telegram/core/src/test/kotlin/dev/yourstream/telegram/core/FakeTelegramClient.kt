@@ -219,6 +219,22 @@ class FakeTelegramClient : TelegramClient {
     override suspend fun getBasicGroupFullInfo(basicGroupId: Long): AppResult<TgBasicGroupFullInfo> =
         TgBasicGroupFullInfo("basic description").ok()
 
+    override suspend fun searchChatMedia(
+        chatId: Long,
+        filter: dev.yourstream.telegram.api.model.MediaSearchFilter,
+        fromMessageId: Long,
+        limit: Int,
+    ): AppResult<dev.yourstream.telegram.api.model.MediaMessagePage> {
+        calls += "searchChatMedia:$chatId:$filter:$fromMessageId"
+        return dev.yourstream.telegram.api.model.MediaMessagePage(emptyList(), 0, 0).ok()
+    }
+
+    override suspend fun getMessages(
+        chatId: Long,
+        messageIds: List<Long>,
+    ): AppResult<List<dev.yourstream.telegram.api.model.MessageLookup>> =
+        messageIds.map { dev.yourstream.telegram.api.model.MessageLookup.Missing(it) }.ok()
+
     override suspend fun getFile(fileId: Int): AppResult<TelegramFile> = file(fileId).ok()
 
     override suspend fun downloadFile(fileId: Int, priority: Int, offset: Long, limit: Long): AppResult<TelegramFile> {
@@ -242,7 +258,7 @@ class FakeTelegramClient : TelegramClient {
         )
 
         fun file(id: Int) = TelegramFile(
-            id = id, remoteUniqueId = "u$id", size = 100, expectedSize = 100, localPath = null,
+            id = id, remoteUniqueId = "u$id", remoteId = "r$id", size = 100, expectedSize = 100, localPath = null,
             canBeDownloaded = true, isDownloadingActive = false, isDownloadingCompleted = false,
             downloadOffset = 0, downloadedPrefixSize = 0, downloadedSize = 0,
         )

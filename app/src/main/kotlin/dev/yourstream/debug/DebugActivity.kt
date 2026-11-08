@@ -12,10 +12,11 @@ import dagger.hilt.android.AndroidEntryPoint
 class DebugActivity : ComponentActivity() {
 
     private val viewModel: DebugViewModel by viewModels()
+    private val indexViewModel: IndexDebugViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { DebugApp(viewModel) }
+        setContent { DebugApp(viewModel, indexViewModel) }
     }
 }

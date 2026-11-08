@@ -58,7 +58,8 @@ import java.util.Date
 // Stage-1 debug UI: plain, functional, intentionally unstyled. Do not polish; Stage 2 replaces it.
 
 @Composable
-fun DebugApp(vm: DebugViewModel) {
+fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel) {
+    var tab by rememberSaveable { mutableStateOf(0) }
     val status by vm.status.collectAsStateWithLifecycle()
     val connection by vm.connection.collectAsStateWithLifecycle()
     val auth by vm.authState.collectAsStateWithLifecycle()
@@ -77,6 +78,11 @@ fun DebugApp(vm: DebugViewModel) {
                     TextButton(onClick = vm::restart) { Text("Restart TDLib") }
                     TextButton(onClick = vm::toggleLogs) { Text(if (showLogs) "Hide logs" else "Logs") }
                 }
+                Row {
+                    listOf("Telegram", "Index & search").forEachIndexed { i, name ->
+                        TextButton(onClick = { tab = i }) { Text(if (tab == i) "[$name]" else name) }
+                    }
+                }
                 message?.let {
                     Text("Error: $it", color = Color(0xFFB00020), modifier = Modifier.clickable { vm.dismissMessage() })
                 }
@@ -88,9 +94,10 @@ fun DebugApp(vm: DebugViewModel) {
                         BackHandler { vm.toggleLogs() }
                         LogsPane(vm)
                     }
+                    tab == 1 -> IndexPane(indexVm)
                     selected != null -> {
                         BackHandler { vm.clearSelection() }
-                        ChatDetailsPane(vm)
+                        ChatDetailsPane(vm, indexVm)
                     }
                     else -> AuthOrChats(vm, auth)
                 }
@@ -211,7 +218,7 @@ private fun ChatRow(chat: TelegramChat, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ChatDetailsPane(vm: DebugViewModel) {
+private fun ChatDetailsPane(vm: DebugViewModel, indexVm: IndexDebugViewModel) {
     val details by vm.details.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TextButton(onClick = vm::clearSelection) { Text("< Back to chats") }
@@ -236,6 +243,7 @@ private fun ChatDetailsPane(vm: DebugViewModel) {
                 Field("Lists", chat.positions.joinToString { "${it.list}${if (it.isPinned) " (pinned)" else ""}" })
                 info.user?.let { Field("User", "${it.displayName} (id ${it.id}${if (it.isBot) ", bot" else ""})") }
                 Field("Description", info.description)
+                ChatIndexControls(indexVm, chat.id)
             }
         }
     }

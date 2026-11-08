@@ -44,6 +44,18 @@ import dev.g000sha256.tdl.dto.ConnectionStateReady
 import dev.g000sha256.tdl.dto.ConnectionStateUpdating
 import dev.g000sha256.tdl.dto.ConnectionStateWaitingForNetwork
 import dev.g000sha256.tdl.dto.File
+import dev.g000sha256.tdl.dto.Message
+import dev.g000sha256.tdl.dto.MessageAudio
+import dev.g000sha256.tdl.dto.MessageContent
+import dev.g000sha256.tdl.dto.MessageDocument
+import dev.g000sha256.tdl.dto.MessageVideo
+import dev.g000sha256.tdl.dto.SearchMessagesFilter
+import dev.g000sha256.tdl.dto.SearchMessagesFilterAudio
+import dev.g000sha256.tdl.dto.SearchMessagesFilterDocument
+import dev.g000sha256.tdl.dto.SearchMessagesFilterVideo
+import dev.g000sha256.tdl.dto.UpdateDeleteMessages
+import dev.g000sha256.tdl.dto.UpdateMessageContent
+import dev.g000sha256.tdl.dto.UpdateNewMessage
 import dev.g000sha256.tdl.dto.NetworkTypeMobile
 import dev.g000sha256.tdl.dto.NetworkTypeMobileRoaming
 import dev.g000sha256.tdl.dto.NetworkTypeNone
@@ -71,6 +83,10 @@ import dev.yourstream.telegram.api.model.ChatListType
 import dev.yourstream.telegram.api.model.ChatPosition
 import dev.yourstream.telegram.api.model.CodeDeliveryType
 import dev.yourstream.telegram.api.model.CodeInfo
+import dev.yourstream.telegram.api.model.MediaSearchFilter
+import dev.yourstream.telegram.api.model.TelegramMediaContentType
+import dev.yourstream.telegram.api.model.TelegramMediaFile
+import dev.yourstream.telegram.api.model.TelegramMediaMessage
 import dev.yourstream.telegram.api.model.NetworkType
 import dev.yourstream.telegram.api.model.TelegramChat
 import dev.yourstream.telegram.api.model.TelegramConnectionState
@@ -228,6 +244,7 @@ internal object TdMappers {
     fun file(file: File): TelegramFile = TelegramFile(
         id = file.id,
         remoteUniqueId = file.remote.uniqueId,
+        remoteId = file.remote.id,
         size = file.size,
         expectedSize = file.expectedSize,
         localPath = file.local.path.ifEmpty { null },
@@ -262,6 +279,91 @@ internal object TdMappers {
         is UpdateChatReadInbox -> TelegramEvent.ChatUnreadCountChanged(update.chatId, update.unreadCount)
         is UpdateUser -> TelegramEvent.UserChanged(user(update.user))
         is UpdateFile -> TelegramEvent.FileChanged(file(update.file))
+        is UpdateNewMessage -> TelegramEvent.NewMessage(update.message.chatId, update.message.id, mediaMessage(update.message))
+        is UpdateDeleteMessages -> TelegramEvent.MessagesDeleted(
+            chatId = update.chatId,
+            messageIds = update.messageIds.toList(),
+            isPermanent = update.isPermanent,
+            fromCache = update.fromCache,
+        )
+        is UpdateMessageContent -> TelegramEvent.MessageContentChanged(update.chatId, update.messageId)
+        else -> null
+    }
+
+    fun tdSearchFilter(filter: MediaSearchFilter): SearchMessagesFilter = when (filter) {
+        MediaSearchFilter.VIDEO -> SearchMessagesFilterVideo()
+        MediaSearchFilter.DOCUMENT -> SearchMessagesFilterDocument()
+        MediaSearchFilter.AUDIO -> SearchMessagesFilterAudio()
+    }
+
+    /** The file-carrying part of a message, or null for anything that is not video/document/audio. */
+    fun mediaMessage(message: Message): TelegramMediaMessage? {
+        val (type, media, caption) = mediaContent(message.content) ?: return null
+        return TelegramMediaMessage(
+            chatId = message.chatId,
+            messageId = message.id,
+            date = message.date.toLong(),
+            editDate = message.editDate.toLong(),
+            albumId = message.mediaAlbumId,
+            caption = caption,
+            contentType = type,
+            media = media,
+        )
+    }
+
+    private fun mediaContent(content: MessageContent): Triple<TelegramMediaContentType, TelegramMediaFile, String>? = when (content) {
+        is MessageVideo -> Triple(
+            TelegramMediaContentType.VIDEO,
+            TelegramMediaFile(
+                file = file(content.video.video),
+                fileName = content.video.fileName,
+                mimeType = content.video.mimeType,
+                durationSeconds = content.video.duration.takeIf { it > 0 },
+                width = content.video.width.takeIf { it > 0 },
+                height = content.video.height.takeIf { it > 0 },
+                supportsStreaming = content.video.supportsStreaming,
+                // Only HLS "alternative" qualities carry a codec; the original's is not reported.
+                codec = content.alternativeVideos.firstOrNull { it.codec.isNotBlank() }?.codec,
+                title = null,
+                performer = null,
+                thumbnailFileId = content.video.thumbnail?.file?.id,
+            ),
+            content.caption.text,
+        )
+        is MessageDocument -> Triple(
+            TelegramMediaContentType.DOCUMENT,
+            TelegramMediaFile(
+                file = file(content.document.document),
+                fileName = content.document.fileName,
+                mimeType = content.document.mimeType,
+                durationSeconds = null,
+                width = null,
+                height = null,
+                supportsStreaming = false,
+                codec = null,
+                title = null,
+                performer = null,
+                thumbnailFileId = content.document.thumbnail?.file?.id,
+            ),
+            content.caption.text,
+        )
+        is MessageAudio -> Triple(
+            TelegramMediaContentType.AUDIO,
+            TelegramMediaFile(
+                file = file(content.audio.audio),
+                fileName = content.audio.fileName,
+                mimeType = content.audio.mimeType,
+                durationSeconds = content.audio.duration.takeIf { it > 0 },
+                width = null,
+                height = null,
+                supportsStreaming = false,
+                codec = null,
+                title = content.audio.title.ifBlank { null },
+                performer = content.audio.performer.ifBlank { null },
+                thumbnailFileId = content.audio.albumCoverThumbnail?.file?.id,
+            ),
+            content.caption.text,
+        )
         else -> null
     }
 }

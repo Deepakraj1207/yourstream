@@ -125,6 +125,7 @@ class TdMappersTest {
             ),
         )
         assertEquals("uniq", file.remoteUniqueId)
+        assertEquals("rid", file.remoteId)
         assertNull(file.localPath)
         assertEquals(200, file.downloadOffset)
         assertEquals(300, file.downloadedPrefixSize)

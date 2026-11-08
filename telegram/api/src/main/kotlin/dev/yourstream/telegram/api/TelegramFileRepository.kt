@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
  * ranged streaming for playback is Phase 2 and will build on [download] with offsets.
  */
 public interface TelegramFileRepository {
+    /** Every file state change TDLib reports (downloads progressing, finishing, cancelled). */
+    public val fileUpdates: Flow<TelegramFile>
+
     public suspend fun getFile(fileId: Int): AppResult<TelegramFile>
 
     /** Emits the file each time its download state changes. */

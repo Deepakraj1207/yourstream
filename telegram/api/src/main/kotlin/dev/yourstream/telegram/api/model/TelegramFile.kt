@@ -8,7 +8,10 @@ package dev.yourstream.telegram.api.model
  */
 public data class TelegramFile(
     val id: Int,
+    /** Stable across sessions and forwards of the same upload: the key for duplicate detection. */
     val remoteUniqueId: String,
+    /** Persistent remote id; can be used to re-obtain the file in a later session. */
+    val remoteId: String,
     /** Exact size in bytes, or 0 if unknown. */
     val size: Long,
     val expectedSize: Long,

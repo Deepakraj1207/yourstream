@@ -24,6 +24,9 @@ class DefaultTelegramFileRepository @Inject constructor(
     private val client: TelegramClient,
 ) : TelegramFileRepository {
 
+    override val fileUpdates: Flow<TelegramFile> =
+        client.events.filterIsInstance<TelegramEvent.FileChanged>().map { it.file }
+
     override suspend fun getFile(fileId: Int): AppResult<TelegramFile> = client.getFile(fileId)
 
     override fun observeFile(fileId: Int): Flow<TelegramFile> = channelFlow {

@@ -5,6 +5,7 @@ import dev.yourstream.telegram.api.model.ChatPosition
 import dev.yourstream.telegram.api.model.TelegramChat
 import dev.yourstream.telegram.api.model.TelegramConnectionState
 import dev.yourstream.telegram.api.model.TelegramFile
+import dev.yourstream.telegram.api.model.TelegramMediaMessage
 import dev.yourstream.telegram.api.model.TelegramUser
 
 /** TDLib updates the app cares about, already translated to our models. */
@@ -29,4 +30,11 @@ sealed interface TelegramEvent {
     data class ChatUnreadCountChanged(val chatId: Long, val unreadCount: Int) : TelegramEvent
     data class UserChanged(val user: TelegramUser) : TelegramEvent
     data class FileChanged(val file: TelegramFile) : TelegramEvent
+
+    /** A new message; [media] is null when it carries no supported file. */
+    data class NewMessage(val chatId: Long, val messageId: Long, val media: TelegramMediaMessage?) : TelegramEvent
+
+    data class MessagesDeleted(val chatId: Long, val messageIds: List<Long>, val isPermanent: Boolean, val fromCache: Boolean) : TelegramEvent
+
+    data class MessageContentChanged(val chatId: Long, val messageId: Long) : TelegramEvent
 }

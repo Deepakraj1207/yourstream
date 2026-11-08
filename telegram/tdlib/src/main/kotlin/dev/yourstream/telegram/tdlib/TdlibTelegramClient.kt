@@ -11,6 +11,9 @@ import dev.yourstream.core.common.err
 import dev.yourstream.core.common.ok
 import dev.yourstream.telegram.api.model.AuthState
 import dev.yourstream.telegram.api.model.ChatListType
+import dev.yourstream.telegram.api.model.MediaMessagePage
+import dev.yourstream.telegram.api.model.MediaSearchFilter
+import dev.yourstream.telegram.api.model.MessageLookup
 import dev.yourstream.telegram.api.model.NetworkType
 import dev.yourstream.telegram.api.model.TelegramChat
 import dev.yourstream.telegram.api.model.TelegramConfig
@@ -208,6 +211,42 @@ class TdlibTelegramClient @Inject constructor(
 
     override suspend fun getBasicGroupFullInfo(basicGroupId: Long): AppResult<TgBasicGroupFullInfo> =
         request("getBasicGroupFullInfo") { getBasicGroupFullInfo(basicGroupId) }.mapValue(TdMappers::basicGroupFullInfo)
+
+    override suspend fun searchChatMedia(
+        chatId: Long,
+        filter: MediaSearchFilter,
+        fromMessageId: Long,
+        limit: Int,
+    ): AppResult<MediaMessagePage> =
+        request("searchChatMessages", LOAD_TIMEOUT) {
+            searchChatMessages(
+                chatId = chatId,
+                topicId = null,
+                query = "",
+                senderId = null,
+                fromMessageId = fromMessageId,
+                offset = 0,
+                limit = limit,
+                filter = TdMappers.tdSearchFilter(filter),
+            )
+        }.mapValue { found ->
+            MediaMessagePage(
+                messages = found.messages.mapNotNull(TdMappers::mediaMessage),
+                nextFromMessageId = found.nextFromMessageId,
+                totalCount = found.totalCount,
+            )
+        }
+
+    override suspend fun getMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>> =
+        request("getMessages", LOAD_TIMEOUT) { getMessages(chatId, messageIds.toLongArray()) }.mapValue { result ->
+            messageIds.mapIndexed { index, id ->
+                val message = result.messages.getOrNull(index)
+                when {
+                    message == null -> MessageLookup.Missing(id)
+                    else -> TdMappers.mediaMessage(message)?.let { MessageLookup.Found(it) } ?: MessageLookup.NoMedia(id)
+                }
+            }
+        }
 
     override suspend fun getFile(fileId: Int): AppResult<TelegramFile> = request("getFile") { getFile(fileId) }.mapValue(TdMappers::file)
 
