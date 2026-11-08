@@ -1,0 +1,61 @@
+package dev.yourstream.di
+
+import android.content.Context
+import android.os.Build
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import dev.yourstream.BuildConfig
+import dev.yourstream.core.common.Logger
+import dev.yourstream.log.AppLogger
+import dev.yourstream.telegram.api.model.TelegramConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.io.File
+import java.util.Locale
+import javax.inject.Qualifier
+import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ApplicationScope
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AppModule {
+
+    @Provides
+    @Singleton
+    @ApplicationScope
+    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    fun logger(appLogger: AppLogger): Logger = appLogger
+
+    /**
+     * Telegram configuration. API id/hash come from BuildConfig, which the build fills from
+     * local.properties / secrets.properties / environment (docs/TELEGRAM_SETUP.md).
+     *
+     * The database lives in noBackupFilesDir: it holds the session and must persist across
+     * launches, but never be backed up. Downloaded files go to the cache directory.
+     */
+    @Provides
+    @Singleton
+    fun telegramConfig(@ApplicationContext context: Context): TelegramConfig = TelegramConfig(
+        apiId = BuildConfig.TELEGRAM_API_ID,
+        apiHash = BuildConfig.TELEGRAM_API_HASH,
+        databaseDirectory = File(context.noBackupFilesDir, "tdlib/db").absolutePath,
+        filesDirectory = File(context.cacheDir, "tdlib/files").absolutePath,
+        useTestDc = BuildConfig.TELEGRAM_USE_TEST_DC,
+        systemLanguageCode = Locale.getDefault().language.ifEmpty { "en" },
+        deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+        systemVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+        applicationVersion = BuildConfig.VERSION_NAME,
+        tdlibLogVerbosity = if (BuildConfig.DEBUG) 2 else 1,
+        tdlibLogFile = File(context.cacheDir, "tdlib/tdlib.log").absolutePath,
+    )
+}

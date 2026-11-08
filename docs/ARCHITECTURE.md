@@ -1,7 +1,15 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **proposal, nothing implemented yet**. This document is the reference for every later
-phase. Decisions marked **DECISION** need sign-off before Phase 0 starts.
+Status: **Phase 1 (Telegram connection layer) implemented.** This document is the reference
+for every later phase. Decisions marked **DECISION** still need sign-off; until then the
+recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
+
+### Implementation status
+
+| Phase | State | Notes |
+|---|---|---|
+| P0 Foundation | partial | Version catalog, Gradle 9.8.1 wrapper, AGP 9.4.1, Kotlin 2.4.21, Hilt. `build-logic` convention plugins and CI are not added yet |
+| P1 Telegram core | **done** | `:core:common`, `:telegram:api`, `:telegram:core`, `:telegram:tdlib`, debug UI in `:app`. See §14 |
 
 ---
 
@@ -165,8 +173,9 @@ yourstream/
 │   ├── network/       (JVM)       # Ktor HttpClient factory, HTTP cache, RateLimiter, retry
 │   └── testing/       (JVM)       # fakes, fixtures, coroutine test rules
 ├── telegram/
-│   ├── api/           (JVM)       # TelegramClient, TelegramAuth, TelegramFiles interfaces + models
-│   └── tdlib/         (Android)   # TDLib-backed implementation, update dispatcher, file streamer
+│   ├── api/           (JVM)       # public contracts: TelegramManager, TelegramAuthManager, repositories, models
+│   ├── core/          (JVM)       # TelegramClient port + implementations of the contracts (unit-tested)
+│   └── tdlib/         (Android)   # TdlibTelegramClient (the only TDLib user), mappers, network monitor, Hilt
 ├── media/
 │   ├── source/        (JVM)       # MediaSource, MediaSourceResolver, PlayableSource
 │   ├── parser/        (JVM)       # ReleaseNameParser (filename + caption), language dictionaries
@@ -571,3 +580,33 @@ features (media only), Android only in v1.
 3. Application ID / package root (proposal: `dev.yourstream`).
 4. TDLib route: `tdl-coroutines` prebuilt (faster start) vs our own TDLib JNI build (full control).
 5. Is Android TV a v1 target (affects P8 test matrix and Stage 2 scope)?
+
+---
+
+## 14. Phase 1 as built: Telegram layer
+
+```
+ :app (debug UI, BuildConfig credentials → TelegramConfig, AppLogger)
+   │ uses only :telegram:api interfaces
+   ▼
+ :telegram:api   TelegramManager · TelegramAuthManager · TelegramChatRepository
+                 TelegramUserRepository · TelegramFileRepository · models
+   ▲ implemented by
+ :telegram:core  DefaultTelegramManager (lifecycle) · DefaultTelegramAuthManager (login)
+                 DefaultTelegramChatRepository (+ ChatListStore) · DefaultTelegramUserRepository
+                 DefaultTelegramFileRepository · TelegramErrorMapper · LoginInput
+                 └── talks to the TelegramClient port (+ TelegramEvent stream)
+   ▲ port implemented by
+ :telegram:tdlib TdlibTelegramClient (tdl-coroutines / TDLib 1.8.69) · TdMappers
+                 AndroidNetworkMonitor · TelegramInitializer · Hilt TelegramModule
+```
+
+Rules that hold:
+- `dev.g000sha256.tdl.*` appears only in `:telegram:tdlib`.
+- `:telegram:core` and `:telegram:api` are plain JVM modules. `:telegram:core` has 50 unit tests
+  that run against `FakeTelegramClient`.
+- Every call returns `AppResult`. TDLib errors go through `TelegramErrorMapper` (FLOOD_WAIT →
+  `RateLimited`, `PHONE_CODE_INVALID` → `InvalidInput`, revoked session → `Unauthorized`, …).
+- Every TDLib request has a timeout, because TDLib waits forever while offline.
+
+Credentials and the manual test procedure are in [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md).
