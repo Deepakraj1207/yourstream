@@ -1,0 +1,26 @@
+{
+  "metas": [
+    {
+      "id": "tmdb:1900001||Sample Tamil Film||2026||movie||https://image.tmdb.org/t/p/original/abc.jpg||A%20young%20filmmaker%20chases%20a%20dream.",
+      "name": "Sample Tamil Film",
+      "poster": "https://image.tmdb.org/t/p/original/abc.jpg",
+      "releaseInfo": "2026",
+      "type": "movie"
+    },
+    {
+      "id": "tt2000002",
+      "name": "Another Tamil Film",
+      "poster": "https://api.ratingposterdb.com/t0-free-rpdb/imdb/poster-default/tt2000002.jpg",
+      "releaseInfo": "2025",
+      "type": "movie"
+    },
+    {
+      "id": "ir:promo-unlock",
+      "name": "🎬 New Hindi Dubbed Catalog!",
+      "poster": "https://example.invalid/promo.webp",
+      "year": "2026",
+      "type": "movie",
+      "description": "Get updates on new movies in the add-on."
+    }
+  ]
+}

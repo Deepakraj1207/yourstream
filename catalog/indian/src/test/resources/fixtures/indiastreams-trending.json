@@ -1,0 +1,6 @@
+{"metas":[
+ {"name":"Sample Thriller","id":"tt1000001","runtime":"114 min","poster":"https://images.metahub.space/poster/medium/tt1000001/img",
+  "background":"https://images.metahub.space/background/medium/tt1000001/img","releaseInfo":2025,"year":2025,"type":"movie","imdbRating":7.3,
+  "description":"A test description.","genre":["Crime","Drama"],"genres":["Crime","Drama"],"cast":["Actor One","Actor Two"],"director":["Director One"]},
+ {"name":"Sample Comedy","id":"tt1000002","releaseInfo":"2024","type":"movie","imdbRating":"6.1","genres":["Comedy"]}
+]}

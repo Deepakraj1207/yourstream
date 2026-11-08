@@ -1,0 +1,11 @@
+{"id":"in.rdata.indiastreams","version":"1.0.2","name":"IndiaStreams","logo":"https://indiastreams.rdata.in/smallicon.png",
+ "description":"Stremio extension for Catalog of Movies & TV shows popular in India, includes Hindi, English and regional titles.",
+ "catalogs":[{"type":"movie","id":"trendingmovies","name":"Trending movies in India"},
+  {"type":"series","id":"trendingtv","name":"Trending TV shows in India"},
+  {"type":"movie","id":"nfxprm","name":"Popular movies on Netflix & Prime"},
+  {"type":"movie","id":"hstzee","name":"Popular movies on Hotstar, SonyLiv, Zee 5"},
+  {"type":"series","id":"nfxprmtv","name":"Popular TV series on Netflix & Prime"},
+  {"type":"series","id":"hstzeetv","name":"Popular TV series on Hotstar, Sony Liv, Zee5 & Others"},
+  {"type":"movie","id":"recmov","name":"Recommended movies"},
+  {"type":"series","id":"atpmub","name":"Recommended TV shows"}],
+ "resources":["catalog"],"types":["movie","series"],"behaviorHints":{"configurable":true,"configurationRequired":false}}

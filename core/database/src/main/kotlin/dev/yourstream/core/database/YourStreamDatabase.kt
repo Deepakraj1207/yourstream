@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.AutoMigrationSpec
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dev.yourstream.core.database.dao.CatalogDao
 import dev.yourstream.core.database.dao.IndexRunDao
 import dev.yourstream.core.database.dao.IndexedChatDao
 import dev.yourstream.core.database.dao.LibraryDao
@@ -16,6 +17,7 @@ import dev.yourstream.core.database.dao.ScanCursorDao
 import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
 import dev.yourstream.core.database.entity.AudioTrackEntity
+import dev.yourstream.core.database.entity.CatalogCacheEntity
 import dev.yourstream.core.database.entity.EpisodeMetadataEntity
 import dev.yourstream.core.database.entity.ItemMetadataEntity
 import dev.yourstream.core.database.entity.MetadataCacheEntity
@@ -48,7 +50,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  * missing migration fails loudly instead of wiping user data.
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
- * data (favorites, watch state/history, track preferences) · v4 external metadata.
+ * data (favorites, watch state/history, track preferences) · v4 external metadata ·
+ * v5 catalog provider cache.
  */
 @Database(
     entities = [
@@ -78,8 +81,9 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         ItemMetadataEntity::class,
         SeasonMetadataEntity::class,
         EpisodeMetadataEntity::class,
+        CatalogCacheEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -88,6 +92,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 2, to = 3, spec = YourStreamDatabase.V3::class),
         // v4: external metadata (cache, matches, applied item/season/episode metadata). Adds tables only.
         AutoMigration(from = 3, to = 4),
+        // v5: catalog provider cache. Adds one table; nothing else changes.
+        AutoMigration(from = 4, to = 5),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
@@ -99,6 +105,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun watchDao(): WatchDao
     abstract fun trackDao(): TrackDao
     abstract fun metadataDao(): MetadataDao
+    abstract fun catalogDao(): CatalogDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {

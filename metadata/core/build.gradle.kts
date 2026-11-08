@@ -17,6 +17,7 @@ kotlin {
 
 dependencies {
     api(projects.metadata.api)
+    implementation(projects.core.network)
     api(libs.kotlinx.coroutines.core)
     implementation(libs.javax.inject)
     testImplementation(libs.junit)

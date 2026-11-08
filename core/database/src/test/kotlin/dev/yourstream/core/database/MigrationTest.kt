@@ -116,4 +116,22 @@ class MigrationTest {
         assertEquals(listOf(1L), db.metadataDao().matchWork(now = 0, limit = 10).map { it.id }, "existing items are queued for matching")
         db.close()
     }
+    @Test
+    fun v4ToV5AddsTheCatalogCacheWithoutTouchingLibraryOrMetadata() = runTest {
+        helper.createDatabase(name, 4).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'MOVIE', 'movie:leo:2023', 'Leo', 'leo', 'leo', 2023, 'leo', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, NULL)")
+            execSQL("INSERT INTO item_metadata (item_id, provider, external_id, imdb_id, title, original_title, overview, poster_url, backdrop_url, genres, release_date, year, original_language, runtime_minutes, rating, `cast`, directors, series_status, fetched_at) VALUES (1, 'tmdb', '1', 'tt15654328', 'Leo', NULL, NULL, NULL, NULL, 'Action', NULL, 2023, 'ta', NULL, NULL, '[]', '', NULL, 0)")
+            execSQL("INSERT INTO metadata_cache VALUES ('tmdb', 'movie:1:en', '{}', 1, 2)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 5, true).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        assertEquals("Leo", db.libraryDao().item(1)!!.title)
+        assertEquals("tt15654328", db.metadataDao().itemMetadata(1)!!.imdbId)
+        assertEquals("{}", db.metadataDao().cacheEntry("tmdb", "movie:1:en")!!.payload)
+        assertEquals(0, db.catalogDao().cacheSize())
+        assertEquals(listOf(1L), db.catalogDao().presenceByImdb(listOf("tt15654328")).map { it.id })
+        db.close()
+    }
 }

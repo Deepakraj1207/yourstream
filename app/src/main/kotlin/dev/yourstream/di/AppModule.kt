@@ -8,7 +8,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.yourstream.BuildConfig
+import dev.yourstream.catalog.indian.IndianCatalogs
+import dev.yourstream.catalog.stremio.StremioAddonDefinition
+import dev.yourstream.catalog.stremio.StremioCatalogProvider
+import dev.yourstream.catalog.sync.CatalogProviders
+import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
+import dev.yourstream.core.network.HttpClients
 import dev.yourstream.log.AppLogger
 import dev.yourstream.metadata.sync.MetadataProviderOrder
 import dev.yourstream.metadata.sync.MetadataSettings
@@ -51,6 +57,20 @@ object AppModule {
     @Provides
     @Singleton
     fun metadataSettings(): MetadataSettings = MetadataSettings(language = BuildConfig.METADATA_LANGUAGE.ifBlank { null })
+
+    /**
+     * Catalog providers from configuration, in fallback order. The catalog core knows none of
+     * them; this is the only place that names concrete add-ons.
+     */
+    @Provides
+    @Singleton
+    fun catalogProviders(clock: Clock): CatalogProviders {
+        val ids = BuildConfig.CATALOG_PROVIDERS.split(',').map { it.trim() }.filter { it.isNotEmpty() && it != "none" }
+        val known = IndianCatalogs.create(ids, { HttpClients.create() }, clock)
+        val custom = BuildConfig.CATALOG_CUSTOM_MANIFESTS.split(',').map { it.trim() }.filter { it.startsWith("https://") || it.startsWith("stremio://") }
+            .map { StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(it), clock) }
+        return CatalogProviders(known + custom)
+    }
 
     /**
      * Telegram configuration. API id/hash come from BuildConfig, which the build fills from

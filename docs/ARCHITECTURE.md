@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–5 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata). This document is the reference
+Status: **Phases 1–6 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -14,6 +14,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P3 (= roadmap P4) Filename parsing | **done** | Standalone `:media:filename`, DB v2, re-parse worker. See [PARSER.md](PARSER.md) |
 | P4 (= roadmap P7 + parts of P9) Library | **done** | `:library`, DB v3: items/seasons/episodes/versions, watch state & history, favorites, tracks. See [LIBRARY.md](LIBRARY.md) |
 | P5 Metadata + matching | **done** | `:core:network`, `:metadata:{api,core,tmdb,cinemeta,sync}`, DB v4. See [METADATA.md](METADATA.md) |
+| P6 Catalogs | **done** | `:catalog:{api,stremio,core,indian,sync}`, DB v5 (`catalog_cache`). IndiaStreams + Indian Regional Catalog as Stremio add-on definitions; custom add-ons by manifest URL; TMDB/Cinemeta used as metadata fallback (not yet as catalog providers). As built, the blueprint's `:catalog:indiastreams/regional/custom` became one generic protocol module + definitions. See [CATALOGS.md](CATALOGS.md) |
 
 ---
 

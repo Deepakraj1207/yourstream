@@ -14,10 +14,11 @@ class DebugActivity : ComponentActivity() {
     private val viewModel: DebugViewModel by viewModels()
     private val indexViewModel: IndexDebugViewModel by viewModels()
     private val libraryViewModel: LibraryDebugViewModel by viewModels()
+    private val catalogViewModel: CatalogDebugViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel) }
+        setContent { DebugApp(viewModel, indexViewModel, libraryViewModel, catalogViewModel) }
     }
 }

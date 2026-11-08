@@ -38,6 +38,10 @@ val tmdbApiKey = secret("tmdb.apiKey", "TMDB_API_KEY")
 val tmdbReadToken = secret("tmdb.readToken", "TMDB_READ_TOKEN")
 val metadataProviders = secret("metadata.providers", "METADATA_PROVIDERS").ifEmpty { "tmdb,cinemeta" }
 val metadataLanguage = secret("metadata.language", "METADATA_LANGUAGE").ifEmpty { "en" }
+// Catalog providers (docs/CATALOGS.md): optional title lists, never a media source. Empty
+// ("none") leaves the local library only. Custom add-ons: comma-separated manifest URLs.
+val catalogProviders = secret("catalog.providers", "CATALOG_PROVIDERS").ifEmpty { "indiastreams,indian_regional" }
+val catalogCustomManifests = secret("catalog.customManifests", "CATALOG_CUSTOM_MANIFESTS")
 
 fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -62,6 +66,8 @@ android {
         buildConfigField("String", "TMDB_READ_TOKEN", quoted(tmdbReadToken))
         buildConfigField("String", "METADATA_PROVIDERS", quoted(metadataProviders))
         buildConfigField("String", "METADATA_LANGUAGE", quoted(metadataLanguage))
+        buildConfigField("String", "CATALOG_PROVIDERS", quoted(catalogProviders))
+        buildConfigField("String", "CATALOG_CUSTOM_MANIFESTS", quoted(catalogCustomManifests))
     }
 
     buildFeatures {
@@ -92,6 +98,9 @@ dependencies {
     implementation(projects.library)
     implementation(projects.metadata.sync)
     implementation(projects.metadata.tmdb)
+    implementation(projects.catalog.sync)
+    implementation(projects.catalog.indian)
+    implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.paging.compose)

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -58,7 +59,7 @@ import java.util.Date
 // Stage-1 debug UI: plain, functional, intentionally unstyled. Do not polish; Stage 2 replaces it.
 
 @Composable
-fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: LibraryDebugViewModel) {
+fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: LibraryDebugViewModel, catalogVm: CatalogDebugViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     val status by vm.status.collectAsStateWithLifecycle()
     val connection by vm.connection.collectAsStateWithLifecycle()
@@ -78,8 +79,8 @@ fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: Librar
                     TextButton(onClick = vm::restart) { Text("Restart TDLib") }
                     TextButton(onClick = vm::toggleLogs) { Text(if (showLogs) "Hide logs" else "Logs") }
                 }
-                Row {
-                    listOf("Telegram", "Index & search", "Library").forEachIndexed { i, name ->
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    listOf("Telegram", "Index & search", "Library", "Catalogs").forEachIndexed { i, name ->
                         TextButton(onClick = { tab = i }) { Text(if (tab == i) "[$name]" else name) }
                     }
                 }
@@ -96,6 +97,7 @@ fun DebugApp(vm: DebugViewModel, indexVm: IndexDebugViewModel, libraryVm: Librar
                     }
                     tab == 1 -> IndexPane(indexVm)
                     tab == 2 -> LibraryPane(libraryVm)
+                    tab == 3 -> CatalogPane(catalogVm) { id -> libraryVm.open(id); tab = 2 }
                     selected != null -> {
                         BackHandler { vm.clearSelection() }
                         ChatDetailsPane(vm, indexVm)
