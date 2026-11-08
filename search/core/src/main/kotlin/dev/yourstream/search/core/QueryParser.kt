@@ -133,7 +133,7 @@ class QueryParser(private val genres: Set<String> = DEFAULT_GENRES) {
             "action", "adventure", "animation", "comedy", "crime", "documentary", "drama", "family", "fantasy", "history", "horror",
             "music", "mystery", "romance", "science fiction", "thriller", "war", "western", "kids", "reality", "sci fi", "talk", "news",
         )
-        private val GENRE_SYNONYMS = mapOf(
+        val GENRE_SYNONYMS: Map<String, String> = mapOf(
             "comedies" to "comedy", "funny" to "comedy", "cartoon" to "animation", "cartoons" to "animation", "anime" to "animation", "animated" to "animation",
             "romantic" to "romance", "scifi" to "science fiction", "horror" to "horror", "scary" to "horror",
             "thrillers" to "thriller", "documentaries" to "documentary", "docu" to "documentary", "kids" to "family", "children" to "family",

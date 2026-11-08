@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.AutoMigrationSpec
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dev.yourstream.core.database.dao.AssistantDao
 import dev.yourstream.core.database.dao.CatalogDao
 import dev.yourstream.core.database.dao.IndexRunDao
 import dev.yourstream.core.database.dao.IndexedChatDao
@@ -121,6 +122,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun metadataDao(): MetadataDao
     abstract fun catalogDao(): CatalogDao
     abstract fun searchDao(): SearchDao
+    abstract fun assistantDao(): AssistantDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {

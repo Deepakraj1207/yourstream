@@ -65,6 +65,7 @@ fun DebugApp(
     libraryVm: LibraryDebugViewModel,
     catalogVm: CatalogDebugViewModel,
     searchVm: SearchDebugViewModel,
+    assistantVm: AssistantDebugViewModel,
     onPlay: (dev.yourstream.library.api.PlaybackTarget, Long?) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(0) }
@@ -87,7 +88,7 @@ fun DebugApp(
                     TextButton(onClick = vm::toggleLogs) { Text(if (showLogs) "Hide logs" else "Logs") }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    listOf("Telegram", "Index & search", "Library", "Catalogs", "Search").forEachIndexed { i, name ->
+                    listOf("Telegram", "Index & search", "Library", "Catalogs", "Search", "Assistant").forEachIndexed { i, name ->
                         TextButton(onClick = { tab = i }) { Text(if (tab == i) "[$name]" else name) }
                     }
                 }
@@ -106,6 +107,7 @@ fun DebugApp(
                     tab == 2 -> LibraryPane(libraryVm, onPlay)
                     tab == 3 -> CatalogPane(catalogVm) { id -> libraryVm.open(id); tab = 2 }
                     tab == 4 -> SearchPane(searchVm) { id -> libraryVm.open(id); tab = 2 }
+                    tab == 5 -> AssistantPane(assistantVm, { id -> libraryVm.open(id); tab = 2 }, onPlay)
                     selected != null -> {
                         BackHandler { vm.clearSelection() }
                         ChatDetailsPane(vm, indexVm)
