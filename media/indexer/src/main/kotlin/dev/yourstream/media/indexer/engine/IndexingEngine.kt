@@ -63,7 +63,7 @@ class IndexingEngine @Inject constructor(
     /** Permanent for this run: e.g. chat no longer accessible. */
     private class Fatal(val error: AppError) : Exception(error.message)
 
-    private inner class Run(val chatId: Long, val mode: IndexMode, val deadline: Long) {
+    private inner class Run(val chatId: Long, val chatTitle: String?, val mode: IndexMode, val deadline: Long) {
         val startedAt = clock.nowMillis()
         var phase = IndexPhase.HEAD
         var filter: MediaSearchFilter? = null
@@ -91,7 +91,7 @@ class IndexingEngine @Inject constructor(
         if (chat == null || !chat.enabled) {
             return@withPermit IndexRunResult(chatId, mode, Outcome.FAILED, 0, 0, 0, 0, 0, "Chat is not enabled for indexing")
         }
-        val run = Run(chatId, mode, deadline = clock.nowMillis() + timeBudget.inWholeMilliseconds)
+        val run = Run(chatId, chat.title, mode, deadline = clock.nowMillis() + timeBudget.inWholeMilliseconds)
         val runId = store.startRun(chatId, mode)
         store.setState(chatId, IndexState.RUNNING)
         run.publish()
@@ -163,7 +163,7 @@ class IndexingEngine @Inject constructor(
                 val page = fetchPage(run, filter, from)
                 val fresh = page.messages.filter { it.messageId > boundary }
                 maxSeen = maxOf(maxSeen, page.messages.maxOfOrNull { it.messageId } ?: 0)
-                write(run, page, fresh.mapNotNull(normalizer::normalize), cursor = null)
+                write(run, page, fresh.mapNotNull { normalizer.normalize(it, run.chatTitle) }, cursor = null)
                 // Stop as soon as the page reaches already indexed territory.
                 if (page.messages.isEmpty() || page.nextFromMessageId == 0L || page.nextFromMessageId <= boundary || fresh.size < page.messages.size) break
                 from = page.nextFromMessageId
@@ -191,7 +191,7 @@ class IndexingEngine @Inject constructor(
                     backfillComplete = done,
                     estimatedTotal = page.totalCount,
                 )
-                write(run, page, page.messages.mapNotNull(normalizer::normalize), cursor)
+                write(run, page, page.messages.mapNotNull { normalizer.normalize(it, run.chatTitle) }, cursor)
                 if (done) break
                 from = page.nextFromMessageId
                 delay(config.pageDelay)
@@ -234,8 +234,9 @@ class IndexingEngine @Inject constructor(
             val gone = lookups.filter { it is MessageLookup.Missing || it is MessageLookup.NoMedia }.map { it.messageId }
             val alive = lookups.filterIsInstance<MessageLookup.Found>()
             // Re-upsert the living: catches replaced files and refreshes session file ids.
-            val written = store.upsert(alive.mapNotNull { normalizer.normalize(it.message) })
-            val removedByPolicy = alive.filter { normalizer.normalize(it.message) == null }.map { it.messageId }
+            val normalized = alive.associate { it.messageId to normalizer.normalize(it.message, run.chatTitle) }
+            val written = store.upsert(normalized.values.filterNotNull())
+            val removedByPolicy = normalized.filterValues { it == null }.keys.toList()
             val removed = store.markDeleted(run.chatId, gone + removedByPolicy)
             cursor = ids.last()
             store.setVerifyCursor(run.chatId, cursor, finished = false)

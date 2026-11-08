@@ -24,6 +24,13 @@ android {
     }
 }
 
+// MigrationTestHelper reads the exported schemas as unit-test assets.
+androidComponents {
+    onVariants { variant ->
+        variant.hostTests.values.forEach { it.sources.assets?.addStaticSourceDirectory("schemas") }
+    }
+}
+
 room {
     // Committed: every schema version is kept for migration tests.
     schemaDirectory("$projectDir/schemas")
@@ -40,4 +47,5 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.room.testing)
 }

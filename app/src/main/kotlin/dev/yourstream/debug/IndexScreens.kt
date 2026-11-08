@@ -34,6 +34,7 @@ import dev.yourstream.media.api.model.IndexMode
 import dev.yourstream.media.api.model.IndexedMedia
 import dev.yourstream.media.api.model.MediaSummary
 import dev.yourstream.media.api.model.MediaType
+import dev.yourstream.media.filename.MediaFilenameParser
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +73,43 @@ fun IndexPane(vm: IndexDebugViewModel) {
     }
 }
 
+/** Type any name and see what the parser makes of it (no indexing involved). */
+@Composable
+private fun ParserPlayground() {
+    var input by remember { mutableStateOf("Doraemon.S03E12.Tamil.720p.mkv") }
+    var open by remember { mutableStateOf(false) }
+    TextButton(onClick = { open = !open }) { Text(if (open) "Hide parser playground" else "Parser playground") }
+    if (!open) return
+    OutlinedTextField(value = input, onValueChange = { input = it }, label = { Text("File name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    val m = remember(input) { MediaFilenameParser.parse(input) }
+    val lines = buildList {
+        add("cleaned: ${m.cleanedName}  ext: ${m.extension ?: "—"}  kind: ${m.kind.value} (${pct(m.kind.confidence)})  overall: ${pct(m.confidence)}")
+        m.title?.let { add("title: ${it.value} (${pct(it.confidence)})  key: ${m.normalizedTitle}") }
+        m.year?.let { add("year: ${it.value} (${pct(it.confidence)})") }
+        m.season?.let { add("season: ${it.value}${m.seasonEnd?.let { e -> "-$e" } ?: ""} (${pct(it.confidence)})") }
+        m.episode?.let { add("episode: ${it.value}${m.episodeEnd?.let { e -> "-$e" } ?: ""} (${pct(it.confidence)})") }
+        m.absoluteEpisode?.let { add("absolute episode: ${it.value} (${pct(it.confidence)})") }
+        m.resolution?.let { add("resolution: ${it.value}p (${pct(it.confidence)})") }
+        m.quality?.let { add("quality: ${it.value} (${pct(it.confidence)})") }
+        m.videoCodec?.let { add("codec: ${it.value}") }
+        m.audio?.let { add("audio: ${it.codecs} ${it.channels ?: ""} dual=${it.isDualAudio}") }
+        if (m.languages.isNotEmpty()) add("languages: " + m.languages.joinToString { "${it.value.name} (${pct(it.confidence)})" })
+        m.subtitles?.let { add("subtitles: ${it.languages.map { l -> l.code }} hardcoded=${it.hardcoded}") }
+        m.releaseGroup?.let { add("group: ${it.value}") }
+        if (m.warnings.isNotEmpty()) add("warnings: ${m.warnings}")
+    }
+    lines.forEach { Text(it, fontSize = 11.sp) }
+    HorizontalDivider()
+}
+
+private fun pct(f: Float) = String.format(Locale.US, "%.2f", f)
+
+private fun String?.withConfidence(p: dev.yourstream.media.api.model.ParsedMedia?, field: String): String? {
+    if (this == null) return null
+    val c = p?.fieldConfidence?.get(field) ?: return this
+    return "$this  (${pct(c)})"
+}
+
 @Composable
 private fun SearchPane(vm: IndexDebugViewModel) {
     val chats by vm.chats.collectAsStateWithLifecycle()
@@ -102,6 +140,7 @@ private fun SearchPane(vm: IndexDebugViewModel) {
             if (chats.isEmpty()) Text("No chats indexed. Open a chat in the Telegram tab and tap Start indexing.", fontSize = 12.sp)
         }
         HorizontalDivider()
+        ParserPlayground()
         OutlinedTextField(
             value = text,
             onValueChange = { text = it; vm.setText(it) },
@@ -131,13 +170,14 @@ private fun SearchPane(vm: IndexDebugViewModel) {
 @Composable
 private fun MediaRow(media: MediaSummary, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 5.dp)) {
-        Text(media.fileName, fontSize = 13.sp)
+        Text(media.fileName.ifEmpty { media.parsedTitle ?: "(no name)" }, fontSize = 13.sp)
         Text(
             listOfNotNull(
                 media.mediaType.name,
                 bytes(media.sizeBytes),
                 media.parsedTitle?.let { "“$it”" },
-                media.season?.let { s -> "S$s" + (media.episode?.let { "E$it" } ?: "") } ?: media.episode?.let { "E$it" },
+                media.season?.let { s -> "S$s" + (media.episode?.let { "E$it" } ?: "") } ?: media.episode?.let { "E$it" }
+                    ?: media.absoluteEpisode?.let { "#$it" },
                 media.resolution?.let { "${it}p" },
                 media.durationSeconds?.let { duration(it) },
                 if (media.isDuplicate) "duplicate" else null,
@@ -157,7 +197,7 @@ private fun MediaDetailsPane(media: IndexedMedia, duplicates: List<MediaSummary>
         val p = media.parsed
         listOf(
             "Record id" to media.id.toString(),
-            "File name" to media.fileName,
+            "File name (original)" to media.fileName.ifEmpty { "(Telegram sent no name)" },
             "Media type" to media.mediaType.name,
             "Sent as" to media.contentType.name,
             "MIME" to media.mimeType.ifBlank { null },
@@ -183,21 +223,32 @@ private fun MediaDetailsPane(media: IndexedMedia, duplicates: List<MediaSummary>
             "Indexed" to date(media.indexedAt),
             "Updated" to date(media.updatedAt),
             "Caption" to media.caption.ifBlank { null },
-            "— Parsed —" to "",
-            "Title" to p?.title,
-            "Year" to p?.year?.toString(),
-            "Season / episode" to p?.let { listOfNotNull(it.season?.let { s -> "S$s" }, it.episode?.let { e -> "E$e" }, it.episodeEnd?.let { e -> "–E$e" }).joinToString("").ifBlank { null } },
-            "Resolution" to p?.resolution?.let { "${it}p" },
-            "Source" to p?.source,
-            "Codec (name)" to p?.videoCodec,
-            "Audio (name)" to p?.audioCodecs?.joinToString()?.ifBlank { null },
+            "— Parsed (from the original name) —" to "",
+            "Kind" to p?.kind,
+            "Title" to p?.title.withConfidence(p, "title"),
+            "Normalized title" to p?.normalizedTitle,
+            "Alternative title" to p?.alternativeTitle,
+            "Year" to p?.year?.toString().withConfidence(p, "year"),
+            "Season" to p?.season?.let { s -> "S$s" + (p.seasonEnd?.let { "–S$it" } ?: "") }.withConfidence(p, "season"),
+            "Episode" to p?.episode?.let { e -> "E$e" + (p.episodeEnd?.let { "–E$it" } ?: "") }.withConfidence(p, "episode"),
+            "Absolute episode" to p?.absoluteEpisode?.toString().withConfidence(p, "absoluteEpisode"),
+            "Air date" to p?.airDate,
+            "Resolution" to p?.resolution?.let { "${it}p" }.withConfidence(p, "resolution"),
+            "Quality" to p?.quality.withConfidence(p, "quality"),
+            "Quality tags" to p?.qualityTags?.joinToString()?.ifBlank { null },
+            "Service" to p?.streamingService,
+            "Codec (name)" to p?.videoCodec.withConfidence(p, "videoCodec"),
+            "Bit depth" to p?.bitDepth?.toString(),
             "HDR" to p?.hdr,
-            "Languages" to p?.languages?.joinToString()?.ifBlank { null },
-            "Subtitles" to p?.subtitleLanguages?.joinToString()?.ifBlank { null },
+            "Audio" to p?.let { listOfNotNull(it.audioCodecs.joinToString().ifBlank { null }, it.audioChannels, it.audioBitrateKbps?.let { b -> "${b}kbps" }, if (it.isDualAudio) "dual" else null, if (it.isMultiAudio) "multi" else null).joinToString(" ").ifBlank { null } },
+            "Languages" to p?.languages?.joinToString()?.ifBlank { null }?.let { if (p.isDubbed) "$it (dubbed)" else it }.withConfidence(p, "language"),
+            "Subtitles" to p?.let { listOfNotNull(it.subtitleLanguages.joinToString().ifBlank { null }, it.subtitlesHardcoded?.let { h -> if (h) "hardcoded" else "soft" }).joinToString(" ").ifBlank { null } },
             "Edition" to p?.edition,
-            "Release group" to p?.releaseGroup,
+            "Release group" to p?.releaseGroup.withConfidence(p, "releaseGroup"),
             "Part" to p?.partNumber?.toString(),
-            "Confidence" to p?.confidence?.let { String.format(Locale.US, "%.2f", it) },
+            "Flags" to p?.flags?.joinToString()?.ifBlank { null },
+            "Overall confidence" to p?.confidence?.let { String.format(Locale.US, "%.2f", it) },
+            "Warnings" to p?.warnings?.joinToString("; ")?.ifBlank { null },
             "Parser version" to p?.parserVersion?.toString(),
         ).forEach { (label, value) -> Text("$label: ${value ?: "—"}", fontSize = 13.sp, modifier = Modifier.padding(vertical = 1.dp)) }
 

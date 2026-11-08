@@ -29,6 +29,7 @@ data class MediaSummaryRow(
     @ColumnInfo(name = "parsed_title") val parsedTitle: String?,
     val season: Int?,
     val episode: Int?,
+    @ColumnInfo(name = "absolute_episode") val absoluteEpisode: Int?,
     val resolution: Int?,
     @ColumnInfo(name = "is_duplicate") val isDuplicate: Boolean,
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
@@ -53,4 +54,14 @@ data class DuplicateKeyRow(
     val id: Long,
     @ColumnInfo(name = "file_unique_id") val fileUniqueId: String,
     val fingerprint: String?,
+)
+
+/** Input for re-parsing: the stored original name and the context hints. */
+data class ReparseRow(
+    val id: Long,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    val caption: String,
+    @ColumnInfo(name = "audio_title") val audioTitle: String?,
+    @ColumnInfo(name = "audio_performer") val audioPerformer: String?,
+    @ColumnInfo(name = "chat_title") val chatTitle: String?,
 )

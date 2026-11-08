@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–2 implemented** (Telegram layer; media discovery and indexing). This document is the reference
+Status: **Phases 1–3 implemented** (Telegram layer; media discovery and indexing; filename parsing). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -11,6 +11,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P0 Foundation | partial | Version catalog, Gradle 9.8.1 wrapper, AGP 9.4.1, Kotlin 2.4.21, Hilt. `build-logic` convention plugins and CI are not added yet |
 | P1 Telegram core | **done** | `:core:common`, `:telegram:api`, `:telegram:core`, `:telegram:tdlib`, debug UI in `:app`. See §14 |
 | P2 (= roadmap P3 + basic P4) Indexing | **done** | `:core:database`, `:media:api`, `:media:parser`, `:media:indexer`. See [INDEXING.md](INDEXING.md) |
+| P3 (= roadmap P4) Filename parsing | **done** | Standalone `:media:filename`, DB v2, re-parse worker. See [PARSER.md](PARSER.md) |
 
 ---
 
@@ -179,7 +180,8 @@ yourstream/
 │   └── tdlib/         (Android)   # TdlibTelegramClient (the only TDLib user), mappers, network monitor, Hilt
 ├── media/
 │   ├── source/        (JVM)       # MediaSource, MediaSourceResolver, PlayableSource
-│   ├── parser/        (JVM)       # ReleaseNameParser (filename + caption), language dictionaries
+│   ├── filename/      (JVM)       # standalone MediaFilenameParser (no dependencies)
+│   ├── parser/        (JVM)       # classifier, normaliser, filename → ParsedMedia bridge
 │   └── indexer/       (Android)   # IndexingPipeline, ChatIndexer, WorkManager workers
 ├── metadata/
 │   ├── api/           (JVM)       # MetadataProvider, ExternalIds, MetadataDetails

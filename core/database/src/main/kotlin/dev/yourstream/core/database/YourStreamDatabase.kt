@@ -1,6 +1,7 @@
 package dev.yourstream.core.database
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -16,8 +17,8 @@ import dev.yourstream.core.database.entity.ParsedMediaEntity
 import dev.yourstream.core.database.entity.ScanCursorEntity
 
 /**
- * Schema history is exported to core/database/schemas. Every version bump needs a Migration
- * and a MigrationTestHelper test; destructive fallback is not allowed.
+ * Schema history is exported to core/database/schemas. Every version bump needs a migration
+ * (auto or manual) and a test in MigrationTest; destructive fallback is not allowed.
  */
 @Database(
     entities = [
@@ -28,8 +29,12 @@ import dev.yourstream.core.database.entity.ScanCursorEntity
         MediaFtsEntity::class,
         IndexRunEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [
+        // v2: richer parsed metadata (media_parsed columns + normalized_title index).
+        AutoMigration(from = 1, to = 2),
+    ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun indexedChatDao(): IndexedChatDao

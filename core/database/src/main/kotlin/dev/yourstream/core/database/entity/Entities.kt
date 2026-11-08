@@ -117,11 +117,16 @@ data class MediaEntity(
     @ColumnInfo(name = "last_seen_at") val lastSeenAt: Long,
 )
 
-/** Parser output, kept apart so it can be recomputed when the parser improves (parser_version). */
+/**
+ * Metadata parsed from the original file name (media.file_name, never modified). Kept apart so
+ * it can be recomputed from the stored name whenever the parser improves (parser_version).
+ * Added in v2: everything from normalized_title down. Lists are comma-joined; field_confidence
+ * is "field=0.95;field=0.80".
+ */
 @Entity(
     tableName = "media_parsed",
     foreignKeys = [ForeignKey(MediaEntity::class, ["id"], ["media_id"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index(value = ["parser_version"])],
+    indices = [Index(value = ["parser_version"]), Index(value = ["normalized_title"])],
 )
 data class ParsedMediaEntity(
     @PrimaryKey @ColumnInfo(name = "media_id") val mediaId: Long,
@@ -131,7 +136,8 @@ data class ParsedMediaEntity(
     val episode: Int?,
     @ColumnInfo(name = "episode_end") val episodeEnd: Int?,
     val resolution: Int?,
-    val source: String?,
+    /** Release source / quality (WEB-DL, BluRay …). Column name kept from v1. */
+    @ColumnInfo(name = "source") val quality: String?,
     @ColumnInfo(name = "video_codec") val videoCodec: String?,
     @ColumnInfo(name = "audio_codecs") val audioCodecs: String,
     val hdr: String?,
@@ -142,6 +148,25 @@ data class ParsedMediaEntity(
     @ColumnInfo(name = "part_number") val partNumber: Int?,
     val confidence: Float,
     @ColumnInfo(name = "parser_version") val parserVersion: Int,
+    // ---- v2 ----
+    @ColumnInfo(name = "normalized_title") val normalizedTitle: String? = null,
+    @ColumnInfo(name = "alternative_title") val alternativeTitle: String? = null,
+    @ColumnInfo(name = "season_end") val seasonEnd: Int? = null,
+    @ColumnInfo(name = "absolute_episode") val absoluteEpisode: Int? = null,
+    @ColumnInfo(name = "air_date") val airDate: String? = null,
+    @ColumnInfo(name = "quality_tags", defaultValue = "") val qualityTags: String = "",
+    @ColumnInfo(name = "streaming_service") val streamingService: String? = null,
+    @ColumnInfo(name = "bit_depth") val bitDepth: Int? = null,
+    @ColumnInfo(name = "audio_channels") val audioChannels: String? = null,
+    @ColumnInfo(name = "audio_bitrate_kbps") val audioBitrateKbps: Int? = null,
+    @ColumnInfo(name = "dual_audio", defaultValue = "0") val dualAudio: Boolean = false,
+    @ColumnInfo(name = "multi_audio", defaultValue = "0") val multiAudio: Boolean = false,
+    @ColumnInfo(name = "dubbed", defaultValue = "0") val dubbed: Boolean = false,
+    @ColumnInfo(name = "subtitles_hardcoded") val subtitlesHardcoded: Boolean? = null,
+    @ColumnInfo(name = "flags", defaultValue = "") val flags: String = "",
+    @ColumnInfo(name = "kind", defaultValue = "UNKNOWN") val kind: String = "UNKNOWN",
+    @ColumnInfo(name = "field_confidence", defaultValue = "") val fieldConfidence: String = "",
+    @ColumnInfo(name = "warnings", defaultValue = "") val warnings: String = "",
 )
 
 /**

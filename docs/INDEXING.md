@@ -5,7 +5,7 @@ Telegram (TDLib)
   → Chat scanner      DefaultMediaIndexer / IndexScheduler   which chats, when (WorkManager)
   → Message scanner   IndexingEngine                          searchChatMessages per filter, cursors
   → Media extractor   TdMappers.mediaMessage                  MessageVideo / MessageDocument / MessageAudio
-  → Filename parser   ReleaseNameParser                       title, year, SxxEyy, 1080p, codecs, languages…
+  → Filename parser   :media:filename MediaFilenameParser      see PARSER.md
   → Media normalizer  MediaClassifier + MediaNormalizer       type, extension, fingerprint, search text
   → Local database    RoomIndexStore → core:database (Room)   upsert, duplicates, FTS
 ```
@@ -14,11 +14,12 @@ Telegram (TDLib)
 |---|---|
 | `:telegram:api` / `:telegram:tdlib` | `TelegramMessageRepository`: `searchMedia`, `lookupMessages`, live `events`. TDLib stays in `:telegram:tdlib` |
 | `:media:api` | `MediaIndexRepository` (read, paged), `MediaIndexer` (write/schedule), models |
-| `:media:parser` | Pure Kotlin: `ReleaseNameParser`, `MediaClassifier`, `MediaNormalizer`, `SearchText` |
+| `:media:filename` | Standalone filename parser (see [PARSER.md](PARSER.md)) |
+| `:media:parser` | Pure Kotlin: `ParsedMediaMapper`, `MediaClassifier`, `MediaNormalizer`, `SearchText` |
 | `:core:database` | `YourStreamDatabase` (Room, schema in `core/database/schemas`) |
 | `:media:indexer` | `IndexingEngine`, `RoomIndexStore`, `LiveIndexUpdater`, workers, use cases, Hilt |
 
-## Database schema (version 1)
+## Database schema (version 2; v1 → v2 adds parsed-metadata columns, see PARSER.md)
 
 | Table | Key | Purpose |
 |---|---|---|
@@ -56,7 +57,7 @@ Extraction and normalisation happen per message:
 - `TdMappers` turns video, document and audio messages into `TelegramMediaMessage`; anything else is ignored.
 - `MediaClassifier` decides the type from extension, then MIME. Telegram often sends MKVs and SRTs as `application/octet-stream`. Split parts like `.mkv.001` are classified as video.
 - `IndexingPolicy` keeps video, subtitles and audio by default. Archives and other documents (PDF, APK…) are skipped.
-- `ReleaseNameParser` parses the file name. If the name is generic (`video_2024.mp4`), it parses the caption's first line instead.
+- `MediaFilenameParser` parses the file name, falling back to the caption and then the chat title for generic names. The original `file_name` is stored unchanged.
 
 Running and background work:
 - **Live updates** (`LiveIndexUpdater`): while the app runs, new media in enabled chats are inserted immediately, permanent deletions are applied, and edited messages are re-looked-up. Live inserts deliberately do **not** move cursors: they say nothing about messages missed while the app was closed.

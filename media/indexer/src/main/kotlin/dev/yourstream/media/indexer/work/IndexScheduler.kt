@@ -45,6 +45,15 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
         workManager.cancelUniqueWork(uniqueName(chatId))
     }
 
+    /** Re-parses stored names after a parser upgrade (no network needed). */
+    fun scheduleReparse() {
+        val request = OneTimeWorkRequestBuilder<ReparseWorker>()
+            .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
+            .addTag(TAG)
+            .build()
+        workManager.enqueueUniqueWork(REPARSE_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
     fun ensurePeriodicSync() {
         val request = PeriodicWorkRequestBuilder<PeriodicSyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build())
@@ -62,6 +71,7 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
     companion object {
         const val TAG = "media-index"
         private const val PERIODIC_NAME = "media-index-periodic"
+        private const val REPARSE_NAME = "media-index-reparse"
         fun uniqueName(chatId: Long) = "index-chat-$chatId"
     }
 }

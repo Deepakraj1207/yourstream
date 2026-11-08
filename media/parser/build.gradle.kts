@@ -17,6 +17,7 @@ kotlin {
 dependencies {
     api(projects.media.api)
     api(projects.telegram.api)
+    api(projects.media.filename)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)

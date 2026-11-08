@@ -10,6 +10,8 @@ import dev.yourstream.telegram.api.model.TelegramFile
 /** What the engine knows about a chat it is about to index. */
 data class ChatRecord(
     val chatId: Long,
+    /** Used as a last-resort title hint for generic file names. */
+    val title: String?,
     val enabled: Boolean,
     val verifyCursor: Long,
     val lastVerifiedAt: Long?,

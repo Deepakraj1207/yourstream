@@ -90,7 +90,7 @@ class SearchAndLiveTest {
         assertEquals("Vikram", media.parsed?.title)
         assertEquals(2022, media.parsed?.year)
         assertEquals(1080, media.parsed?.resolution)
-        assertEquals(listOf("tamil"), media.parsed?.languages)
+        assertEquals(listOf("ta"), media.parsed?.languages)
         assertEquals(MediaType.VIDEO, media.mediaType)
     }
 

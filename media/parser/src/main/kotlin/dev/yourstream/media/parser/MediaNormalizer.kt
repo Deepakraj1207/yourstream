@@ -32,6 +32,7 @@ data class NormalizedMedia(
     val fileId: Int,
     val fileUniqueId: String,
     val remoteFileId: String,
+    /** The Telegram file name exactly as received (may be empty). Never rewritten. */
     val fileName: String,
     val mimeType: String,
     val extension: String?,
@@ -60,15 +61,20 @@ data class NormalizedMedia(
 /** Media extractor + normaliser: Telegram message → [NormalizedMedia], or null if not indexed. */
 class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
 
-    fun normalize(message: TelegramMediaMessage): NormalizedMedia? {
+    /**
+     * [chatTitle] is a last-resort hint for the title when both file name and caption are
+     * generic. The Telegram file name is stored exactly as received, even when empty.
+     */
+    fun normalize(message: TelegramMediaMessage, chatTitle: String? = null): NormalizedMedia? {
         val media = message.media
         val file = media.file
-        val fileName = media.fileName.ifBlank { fallbackName(message) }
-        val type = MediaClassifier.classify(fileName, media.mimeType, message.contentType)
+        val originalName = media.fileName
+        val nameForAnalysis = originalName.ifBlank { fallbackName(message) }
+        val type = MediaClassifier.classify(nameForAnalysis, media.mimeType, message.contentType)
         if (!policy.accepts(type)) return null
 
-        val parts = MediaClassifier.splitName(fileName)
-        val parsed = ReleaseNameParser.parse(fileName, message.caption)
+        val parts = MediaClassifier.splitName(originalName)
+        val parsed = ParsedMediaMapper.parse(originalName, message.caption, chatTitle)
         val size = if (file.size > 0) file.size else file.expectedSize
 
         return NormalizedMedia(
@@ -80,7 +86,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
             fileId = file.id,
             fileUniqueId = file.remoteUniqueId,
             remoteFileId = file.remoteId,
-            fileName = fileName,
+            fileName = originalName,
             mimeType = media.mimeType,
             extension = parts.extension,
             sizeBytes = size,
@@ -106,7 +112,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
             },
             downloadedBytes = file.downloadedSize,
             localPath = file.localPath,
-            searchTitle = SearchText.normalize(listOfNotNull(parsed.title, media.title, media.performer).joinToString(" ")),
+            searchTitle = searchTitle(parsed, media.title, media.performer),
             fingerprint = fingerprint(parts.baseName, parts.extension, parts.splitPart, size),
             parsed = parsed,
         )
@@ -122,6 +128,10 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
     }
 
     companion object {
+        /** Words FTS indexes next to the file name: titles, alternative title, audio tags. */
+        fun searchTitle(parsed: ParsedMedia, audioTitle: String?, performer: String?): String =
+            SearchText.normalize(listOfNotNull(parsed.title, parsed.alternativeTitle, audioTitle, performer).joinToString(" "))
+
         /** Files smaller than this are too likely to collide by name+size by accident. */
         const val MIN_FINGERPRINT_BYTES: Long = 1L * 1024 * 1024
 

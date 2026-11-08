@@ -16,34 +16,63 @@ enum class DuplicateKind { EXACT, PROBABLE }
 /** How Telegram delivered it. */
 enum class SourceContentType { VIDEO, DOCUMENT, AUDIO }
 
-/** What the filename/caption parser understood. Every field is optional. */
+/**
+ * Structured metadata derived from the original file name (which is stored unchanged next to
+ * it). Produced by :media:filename; every field is optional and [fieldConfidence] says how sure
+ * the parser was about each one (0..1).
+ */
 data class ParsedMedia(
     val title: String?,
+    /** Lower-case, accent-folded matching key ("tom and jerry"). */
+    val normalizedTitle: String? = null,
+    val alternativeTitle: String? = null,
     val year: Int?,
     val season: Int?,
+    val seasonEnd: Int? = null,
     val episode: Int?,
     /** Last episode of a range such as "E01-E03". */
     val episodeEnd: Int?,
+    /** Season-less episode number ("Shinchan 125", anime "- 12"). */
+    val absoluteEpisode: Int? = null,
+    /** "2024-03-15" for date-numbered shows. */
+    val airDate: String? = null,
     /** Vertical resolution in lines (480, 720, 1080, 2160). */
     val resolution: Int?,
-    /** WEB-DL, BluRay, HDRip, … */
-    val source: String?,
+    /** Release source / quality: WEB-DL, BluRay, HDRip, CAM … */
+    val quality: String?,
+    val qualityTags: List<String> = emptyList(),
+    val streamingService: String? = null,
     val videoCodec: String?,
-    val audioCodecs: List<String>,
+    val bitDepth: Int? = null,
     val hdr: String?,
-    /** Spoken languages named in the release, lower-case English names ("tamil"). */
+    val audioCodecs: List<String>,
+    val audioChannels: String? = null,
+    val audioBitrateKbps: Int? = null,
+    val isDualAudio: Boolean = false,
+    val isMultiAudio: Boolean = false,
+    /** Spoken languages as ISO codes ("ta", "hi", "en"). */
     val languages: List<String>,
-    /** Subtitle hints ("english" for ESub). */
+    val isDubbed: Boolean = false,
+    /** Subtitle languages as ISO codes ("en"; "mul" = several). */
     val subtitleLanguages: List<String>,
+    /** True = burnt in, false = soft, null = unknown. */
+    val subtitlesHardcoded: Boolean? = null,
     val edition: String?,
     val releaseGroup: String?,
-    /** For split files: 1 for ".001"/"part1"/"CD1". */
+    /** For split files: 1 for ".001"/"CD1". */
     val partNumber: Int?,
+    /** SAMPLE, TRAILER, THREE_D, COMPLETE, PROPER, REPACK. */
+    val flags: Set<String> = emptySet(),
+    /** MOVIE, EPISODE, SEASON_PACK or UNKNOWN. */
+    val kind: String = "UNKNOWN",
+    /** Field name → confidence (title, year, season, episode, language, resolution …). */
+    val fieldConfidence: Map<String, Float> = emptyMap(),
     /** 0..1: how much of the name the parser understood. */
     val confidence: Float,
+    val warnings: List<String> = emptyList(),
     val parserVersion: Int,
 ) {
-    val isEpisode: Boolean get() = episode != null
+    val isEpisode: Boolean get() = episode != null || absoluteEpisode != null || airDate != null
 }
 
 /** A full index record. */
@@ -101,6 +130,7 @@ data class MediaSummary(
     val parsedTitle: String?,
     val season: Int?,
     val episode: Int?,
+    val absoluteEpisode: Int?,
     val resolution: Int?,
     val isDuplicate: Boolean,
     val isDeleted: Boolean,

@@ -82,6 +82,17 @@ interface MediaDao {
     @Query("SELECT COUNT(*) FROM media_parsed WHERE parser_version < :version")
     suspend fun countOutdatedParses(version: Int): Int
 
+    /** Rows whose metadata came from an older parser, in id order (keyset paging). */
+    @Query(
+        """SELECT m.id, m.file_name, m.caption, m.audio_title, m.audio_performer, c.title AS chat_title
+        FROM media m JOIN media_parsed p ON p.media_id = m.id LEFT JOIN indexed_chat c ON c.chat_id = m.chat_id
+        WHERE p.parser_version < :version AND m.id > :afterId ORDER BY m.id LIMIT :limit""",
+    )
+    suspend fun outdatedParses(version: Int, afterId: Long, limit: Int): List<ReparseRow>
+
+    @Query("UPDATE media SET search_title = :searchTitle WHERE id = :id")
+    suspend fun setSearchTitle(id: Long, searchTitle: String)
+
     // ---------- reader side ----------
 
     @Transaction
@@ -143,7 +154,7 @@ interface MediaDao {
     private companion object {
         const val SUMMARY_SELECT = """
             SELECT m.id, m.chat_id, m.message_id, m.file_name, m.media_type, m.size_bytes, m.duration_seconds,
-                   m.message_date, p.title AS parsed_title, p.season, p.episode, p.resolution,
+                   m.message_date, p.title AS parsed_title, p.season, p.episode, p.absolute_episode, p.resolution,
                    (m.canonical_media_id IS NOT NULL) AS is_duplicate, m.is_deleted
             FROM media m LEFT JOIN media_parsed p ON p.media_id = m.id"""
 

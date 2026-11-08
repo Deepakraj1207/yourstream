@@ -1,0 +1,869 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "f0ed42e8ec223d1f861b8797dbded923",
+    "entities": [
+      {
+        "tableName": "indexed_chat",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`chat_id` INTEGER NOT NULL, `title` TEXT NOT NULL, `category` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `state` TEXT NOT NULL, `last_error` TEXT, `last_indexed_at` INTEGER, `last_verified_at` INTEGER, `verify_cursor` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`chat_id`))",
+        "fields": [
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "last_error",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastIndexedAt",
+            "columnName": "last_indexed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastVerifiedAt",
+            "columnName": "last_verified_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "verifyCursor",
+            "columnName": "verify_cursor",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "chat_id"
+          ]
+        }
+      },
+      {
+        "tableName": "scan_cursor",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`chat_id` INTEGER NOT NULL, `filter` TEXT NOT NULL, `newest_message_id` INTEGER NOT NULL, `backfill_from_message_id` INTEGER NOT NULL, `backfill_complete` INTEGER NOT NULL, `estimated_total` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`chat_id`, `filter`), FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filter",
+            "columnName": "filter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "newestMessageId",
+            "columnName": "newest_message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backfillFromMessageId",
+            "columnName": "backfill_from_message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backfillComplete",
+            "columnName": "backfill_complete",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estimatedTotal",
+            "columnName": "estimated_total",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "chat_id",
+            "filter"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chat_id` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `album_id` INTEGER NOT NULL, `message_date` INTEGER NOT NULL, `edit_date` INTEGER NOT NULL, `file_id` INTEGER NOT NULL, `file_unique_id` TEXT NOT NULL, `remote_file_id` TEXT NOT NULL, `file_name` TEXT NOT NULL, `mime_type` TEXT NOT NULL, `extension` TEXT, `size_bytes` INTEGER NOT NULL, `duration_seconds` INTEGER, `width` INTEGER, `height` INTEGER, `video_codec` TEXT, `audio_codecs` TEXT NOT NULL, `supports_streaming` INTEGER NOT NULL, `media_type` TEXT NOT NULL, `content_type` TEXT NOT NULL, `caption` TEXT NOT NULL, `audio_title` TEXT, `audio_performer` TEXT, `download_state` TEXT NOT NULL, `downloaded_bytes` INTEGER NOT NULL, `local_path` TEXT, `search_title` TEXT NOT NULL, `fingerprint` TEXT, `canonical_media_id` INTEGER, `duplicate_kind` TEXT, `is_deleted` INTEGER NOT NULL, `deleted_at` INTEGER, `indexed_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `last_seen_at` INTEGER NOT NULL, FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "albumId",
+            "columnName": "album_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageDate",
+            "columnName": "message_date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "editDate",
+            "columnName": "edit_date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileId",
+            "columnName": "file_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileUniqueId",
+            "columnName": "file_unique_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteFileId",
+            "columnName": "remote_file_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileName",
+            "columnName": "file_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extension",
+            "columnName": "extension",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationSeconds",
+            "columnName": "duration_seconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "videoCodec",
+            "columnName": "video_codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioCodecs",
+            "columnName": "audio_codecs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supportsStreaming",
+            "columnName": "supports_streaming",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaType",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentType",
+            "columnName": "content_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioTitle",
+            "columnName": "audio_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioPerformer",
+            "columnName": "audio_performer",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "downloadState",
+            "columnName": "download_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedBytes",
+            "columnName": "downloaded_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localPath",
+            "columnName": "local_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "searchTitle",
+            "columnName": "search_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "canonicalMediaId",
+            "columnName": "canonical_media_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "duplicateKind",
+            "columnName": "duplicate_kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "is_deleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "indexedAt",
+            "columnName": "indexed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "last_seen_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_chat_id_message_id",
+            "unique": true,
+            "columnNames": [
+              "chat_id",
+              "message_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_media_chat_id_message_id` ON `${TABLE_NAME}` (`chat_id`, `message_id`)"
+          },
+          {
+            "name": "index_media_chat_id_is_deleted",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "is_deleted"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_chat_id_is_deleted` ON `${TABLE_NAME}` (`chat_id`, `is_deleted`)"
+          },
+          {
+            "name": "index_media_chat_id_message_date",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "message_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_chat_id_message_date` ON `${TABLE_NAME}` (`chat_id`, `message_date`)"
+          },
+          {
+            "name": "index_media_message_date",
+            "unique": false,
+            "columnNames": [
+              "message_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_message_date` ON `${TABLE_NAME}` (`message_date`)"
+          },
+          {
+            "name": "index_media_file_unique_id",
+            "unique": false,
+            "columnNames": [
+              "file_unique_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_file_unique_id` ON `${TABLE_NAME}` (`file_unique_id`)"
+          },
+          {
+            "name": "index_media_fingerprint",
+            "unique": false,
+            "columnNames": [
+              "fingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_fingerprint` ON `${TABLE_NAME}` (`fingerprint`)"
+          },
+          {
+            "name": "index_media_canonical_media_id",
+            "unique": false,
+            "columnNames": [
+              "canonical_media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_canonical_media_id` ON `${TABLE_NAME}` (`canonical_media_id`)"
+          },
+          {
+            "name": "index_media_file_id",
+            "unique": false,
+            "columnNames": [
+              "file_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_file_id` ON `${TABLE_NAME}` (`file_id`)"
+          },
+          {
+            "name": "index_media_media_type",
+            "unique": false,
+            "columnNames": [
+              "media_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_media_type` ON `${TABLE_NAME}` (`media_type`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_parsed",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` INTEGER NOT NULL, `title` TEXT, `year` INTEGER, `season` INTEGER, `episode` INTEGER, `episode_end` INTEGER, `resolution` INTEGER, `source` TEXT, `video_codec` TEXT, `audio_codecs` TEXT NOT NULL, `hdr` TEXT, `languages` TEXT NOT NULL, `subtitle_languages` TEXT NOT NULL, `edition` TEXT, `release_group` TEXT, `part_number` INTEGER, `confidence` REAL NOT NULL, `parser_version` INTEGER NOT NULL, `normalized_title` TEXT, `alternative_title` TEXT, `season_end` INTEGER, `absolute_episode` INTEGER, `air_date` TEXT, `quality_tags` TEXT NOT NULL DEFAULT '', `streaming_service` TEXT, `bit_depth` INTEGER, `audio_channels` TEXT, `audio_bitrate_kbps` INTEGER, `dual_audio` INTEGER NOT NULL DEFAULT 0, `multi_audio` INTEGER NOT NULL DEFAULT 0, `dubbed` INTEGER NOT NULL DEFAULT 0, `subtitles_hardcoded` INTEGER, `flags` TEXT NOT NULL DEFAULT '', `kind` TEXT NOT NULL DEFAULT 'UNKNOWN', `field_confidence` TEXT NOT NULL DEFAULT '', `warnings` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`media_id`), FOREIGN KEY(`media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "season",
+            "columnName": "season",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episode",
+            "columnName": "episode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episodeEnd",
+            "columnName": "episode_end",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resolution",
+            "columnName": "resolution",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "quality",
+            "columnName": "source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "videoCodec",
+            "columnName": "video_codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioCodecs",
+            "columnName": "audio_codecs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hdr",
+            "columnName": "hdr",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "languages",
+            "columnName": "languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtitleLanguages",
+            "columnName": "subtitle_languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "edition",
+            "columnName": "edition",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "releaseGroup",
+            "columnName": "release_group",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "partNumber",
+            "columnName": "part_number",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parserVersion",
+            "columnName": "parser_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedTitle",
+            "columnName": "normalized_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "alternativeTitle",
+            "columnName": "alternative_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "seasonEnd",
+            "columnName": "season_end",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "absoluteEpisode",
+            "columnName": "absolute_episode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "airDate",
+            "columnName": "air_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qualityTags",
+            "columnName": "quality_tags",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "streamingService",
+            "columnName": "streaming_service",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bitDepth",
+            "columnName": "bit_depth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "audioChannels",
+            "columnName": "audio_channels",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioBitrateKbps",
+            "columnName": "audio_bitrate_kbps",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dualAudio",
+            "columnName": "dual_audio",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "multiAudio",
+            "columnName": "multi_audio",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "dubbed",
+            "columnName": "dubbed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "subtitlesHardcoded",
+            "columnName": "subtitles_hardcoded",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "flags",
+            "columnName": "flags",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNKNOWN'"
+          },
+          {
+            "fieldPath": "fieldConfidence",
+            "columnName": "field_confidence",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "warnings",
+            "columnName": "warnings",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_parsed_parser_version",
+            "unique": false,
+            "columnNames": [
+              "parser_version"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_parsed_parser_version` ON `${TABLE_NAME}` (`parser_version`)"
+          },
+          {
+            "name": "index_media_parsed_normalized_title",
+            "unique": false,
+            "columnNames": [
+              "normalized_title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_parsed_normalized_title` ON `${TABLE_NAME}` (`normalized_title`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`file_name` TEXT NOT NULL, `caption` TEXT NOT NULL, `search_title` TEXT NOT NULL, tokenize=unicode61, content=`media`)",
+        "fields": [
+          {
+            "fieldPath": "fileName",
+            "columnName": "file_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchTitle",
+            "columnName": "search_title",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": []
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "unicode61",
+          "tokenizerArgs": [],
+          "contentTable": "media",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_BEFORE_UPDATE BEFORE UPDATE ON `media` BEGIN DELETE FROM `media_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_BEFORE_DELETE BEFORE DELETE ON `media` BEGIN DELETE FROM `media_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_AFTER_UPDATE AFTER UPDATE ON `media` BEGIN INSERT INTO `media_fts`(`docid`, `file_name`, `caption`, `search_title`) VALUES (NEW.`rowid`, NEW.`file_name`, NEW.`caption`, NEW.`search_title`); END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_AFTER_INSERT AFTER INSERT ON `media` BEGIN INSERT INTO `media_fts`(`docid`, `file_name`, `caption`, `search_title`) VALUES (NEW.`rowid`, NEW.`file_name`, NEW.`caption`, NEW.`search_title`); END"
+        ]
+      },
+      {
+        "tableName": "index_run",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chat_id` INTEGER NOT NULL, `mode` TEXT NOT NULL, `started_at` INTEGER NOT NULL, `finished_at` INTEGER, `outcome` TEXT, `pages` INTEGER NOT NULL, `messages_seen` INTEGER NOT NULL, `media_added` INTEGER NOT NULL, `media_updated` INTEGER NOT NULL, `media_deleted` INTEGER NOT NULL, `error` TEXT, FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "started_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finished_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pages",
+            "columnName": "pages",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messagesSeen",
+            "columnName": "messages_seen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaAdded",
+            "columnName": "media_added",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaUpdated",
+            "columnName": "media_updated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaDeleted",
+            "columnName": "media_deleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "error",
+            "columnName": "error",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_index_run_chat_id_started_at",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "started_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_index_run_chat_id_started_at` ON `${TABLE_NAME}` (`chat_id`, `started_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f0ed42e8ec223d1f861b8797dbded923')"
+    ]
+  }
+}
