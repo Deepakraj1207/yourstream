@@ -43,18 +43,20 @@ class EventJournal(
     private val capacity: Int = 500,
 ) {
     private val events = ConcurrentLinkedDeque<DiagnosticEvent>()
+    /** ConcurrentLinkedDeque.size is O(n); track it. */
+    private val size = AtomicInteger()
     private val counts = DiagnosticCategory.entries.associateWith { AtomicInteger() }
     private val errors = AtomicInteger()
 
     init {
         // Events from previous runs (marked by time; counts are for this run only).
-        file?.tail(capacity)?.mapNotNull(DiagnosticEvent::parse)?.forEach { events.addLast(it) }
+        file?.tail(capacity)?.mapNotNull(DiagnosticEvent::parse)?.forEach { events.addLast(it); size.incrementAndGet() }
     }
 
     fun record(category: DiagnosticCategory, severity: Severity, message: String, error: Throwable? = null): DiagnosticEvent {
         val e = DiagnosticEvent(clock.nowMillis(), severity, category, Redactor.redact(message), error?.let { Redactor.redact(describe(it)) })
         events.addLast(e)
-        while (events.size > capacity) events.pollFirst()
+        if (size.incrementAndGet() > capacity && events.pollFirst() != null) size.decrementAndGet()
         if (severity != Severity.INFO) counts.getValue(category).incrementAndGet()
         if (severity == Severity.ERROR) errors.incrementAndGet()
         file?.append(e.line())

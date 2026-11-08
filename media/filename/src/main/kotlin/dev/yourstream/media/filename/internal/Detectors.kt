@@ -333,6 +333,8 @@ internal object Detectors {
     private val FULL = rx("$B(${Vocabulary.FULL_NAMES.joinToString("|")})$E")
     private val NATIVE = Regex("$B(${Vocabulary.NATIVE_NAMES.joinToString("|")})$E")
     private val GROUPED = rx("$B([\\p{L}]{2,10})((?:\\s?[+&/,-]\\s?[\\p{L}]{2,10}){1,8})$E")
+    /** "Tam.Tel.Hin" (dots become spaces): runs of ≥ 2 distinct abbreviations, never at the start (that is the title). */
+    private val SPACED_SHORT = rx("$B((?:${Vocabulary.SHORT_NAMES.joinToString("|")})(?:\\s(?:${Vocabulary.SHORT_NAMES.joinToString("|")})){1,7})$E")
     private val SHORT_WITH_CONTEXT = rx("$B(${Vocabulary.SHORT_NAMES.joinToString("|")})(?=\\s(?:dub|dubbed|audio|aud|version|ver)$E)")
 
     fun languages(scan: Scan, p: Prepared) {
@@ -350,6 +352,20 @@ internal object Detectors {
                 }
                 scan.claim(m.range)
             }
+        }
+        scan.allFree(SPACED_SHORT).forEach { m ->
+            if (m.range.first == 0) return@forEach
+            val words = m.value.split(' ').filter { it.isNotEmpty() }
+            val entries = words.map { Vocabulary.languageOf(it) }
+            if (entries.any { it == null } || entries.map { it!!.language }.distinct().size != entries.size) return@forEach
+            var cursor = m.range.first
+            for ((word, entry) in words.zip(entries)) {
+                val start = scan.text.indexOf(word, cursor, ignoreCase = true)
+                val range = start until start + word.length
+                cursor = range.last + 1
+                scan.add(Kind.LANGUAGE, entry!!.language, range, 0.75f, word)
+            }
+            scan.claim(m.range)
         }
         scan.allFree(NATIVE).forEach { m -> Vocabulary.languageOf(m.value)?.let { scan.add(Kind.LANGUAGE, it.language, m, 0.9f) } }
         scan.allFree(FULL).forEach { m -> Vocabulary.languageOf(m.value)?.let { scan.add(Kind.LANGUAGE, it.language, m, 0.85f) } }

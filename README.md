@@ -17,6 +17,7 @@ watched/added, favorites, abandoned content), all with plain debug screens and a
 test player. Catalogs are information only; what you can watch is always your own Telegram media.
 
 - Architecture, roadmap and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Functional audit (checklist, bugs, performance, recommendations): [docs/AUDIT.md](docs/AUDIT.md) · interfaces: [docs/API.md](docs/API.md)
 - Robustness and diagnostics (failure handling, database safety, crash/safe mode, recovery, diagnostics screen): [docs/ROBUSTNESS.md](docs/ROBUSTNESS.md)
 - Watch intelligence (progress, next-episode rules, continue watching, abandonment): [docs/WATCH.md](docs/WATCH.md)
 - Local assistant (intents, entities, query plans, optional on-device model): [docs/ASSISTANT.md](docs/ASSISTANT.md)

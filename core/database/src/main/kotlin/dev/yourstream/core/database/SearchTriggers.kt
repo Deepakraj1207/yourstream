@@ -20,11 +20,11 @@ object SearchTriggers {
         "search_season_insert", "search_season_delete", "search_parsed_update", "search_chat_rename",
     )
 
-    private val CREATE = listOf(
+    private fun statements(db: SupportSQLiteDatabase): List<String> = listOf(
         "CREATE TRIGGER search_item_insert AFTER INSERT ON library_item BEGIN ${one("NEW.id")} END",
         "CREATE TRIGGER search_item_update AFTER UPDATE OF $ITEM_COLUMNS ON library_item BEGIN ${one("NEW.id")} END",
         "CREATE TRIGGER search_meta_insert AFTER INSERT ON item_metadata BEGIN ${one("NEW.item_id")} END",
-        "CREATE TRIGGER search_meta_update AFTER UPDATE ON item_metadata BEGIN ${one("NEW.item_id")} END",
+        "CREATE TRIGGER search_meta_update AFTER UPDATE ON item_metadata ${LibraryTriggers.changed(db, "item_metadata", setOf("fetched_at"))} BEGIN ${one("NEW.item_id")} END",
         "CREATE TRIGGER search_meta_delete AFTER DELETE ON item_metadata BEGIN ${one("OLD.item_id")} END",
         "CREATE TRIGGER search_link_insert AFTER INSERT ON media_link BEGIN ${one("NEW.item_id")} END",
         "CREATE TRIGGER search_link_update AFTER UPDATE ON media_link BEGIN ${one("NEW.item_id")} ${one("OLD.item_id")} END",
@@ -33,7 +33,7 @@ object SearchTriggers {
         "CREATE TRIGGER search_lang_delete AFTER DELETE ON library_item_language BEGIN ${one("OLD.item_id")} END",
         "CREATE TRIGGER search_season_insert AFTER INSERT ON season BEGIN ${one("NEW.series_id")} END",
         "CREATE TRIGGER search_season_delete AFTER DELETE ON season BEGIN ${one("OLD.series_id")} END",
-        """CREATE TRIGGER search_parsed_update AFTER UPDATE ON media_parsed BEGIN
+        """CREATE TRIGGER search_parsed_update AFTER UPDATE ON media_parsed ${LibraryTriggers.changed(db, "media_parsed")} BEGIN
             INSERT INTO search_dirty (item_id) SELECT DISTINCT item_id FROM media_link WHERE media_id = NEW.media_id
               AND item_id NOT IN (SELECT item_id FROM search_dirty); END""",
         """CREATE TRIGGER search_chat_rename AFTER UPDATE OF title ON indexed_chat BEGIN
@@ -44,6 +44,6 @@ object SearchTriggers {
     /** Idempotent: recreated on every open so definition changes apply. */
     fun create(db: SupportSQLiteDatabase) {
         NAMES.forEach { db.execSQL("DROP TRIGGER IF EXISTS $it") }
-        CREATE.forEach(db::execSQL)
+        statements(db).forEach(db::execSQL)
     }
 }

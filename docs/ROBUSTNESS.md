@@ -57,7 +57,7 @@ and in the Database check.
   * rebuilds the FTS tables and re-queues the search index;
   * checkpoints the WAL.
 
-DB version stays **v8** (no schema change in this phase).
+No schema change in this phase (v8). The functional audit later added v9, an index only; see [AUDIT.md](AUDIT.md).
 
 ## Retry system
 

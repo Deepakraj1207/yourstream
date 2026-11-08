@@ -28,7 +28,18 @@ val ProviderJson: Json = Json {
 }
 
 object HttpClients {
-    /** One client per provider. [engine] is injectable for tests (Ktor MockEngine). */
+    /**
+     * One OkHttp client (connection pool, dispatcher threads, DNS cache) shared by every provider.
+     * Before, each provider built its own engine: ~8 pools and thread sets for one app.
+     */
+    private val sharedOkHttp: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectionPool(okhttp3.ConnectionPool(5, 2, java.util.concurrent.TimeUnit.MINUTES))
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    /** A client per provider (its own plugins/headers) over the shared engine. [engine] is injectable for tests (Ktor MockEngine). */
     fun create(engine: HttpClientEngine? = null, userAgent: String = "YourStream/0.1"): HttpClient {
         val configure: io.ktor.client.HttpClientConfig<*>.() -> Unit = {
             expectSuccess = false
@@ -40,7 +51,10 @@ object HttpClients {
             }
             defaultRequest { headers.append("User-Agent", userAgent) }
         }
-        return if (engine != null) HttpClient(engine, configure) else HttpClient(OkHttp, configure)
+        return if (engine != null) HttpClient(engine, configure) else HttpClient(OkHttp) {
+            engine { preconfigured = sharedOkHttp }
+            configure()
+        }
     }
 }
 

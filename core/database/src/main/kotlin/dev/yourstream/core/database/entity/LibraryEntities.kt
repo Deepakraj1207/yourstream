@@ -28,6 +28,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["match_key"], unique = true),
         Index(value = ["kind", "hidden", "sort_title"]),
+        // v9: the all-kinds title sort (default list) walks this instead of sorting the table per page.
+        Index(value = ["sort_title", "id"]),
         Index(value = ["kind", "latest_added_at"]),
         Index(value = ["latest_added_at"]),
         Index(value = ["kind", "year"]),

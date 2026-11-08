@@ -189,4 +189,18 @@ class MigrationTest {
         assertEquals(null, row.dismissedAt)
         db.close()
     }
+
+    @Test
+    fun v8ToV9AddsTheTitleIndexOnly() = runTest {
+        helper.createDatabase(name, 8).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'MOVIE', 'movie:leo', 'Leo', 'leo', 'leo', 2023, 'leo', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, NULL)")
+            execSQL("INSERT INTO watch_dismissal VALUES (1, 4)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 9, true).apply {
+            query("SELECT COUNT(*) FROM watch_dismissal").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
+            query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'library_item' AND name = 'index_library_item_sort_title_id'").use { assertEquals(1, it.count) }
+            close()
+        }
+    }
 }

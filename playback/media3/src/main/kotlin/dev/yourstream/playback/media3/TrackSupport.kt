@@ -23,6 +23,8 @@ import dev.yourstream.telegram.api.TelegramFileRepository
 import dev.yourstream.telegram.api.TelegramMessageRepository
 import dev.yourstream.telegram.api.model.MessageLookup
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.nio.ByteBuffer
@@ -149,19 +151,29 @@ class ExternalSubtitleLoader @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: Context,
 ) {
     var maxBytes: Long = 5L * 1024 * 1024
-    var perFileTimeoutMs: Long = 15_000
+    var perFileTimeoutMs: Long = 5_000
 
+    /**
+     * Prepares every external subtitle of a title *in parallel*, each bounded by
+     * [perFileTimeoutMs]: this runs before playback starts, so a slow Telegram must not hold the
+     * video back (before: one file after another, 15 s each). A file that is not ready in time is
+     * skipped for this playback.
+     */
     suspend fun load(target: PlaybackTarget, mediaId: Long?): List<SideloadedSubtitle> {
         val tracks = subtitles.subtitles(target, mediaId).first().filter { it.source != SubtitleSource.EMBEDDED }
-        return tracks.mapNotNull { t ->
-            withTimeoutOrNull(perFileTimeoutMs) {
-                runCatching {
-                    when (t.source) {
-                        SubtitleSource.LOCAL -> t.localPath?.let { prepare("ext:${t.id}", File(it), t.format, t.language, t.label, t.forced, t.sdh, File(it).name, TrackOrigin.LOCAL) }
-                        else -> t.mediaId?.let { telegramFile(it) }?.let { (file, name) -> prepare("ext:${t.id}", file, t.format, t.language, t.label, t.forced, t.sdh, name, TrackOrigin.EXTERNAL) }
+        return kotlinx.coroutines.coroutineScope {
+            tracks.map { t ->
+                async {
+                    withTimeoutOrNull(perFileTimeoutMs) {
+                        runCatching {
+                            when (t.source) {
+                                SubtitleSource.LOCAL -> t.localPath?.let { prepare("ext:${t.id}", File(it), t.format, t.language, t.label, t.forced, t.sdh, File(it).name, TrackOrigin.LOCAL) }
+                                else -> t.mediaId?.let { telegramFile(it) }?.let { (file, name) -> prepare("ext:${t.id}", file, t.format, t.language, t.label, t.forced, t.sdh, name, TrackOrigin.EXTERNAL) }
+                            }
+                        }.getOrNull()
                     }
-                }.getOrNull()
-            }
+                }
+            }.awaitAll().filterNotNull()
         }
     }
 

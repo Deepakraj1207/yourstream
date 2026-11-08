@@ -87,10 +87,13 @@ interface WatchIntelligenceDao {
     )
     suspend fun episodes(seriesIds: List<Long>): List<WatchEpisodeRow>
 
-    /** Newest arrivals (an item counts as new again when new files/episodes arrive). */
+    /**
+     * Newest arrivals (an item counts as new again when new files/episodes arrive). Available
+     * items always have latest_added_at, so the indexed column is used (no expression sort).
+     */
     @Query(
         """SELECT id FROM library_item WHERE hidden = 0 AND available_count > 0 AND (:allKinds OR kind IN (:kinds))
-        ORDER BY IFNULL(latest_added_at, added_at) DESC, id DESC LIMIT :limit""",
+        ORDER BY latest_added_at DESC, id DESC LIMIT :limit""",
     )
     suspend fun recentlyAddedIds(limit: Int, allKinds: Boolean, kinds: List<String>): List<Long>
 

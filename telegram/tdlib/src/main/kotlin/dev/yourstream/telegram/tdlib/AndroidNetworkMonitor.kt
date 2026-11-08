@@ -25,11 +25,19 @@ class AndroidNetworkMonitor @Inject constructor(
     @TelegramScope private val scope: CoroutineScope,
     private val logger: Logger,
 ) {
-    @Volatile private var started = false
+    private val started = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Latest network type. A StateFlow drops repeats (capability callbacks fire on every signal
+     * change) and one collector delivers changes in order: before, each callback launched its own
+     * coroutine, so a quick Wi-Fi → mobile switch could reach TDLib out of order, and TDLib got a
+     * setNetworkType call per signal-strength change.
+     */
+    private val type = kotlinx.coroutines.flow.MutableStateFlow<NetworkType?>(null)
 
     fun start() {
-        if (started) return
-        started = true
+        if (!started.compareAndSet(false, true)) return
+        scope.launch { type.collect { t -> if (t != null) manager.onNetworkChanged(t) } }
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return
         report(typeOf(connectivity.getNetworkCapabilities(connectivity.activeNetwork)))
         try {
@@ -47,9 +55,7 @@ class AndroidNetworkMonitor @Inject constructor(
         }
     }
 
-    private fun report(type: NetworkType) {
-        scope.launch { manager.onNetworkChanged(type) }
-    }
+    private fun report(t: NetworkType) { type.value = t }
 
     private fun typeOf(capabilities: NetworkCapabilities?): NetworkType = when {
         capabilities == null -> NetworkType.NONE

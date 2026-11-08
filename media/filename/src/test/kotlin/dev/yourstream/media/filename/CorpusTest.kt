@@ -91,6 +91,9 @@ class CorpusTest {
         case("Kantara.2022.Kannada.Dual.Audio.WEBRip.mkv") { title("Kantara"); quality("WEBRip"); dual(true); langs("kn") }
         case("Pushpa 2 The Rule (2024) Hindi Dubbed 1080p.mkv") { title("Pushpa 2 The Rule"); year(2024); langs("hi"); dubbed(true) }
         case("Salaar.2023.Tam-Tel-Hin-Mal-Kan.1080p.mkv") { title("Salaar"); langs("ta", "te", "hi", "ml", "kn") }
+        // Dot-separated abbreviations, the most common Telegram style (audit finding).
+        case("Leo.2023.Tam.Tel.Hin.480p.mkv") { title("Leo"); langs("ta", "te", "hi") }
+        case("Jawan.2023.1080p.Hin.Tam.Tel.WEB-DL.mkv") { title("Jawan"); langs("hi", "ta", "te") }
         case("Jawan (2023) हिंदी 720p.mkv") { title("Jawan"); year(2023); langs("hi") }
         case("Vikram (2022) தமிழ் HDRip.mkv") { title("Vikram"); langs("ta"); quality("HDRip") }
         case("Parasite.2019.KOREAN.1080p.BluRay.x264.mkv") { title("Parasite"); langs("ko") }

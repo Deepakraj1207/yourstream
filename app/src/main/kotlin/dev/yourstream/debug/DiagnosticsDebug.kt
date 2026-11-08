@@ -74,7 +74,10 @@ class DiagnosticsDebugViewModel @Inject constructor(
     val safeMode get() = diagnostics.safeMode
     val info get() = diagnostics.deviceInfo()
 
-    init { refresh(); runChecks() }
+    private var checked = false
+
+    /** Checks run when the Diagnostics tab is first shown, not at every app start (they read the whole database). */
+    fun ensureChecked() { if (!checked) { checked = true; refresh(); runChecks() } }
 
     fun refresh() = viewModelScope.launch(Dispatchers.IO) {
         events.value = diagnostics.events.recent(200, minSeverity.value)
@@ -164,6 +167,7 @@ fun DiagnosticsPane(vm: DiagnosticsDebugViewModel) {
         }
         return
     }
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.ensureChecked() }
     Column(Modifier.fillMaxSize()) {
         if (vm.safeMode) Text("SAFE MODE: repeated crashes at startup; Telegram and background work were not started.", color = Color(0xFFB00020), fontSize = 12.sp)
         Row(Modifier.horizontalScroll(rememberScrollState())) {

@@ -190,6 +190,7 @@ class TelegramPlaybackController(
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (!isPlaying) saveProgress(force = true)
+            else if (!released && media != null && samplerJob?.isActive == true) startSampler() // leave the slow idle tick at once
             publish()
         }
 
@@ -246,7 +247,8 @@ class TelegramPlaybackController(
         resetRecovery()
         val r = (resolver ?: error("no resolver")).resolve(target, mediaId)
         when (r) {
-            is AppResult.Ok -> play(prepareTracks(r.value), startPositionMs, playWhenReady)
+            // Returns what actually plays (with sideloaded subtitles and track context), not the bare resolution.
+            is AppResult.Ok -> return AppResult.Ok(prepareTracks(r.value).also { play(it, startPositionMs, playWhenReady) })
             is AppResult.Err -> _state.value = _state.value.copy(
                 status = PlaybackStatus.ERROR,
                 error = PlaybackError(PlaybackErrorKind.FILE_UNAVAILABLE, r.error.message, retryable = r.error !is dev.yourstream.core.common.AppError.NotFound),
@@ -482,7 +484,8 @@ class TelegramPlaybackController(
             videoWidth = video.width.takeIf { it > 0 } ?: format?.width?.takeIf { it > 0 },
             videoHeight = video.height.takeIf { it > 0 } ?: format?.height?.takeIf { it > 0 },
             seeking = pendingSeekStartNanos != null,
-            recovery = recovery,
+            // Offline while the file still has to come from Telegram: say so instead of an unexplained spinner.
+            recovery = recovery ?: "waiting for network".takeIf { networkUp == false && error == null && (status == PlaybackStatus.PREPARING || status == PlaybackStatus.BUFFERING) },
         )
     }
 
@@ -495,7 +498,9 @@ class TelegramPlaybackController(
         samplerJob = scope.launch {
             while (isActive) {
                 sample()
-                delay(config.metricsSampleIntervalMs)
+                // Battery: sample fast only while something happens; paused/ended/error → slow tick.
+                val busy = player.isPlaying || player.playbackState == Player.STATE_BUFFERING || pendingSeekStartNanos != null
+                delay(if (busy) config.metricsSampleIntervalMs else IDLE_SAMPLE_MS)
             }
         }
     }
@@ -562,7 +567,7 @@ class TelegramPlaybackController(
         val start = pendingSeekStartNanos ?: return
         pendingSeekStartNanos = null
         seekManager?.onSeekCompleted()
-        updateMetrics { it.copy(seekLatenciesMs = it.seekLatenciesMs + ms(now - start)) }
+        updateMetrics { it.copy(seekLatenciesMs = (it.seekLatenciesMs + ms(now - start)).takeLast(MAX_SEEK_SAMPLES)) }
     }
 
     private fun saveProgress(force: Boolean) {
@@ -584,6 +589,11 @@ class TelegramPlaybackController(
     private inline fun updateMetrics(block: (PlaybackMetrics) -> PlaybackMetrics) { _metrics.value = block(_metrics.value) }
 
     private fun ms(nanos: Long) = nanos / 1_000_000
+
+    private companion object {
+        const val IDLE_SAMPLE_MS = 5_000L
+        const val MAX_SEEK_SAMPLES = 200
+    }
 }
 
 /** The tracks of the current file as analysed, and what is selected and why. */

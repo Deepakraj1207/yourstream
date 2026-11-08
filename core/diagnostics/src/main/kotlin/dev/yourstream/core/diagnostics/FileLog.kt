@@ -21,9 +21,27 @@ class RotatingFileLog(
     private val current get() = File(dir, "$name.log")
     @Volatile var failures = 0; private set
 
+    private val pending = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private val draining = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val batchLimit = (maxBytes / 4).coerceIn(1, 64L * 1024)
+
+    /** Queues a line; bursts are written with one file append (not one open/close per line). */
     fun append(line: String) {
-        val text = Redactor.redact(line).replace('\n', ' ') + "\n"
-        runCatching { executor.execute { write(text) } }
+        pending.add(Redactor.redact(line).replace('\n', ' ') + "\n")
+        if (draining.compareAndSet(false, true)) runCatching { executor.execute(::drain) }.onFailure { draining.set(false) }
+    }
+
+    private fun drain() {
+        while (true) {
+            val batch = StringBuilder()
+            while (batch.length < batchLimit) batch.append(pending.poll() ?: break)
+            if (batch.isNotEmpty()) write(batch.toString())
+            if (pending.isEmpty()) {
+                draining.set(false)
+                // A line added between the check and the reset must not wait for the next append.
+                if (pending.isEmpty() || !draining.compareAndSet(false, true)) return
+            }
+        }
     }
 
     /** Writes now on the calling thread (crash handler: the process is about to die). */

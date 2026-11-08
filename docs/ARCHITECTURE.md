@@ -22,6 +22,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P11 Local assistant | **done** | `:assistant:core` (deterministic intent detection + entity extraction → query plan; optional on-device `IntentModel`, validated and merged, never required), `:assistant:engine` (plans run against the library: search, episodes, continue watching, recommendations, play). No cloud AI. See [ASSISTANT.md](ASSISTANT.md) |
 | P12 Watch intelligence | **done** | `:watch:core` (pure next-episode, completion, abandonment and Continue Watching ordering policies), `:watch:engine` (live Continue Watching / Next Episode / Recently Watched / Recently Added / Favorites / Abandoned, per-item watch facts), DB v8 (`watch_dismissal`). See [WATCH.md](WATCH.md) |
 | P13 Robustness | **done** | `:core:diagnostics` (redaction, persistent rotating log, event journal, crash reports, crash-loop safe mode, health checks, report, playback session), `core:common` retry/guard/memory pressure, safe database opening (backup → open → salvage, integrity check/repair), playback recovery (backoff retries, version switching), battery-conscious maintenance work, Diagnostics screen. See [ROBUSTNESS.md](ROBUSTNESS.md) |
+| Functional audit | **done** | End-to-end `:e2e` module (real modules, fake Telegram with real media bytes), scale and query-plan audit, bug fixes, DB v9 (index). Checklist, measurements and recommendations: [AUDIT.md](AUDIT.md); interfaces: [API.md](API.md) |
 
 ---
 

@@ -14,7 +14,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
@@ -81,8 +80,11 @@ class SimulatedTelegramFiles(
     override suspend fun getFile(fileId: Int): AppResult<TelegramFile> =
         files[fileId]?.let { AppResult.Ok(it.state()) } ?: AppResult.Err(AppError.NotFound("file $fileId"))
 
-    override fun observeFile(fileId: Int): Flow<TelegramFile> =
-        updates.filter { it.id == fileId }.onStart { files[fileId]?.let { emit(it.state()) } }
+    /** Subscribes before reading the current state (like the real repository): no update can fall in between. */
+    override fun observeFile(fileId: Int): Flow<TelegramFile> = kotlinx.coroutines.flow.channelFlow {
+        launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { updates.filter { it.id == fileId }.collect { send(it) } }
+        files[fileId]?.let { send(it.state()) }
+    }
 
     override suspend fun download(fileId: Int, priority: Int, offset: Long, limit: Long): AppResult<TelegramFile> {
         val f = files[fileId] ?: return AppResult.Err(AppError.NotFound("file $fileId"))
