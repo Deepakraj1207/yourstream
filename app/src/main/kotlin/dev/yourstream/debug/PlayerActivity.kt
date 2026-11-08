@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -86,7 +87,24 @@ class PlayerActivity : ComponentActivity() {
 class PlayerDebugViewModel @Inject constructor(
     factory: TelegramPlaybackControllerFactory,
     private val history: WatchHistoryRepository,
+    private val trackPrefs: dev.yourstream.playback.tracks.TrackPreferenceStore,
 ) : ViewModel() {
+    val languagePrefs = MutableStateFlow(dev.yourstream.playback.tracks.LanguagePreferences())
+
+    init { viewModelScope.launch { languagePrefs.value = trackPrefs.preferences() } }
+
+    /** Saves "ta,en,hi" style lists; applies from the next file played. */
+    fun saveLanguages(audio: String, subtitles: String, fallback: String, mode: dev.yourstream.playback.tracks.SubtitleMode) = viewModelScope.launch {
+        val p = dev.yourstream.playback.tracks.LanguagePreferences(
+            audio = audio.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+            subtitles = subtitles.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+            fallbackLanguage = fallback.trim().ifEmpty { null },
+            subtitleMode = mode,
+        )
+        trackPrefs.setPreferences(p)
+        languagePrefs.value = trackPrefs.preferences()
+    }
+
     /** Lives in the ViewModel so rotation does not restart playback. */
     val controller: TelegramPlaybackController = factory.create()
     val message = MutableStateFlow<String?>(null)
@@ -143,6 +161,7 @@ private fun PlayerScreen(vm: PlayerDebugViewModel) {
         state.error?.let { Text("ERROR ${it.kind}: ${it.message}${if (it.retryable) " (retryable)" else ""}", color = Color(0xFFB00020), fontSize = 12.sp) }
         metrics.lines().forEach { Text(it, fontSize = 11.sp) }
         vm.controller.adaptive?.let { a -> a.lines(state).forEach { Text(it, fontSize = 10.sp) } } ?: Text("adaptive streaming off", fontSize = 10.sp)
+        TrackSection(vm)
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             TextButton(onClick = vm.controller::togglePlayPause) { Text(if (state.playWhenReady) "Pause" else "Play") }
             TextButton(onClick = { vm.controller.seekBy(-10_000) }) { Text("-10s") }
@@ -192,4 +211,52 @@ private fun dev.yourstream.playback.media3.AdaptivePlayback.lines(@Suppress("UNU
             " · prefetch ${if (g.prefetchPaused) "paused" else "allowed=${p.prefetchAllowed}"}",
         "next episode: ${pf?.status ?: "–"}${pf?.candidate?.let { " ${it.label}" } ?: ""}${pf?.let { if (it.prefetchedBytes > 0) " ${it.prefetchedBytes / 1024} KB" else "" } ?: ""}${pf?.reason?.let { " ($it)" } ?: ""}",
     )
+}
+
+@Composable
+private fun TrackSection(vm: PlayerDebugViewModel) {
+    val tracks by vm.controller.tracks.collectAsStateWithLifecycle()
+    val prefs by vm.languagePrefs.collectAsStateWithLifecycle()
+    val sel = tracks.selection
+    Text("Audio: ${sel?.audio?.rule ?: "–"} · ${sel?.audio?.detail ?: ""}", fontSize = 11.sp)
+    Row(Modifier.horizontalScroll(rememberScrollState())) {
+        tracks.audio.forEach { t ->
+            val chosen = sel?.audio?.track?.id == t.id
+            TextButton(onClick = { vm.controller.selectAudio(t.id) }) { Text((if (chosen) "[" else "") + t.describe() + (if (chosen) "]" else ""), fontSize = 10.sp) }
+        }
+    }
+    Text("Subtitles: ${sel?.subtitle?.rule ?: "–"} · ${sel?.subtitle?.detail ?: ""}", fontSize = 11.sp)
+    Row(Modifier.horizontalScroll(rememberScrollState())) {
+        TextButton(onClick = { vm.controller.selectSubtitle(null) }) { Text(if (sel?.subtitle?.track == null) "[off]" else "off", fontSize = 10.sp) }
+        tracks.subtitles.forEach { t ->
+            val chosen = sel?.subtitle?.track?.id == t.id
+            TextButton(onClick = { vm.controller.selectSubtitle(t.id) }) { Text((if (chosen) "[" else "") + t.describe() + (if (chosen) "]" else ""), fontSize = 10.sp) }
+        }
+    }
+    var audio by androidx.compose.runtime.remember(prefs) { androidx.compose.runtime.mutableStateOf(prefs.audio.joinToString(",")) }
+    var subs by androidx.compose.runtime.remember(prefs) { androidx.compose.runtime.mutableStateOf(prefs.subtitles.joinToString(",")) }
+    var fallback by androidx.compose.runtime.remember(prefs) { androidx.compose.runtime.mutableStateOf(prefs.fallbackLanguage.orEmpty()) }
+    var mode by androidx.compose.runtime.remember(prefs) { androidx.compose.runtime.mutableStateOf(prefs.subtitleMode) }
+    Text("Language preferences (codes or names, in order; apply from the next file)", fontSize = 11.sp)
+    Row {
+        androidx.compose.material3.OutlinedTextField(audio, { audio = it }, label = { Text("audio") }, singleLine = true, modifier = Modifier.weight(1f))
+        androidx.compose.material3.OutlinedTextField(subs, { subs = it }, label = { Text("subtitles") }, singleLine = true, modifier = Modifier.weight(1f))
+        androidx.compose.material3.OutlinedTextField(fallback, { fallback = it }, label = { Text("fallback") }, singleLine = true, modifier = Modifier.weight(0.6f))
+    }
+    Row {
+        TextButton(onClick = { mode = dev.yourstream.playback.tracks.SubtitleMode.entries[(mode.ordinal + 1) % 3] }) { Text("subtitles: $mode", fontSize = 11.sp) }
+        TextButton(onClick = { vm.saveLanguages(audio, subs, fallback, mode) }) { Text("Save", fontSize = 11.sp) }
+    }
+}
+
+private fun dev.yourstream.playback.tracks.AnalyzedTrack.describe(): String = buildString {
+    append(dev.yourstream.playback.tracks.LanguageCatalog.displayName(language.code))
+    track.label?.let { append(" \"$it\"") }
+    append(" (${language.source.name.lowercase()} ${"%.1f".format(Locale.US, language.confidence)})")
+    if (track.origin != dev.yourstream.playback.tracks.TrackOrigin.EMBEDDED) append(" ${track.origin.name.lowercase()}")
+    if (track.isForced) append(" forced")
+    if (track.isHearingImpaired) append(" SDH")
+    if (track.isCommentary) append(" commentary")
+    track.channels?.let { append(" ${it}ch") }
+    if (!track.supported) append(" UNSUPPORTED")
 }

@@ -17,6 +17,13 @@ import androidx.media3.exoplayer.source.MediaSource
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.library.api.PlaybackTarget
 import dev.yourstream.playback.adaptive.AdaptiveStreaming
+import dev.yourstream.playback.tracks.AnalyzedTrack
+import dev.yourstream.playback.tracks.FileContext
+import dev.yourstream.playback.tracks.PreferenceScope
+import dev.yourstream.playback.tracks.TrackScope
+import dev.yourstream.playback.tracks.TrackSelection
+import dev.yourstream.playback.tracks.TrackSession
+import dev.yourstream.playback.tracks.TrackType
 import dev.yourstream.playback.adaptive.PlaybackPhase
 import dev.yourstream.playback.adaptive.PlaybackSample
 import dev.yourstream.playback.adaptive.SeekManager
@@ -84,6 +91,8 @@ class TelegramPlaybackController(
      * with the controller's scope. Null = Phase 7 fixed buffering.
      */
     adaptive: ((CoroutineScope) -> AdaptivePlayback)? = null,
+    /** Phase 9: preference-based audio/subtitle selection, remembered choices, external subtitles. */
+    private val trackSupport: TrackSupport? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     /** The adaptive parts in use, if any (for the test player's diagnostics). */
@@ -129,6 +138,13 @@ class TelegramPlaybackController(
             onFocus = { media?.let { streamer.focus(it.fileId).size } ?: 0 },
         )
     }
+    private var trackSession: TrackSession? = null
+    private var tracksKey: String? = null
+    private var mappedTracks: Media3Tracks.Mapped? = null
+    private val _tracks = MutableStateFlow(TrackState())
+    /** Detected tracks and the current choice with its reason (for a track menu / diagnostics). */
+    val tracks: StateFlow<TrackState> = _tracks.asStateFlow()
+
     private var droppedFrames = 0L
     private var droppedAtLastSample = 0L
     private var lastSampleNanos = 0L
@@ -186,6 +202,8 @@ class TelegramPlaybackController(
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) = publish()
+
+        override fun onTracksChanged(tracks: androidx.media3.common.Tracks) = handleTracks(tracks)
     }
 
     init {
@@ -214,7 +232,7 @@ class TelegramPlaybackController(
     suspend fun open(target: PlaybackTarget, mediaId: Long? = null, startPositionMs: Long? = null, playWhenReady: Boolean = true): AppResult<PlayableMedia> {
         val r = (resolver ?: error("no resolver")).resolve(target, mediaId)
         when (r) {
-            is AppResult.Ok -> play(r.value, startPositionMs, playWhenReady)
+            is AppResult.Ok -> play(prepareTracks(r.value), startPositionMs, playWhenReady)
             is AppResult.Err -> _state.value = _state.value.copy(
                 status = PlaybackStatus.ERROR,
                 error = PlaybackError(PlaybackErrorKind.FILE_UNAVAILABLE, r.error.message, retryable = r.error !is dev.yourstream.core.common.AppError.NotFound),
@@ -228,6 +246,8 @@ class TelegramPlaybackController(
         val previous = this.media
         if (previous != null && previous.fileId != media.fileId) releaseFile(previous)
         this.media = media
+        trackSession = trackSupport?.let { TrackSession(it.store, trackScopeOf(media), media.trackContext ?: FileContext(fileName = media.fileName)) }
+        tracksKey = null; mappedTracks = null; _tracks.value = TrackState()
         this.adaptive?.let { a ->
             a.prefetch?.onPlaying(media.fileId)
             a.prefetch?.reset()
@@ -243,6 +263,74 @@ class TelegramPlaybackController(
         player.prepare()
         startSampler()
         publish()
+    }
+
+    // ------------------------------------------------------------------ tracks
+
+    /**
+     * Before play: external subtitle files (the user's Telegram subtitle files for this title),
+     * file context for language detection, and ExoPlayer's initial language preferences.
+     */
+    private suspend fun prepareTracks(media: PlayableMedia): PlayableMedia {
+        val t = trackSupport ?: return media
+        Media3Tracks.presetLanguages(player, t.store.preferences())
+        val context = runCatching { t.context?.context(media) }.getOrNull()
+        val subtitles = media.target?.let { target -> runCatching { t.subtitles?.load(target, media.mediaId) }.getOrNull() }.orEmpty()
+        return media.copy(subtitles = media.subtitles + subtitles, trackContext = context ?: media.trackContext)
+    }
+
+    private fun trackScopeOf(media: PlayableMedia): TrackScope? = media.target?.let {
+        if (it.episodeId != null) TrackScope(it.itemId, PreferenceScope.SERIES) else TrackScope(it.itemId, PreferenceScope.MOVIE)
+    }
+
+    /** New track list from the player: detect languages, select by preference / memory, apply. Once per distinct list. */
+    private fun handleTracks(t: androidx.media3.common.Tracks) {
+        val session = trackSession ?: return
+        val m = media ?: return
+        val mapped = Media3Tracks.candidates(t, m.subtitles)
+        if (mapped.candidates.isEmpty()) return
+        mappedTracks = mapped
+        val key = mapped.candidates.joinToString { it.id + "/" + it.supported }
+        if (key == tracksKey) return
+        tracksKey = key
+        scope.launch {
+            val selection = session.onTracks(mapped.candidates)
+            if (released || media !== m) return@launch
+            Media3Tracks.apply(player, mapped, selection)
+            publishTracks(session)
+            trackSupport?.onAnalyzed?.let { cb -> backgroundScope.launch { runCatching { cb(m, session.tracks) } } }
+        }
+    }
+
+    /** User picks an audio track: applied now and remembered for the movie / the whole series. */
+    fun selectAudio(trackId: String) {
+        val session = trackSession ?: return
+        val mapped = mappedTracks ?: return
+        scope.launch {
+            session.userSelectedAudio(trackId) ?: return@launch
+            Media3Tracks.apply(player, mapped, session.selection!!)
+            publishTracks(session)
+        }
+    }
+
+    /** User picks a subtitle track, or null for off: applied and remembered. */
+    fun selectSubtitle(trackId: String?) {
+        val session = trackSession ?: return
+        val mapped = mappedTracks ?: return
+        scope.launch {
+            if (trackId != null && session.userSelectedSubtitle(trackId) == null) return@launch
+            if (trackId == null) session.userSelectedSubtitle(null)
+            Media3Tracks.apply(player, mapped, session.selection!!)
+            publishTracks(session)
+        }
+    }
+
+    private fun publishTracks(session: TrackSession) {
+        _tracks.value = TrackState(
+            audio = session.tracks.filter { it.track.type == TrackType.AUDIO },
+            subtitles = session.tracks.filter { it.track.type == TrackType.SUBTITLE },
+            selection = session.selection,
+        )
     }
 
     fun resume() { player.play() }
@@ -437,6 +525,13 @@ class TelegramPlaybackController(
 
     private fun ms(nanos: Long) = nanos / 1_000_000
 }
+
+/** The tracks of the current file as analysed, and what is selected and why. */
+data class TrackState(
+    val audio: List<AnalyzedTrack> = emptyList(),
+    val subtitles: List<AnalyzedTrack> = emptyList(),
+    val selection: TrackSelection? = null,
+)
 
 /** Media3 error → what the app shows and whether a retry makes sense. */
 fun PlaybackException.toPlaybackError(): PlaybackError {

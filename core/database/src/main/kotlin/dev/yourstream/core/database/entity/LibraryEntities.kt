@@ -242,6 +242,29 @@ data class TrackPreferenceEntity(
     @ColumnInfo(name = "subtitles_enabled") val subtitlesEnabled: Boolean,
     @ColumnInfo(name = "subtitle_offset_ms") val subtitleOffsetMs: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** v6: the exact remembered audio track (language|label|channels|flags), found again in other files. */
+    @ColumnInfo(name = "audio_signature") val audioSignature: String? = null,
+    /** v6: the remembered subtitle track; null with subtitles_enabled = 0 means "off". */
+    @ColumnInfo(name = "subtitle_signature") val subtitleSignature: String? = null,
+    /** v6: MOVIE or SERIES (series rows apply to every episode). */
+    val scope: String? = null,
+)
+
+/**
+ * v6: the user's language settings (one row). Audio/subtitle preference lists are
+ * comma-separated normalized codes in priority order ("ta,en,hi").
+ */
+@Entity(tableName = "language_settings")
+data class LanguageSettingsEntity(
+    @PrimaryKey val id: Int = 1,
+    @ColumnInfo(name = "audio_languages") val audioLanguages: String,
+    @ColumnInfo(name = "subtitle_languages") val subtitleLanguages: String,
+    @ColumnInfo(name = "fallback_language") val fallbackLanguage: String?,
+    /** OFF, FOREIGN_ONLY or ALWAYS. */
+    @ColumnInfo(name = "subtitle_mode") val subtitleMode: String,
+    @ColumnInfo(name = "avoid_commentary") val avoidCommentary: Boolean,
+    @ColumnInfo(name = "prefer_sdh") val preferSdh: Boolean,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
 
 // ------------------------------------------------------------------ tracks

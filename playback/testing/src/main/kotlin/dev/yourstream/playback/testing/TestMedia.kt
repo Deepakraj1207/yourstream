@@ -10,6 +10,12 @@ object TestMedia {
     const val RES_1080P = "res_1080p.mp4"                 // 1920x1080, 2 s
     const val RES_480P_MKV = "res_480p.mkv"               // 854x480, 3 s, Matroska
     const val LONG_DURATION_MS = 5_100_000L               // long_85min.mp4
+    /** 3 s, audio hin (default) / tam / eng with titles, embedded subtitles eng + tam (SRT). */
+    const val MULTI_AUDIO = "multi_audio_hin_tam_eng.mkv"
+    /** Same tracks, but every audio track tagged "eng"; only the titles are right. */
+    const val MULTI_AUDIO_WRONG_TAGS = "multi_audio_wrong_tags.mkv"
+    /** Tamil text in an SRT whose name claims English. */
+    const val EXTERNAL_TAMIL_SRT = "external_tamil_named_eng.srt"
 
     /** A committed clip, copied to [dir]. */
     fun file(name: String, dir: File): File {

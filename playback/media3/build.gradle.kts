@@ -21,6 +21,7 @@ android {
 dependencies {
     api(projects.playback.stream)
     api(projects.playback.adaptive)
+    api(projects.playback.tracks)
     api(libs.androidx.media3.exoplayer)
     implementation(projects.library)
     implementation(projects.core.database)

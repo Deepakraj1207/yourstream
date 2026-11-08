@@ -24,12 +24,26 @@ data class PlayableMedia(
     /** Library target and file, for watch progress (null for ad-hoc files). */
     val target: PlaybackTarget? = null,
     val mediaId: Long? = null,
+    /** External subtitle files (the user's Telegram subtitle files / local files), loaded before play. */
+    val subtitles: List<SideloadedSubtitle> = emptyList(),
+    /** What the library knows around the file, for language detection. */
+    val trackContext: dev.yourstream.playback.tracks.FileContext? = null,
 ) {
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun mediaItem(): MediaItem = MediaItem.Builder()
         .setUri(TelegramMediaUri(fileId, StreamHints(sizeBytes.takeIf { it > 0 }, durationMs)).toUri())
         .setMediaId(mediaId?.let { "media:$it" } ?: "tg:$remoteUniqueId")
         .setCustomCacheKey("tg:$remoteUniqueId")
+        .setSubtitleConfigurations(subtitles.map { s ->
+            MediaItem.SubtitleConfiguration.Builder(android.net.Uri.fromFile(java.io.File(s.localPath)))
+                .setId(s.id)
+                .setMimeType(s.mimeType)
+                .setLanguage(s.language)
+                .setLabel(s.label)
+                .setSelectionFlags(if (s.forced) androidx.media3.common.C.SELECTION_FLAG_FORCED else 0)
+                .setRoleFlags(if (s.sdh) androidx.media3.common.C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND else 0)
+                .build()
+        })
         .build()
 }
 

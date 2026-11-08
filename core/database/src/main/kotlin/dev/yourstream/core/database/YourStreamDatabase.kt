@@ -18,6 +18,7 @@ import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
 import dev.yourstream.core.database.entity.AudioTrackEntity
 import dev.yourstream.core.database.entity.CatalogCacheEntity
+import dev.yourstream.core.database.entity.LanguageSettingsEntity
 import dev.yourstream.core.database.entity.EpisodeMetadataEntity
 import dev.yourstream.core.database.entity.ItemMetadataEntity
 import dev.yourstream.core.database.entity.MetadataCacheEntity
@@ -51,7 +52,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
  * data (favorites, watch state/history, track preferences) · v4 external metadata ·
- * v5 catalog provider cache.
+ * v5 catalog provider cache · v6 language settings and remembered track choices.
  */
 @Database(
     entities = [
@@ -82,8 +83,9 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         SeasonMetadataEntity::class,
         EpisodeMetadataEntity::class,
         CatalogCacheEntity::class,
+        LanguageSettingsEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -94,6 +96,9 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 3, to = 4),
         // v5: catalog provider cache. Adds one table; nothing else changes.
         AutoMigration(from = 4, to = 5),
+        // v6: language settings table + remembered track signatures on track_preference (nullable
+        // columns: existing preferences keep working unchanged).
+        AutoMigration(from = 5, to = 6),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import dev.yourstream.core.database.entity.AudioTrackEntity
+import dev.yourstream.core.database.entity.LanguageSettingsEntity
 import dev.yourstream.core.database.entity.SubtitleTrackEntity
 import dev.yourstream.core.database.entity.TrackPreferenceEntity
 import kotlinx.coroutines.flow.Flow
@@ -88,4 +89,15 @@ interface TrackDao {
 
     @Query("DELETE FROM track_preference WHERE item_id = :itemId")
     suspend fun deletePreference(itemId: Long)
+
+    // ---- language settings (user data) ----
+
+    @Query("SELECT * FROM language_settings WHERE id = 1")
+    suspend fun languageSettings(): LanguageSettingsEntity?
+
+    @Query("SELECT * FROM language_settings WHERE id = 1")
+    fun observeLanguageSettings(): Flow<LanguageSettingsEntity?>
+
+    @Upsert
+    suspend fun putLanguageSettings(settings: LanguageSettingsEntity)
 }

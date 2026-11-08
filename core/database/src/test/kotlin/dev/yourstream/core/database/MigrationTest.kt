@@ -134,4 +134,23 @@ class MigrationTest {
         assertEquals(listOf(1L), db.catalogDao().presenceByImdb(listOf("tt15654328")).map { it.id })
         db.close()
     }
+
+    @Test
+    fun v5ToV6KeepsTrackPreferencesAndAddsLanguageSettings() = runTest {
+        helper.createDatabase(name, 5).apply {
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'SERIES', 'series:doraemon', 'Doraemon', 'doraemon', 'doraemon', NULL, 'doraemon', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, NULL)")
+            execSQL("INSERT INTO track_preference VALUES (1, 'ta', 'en', 1, 250, 7)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 6, true).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        val pref = db.trackDao().preference(1)!!
+        assertEquals("ta", pref.audioLanguage)
+        assertEquals(250, pref.subtitleOffsetMs)
+        assertNull(pref.audioSignature)
+        assertNull(pref.scope)
+        assertNull(db.trackDao().languageSettings(), "no settings until the user sets them (defaults apply)")
+        db.close()
+    }
 }

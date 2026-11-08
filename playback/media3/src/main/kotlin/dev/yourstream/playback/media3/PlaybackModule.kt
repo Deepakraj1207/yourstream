@@ -59,6 +59,7 @@ class TelegramPlaybackControllerFactory @Inject constructor(
     private val monitor: DefaultNetworkMonitor,
     private val episodes: EpisodeRepository,
     private val settings: PlaybackSettings,
+    private val tracks: TrackSupport,
 ) {
     fun create(config: PlaybackConfig = PlaybackConfig()) = TelegramPlaybackController(
         context = context,
@@ -72,6 +73,7 @@ class TelegramPlaybackControllerFactory @Inject constructor(
             val prefetch = PrefetchManager(governor, next, scope, settings.prefetch)
             AdaptivePlayback(AdaptiveStreaming(streamer, governor, monitor, BufferManager(deviceProfile(context), settings.buffer), scope, prefetch), next)
         },
+        trackSupport = tracks,
     )
 }
 
@@ -80,6 +82,8 @@ class TelegramPlaybackControllerFactory @Inject constructor(
 abstract class PlaybackModule {
 
     @Binds abstract fun resolver(impl: LibraryMediaSourceResolver): MediaSourceResolver
+
+    @Binds abstract fun trackPreferences(impl: RoomTrackPreferenceStore): dev.yourstream.playback.tracks.TrackPreferenceStore
 
     companion object {
         @Provides @Singleton
@@ -107,6 +111,27 @@ abstract class PlaybackModule {
         fun streamer(governor: DownloadGovernor, cache: StreamCache, logger: Logger, monitor: DefaultNetworkMonitor, @PlaybackScope scope: CoroutineScope): TelegramFileStreamer =
             TelegramFileStreamer(repo = governor, scope = scope, config = StreamingConfig(), logger = logger, cache = cache)
                 .also { AdaptiveStreaming.connect(it, monitor) }
+
+        /** Track intelligence, plus feeding what was detected back to the library (probed audio, embedded subtitles). */
+        @Provides @Singleton
+        fun trackSupport(
+            store: RoomTrackPreferenceStore,
+            loader: ExternalSubtitleLoader,
+            context: TrackContextProvider,
+            audio: dev.yourstream.library.api.AudioTrackRepository,
+            subtitles: dev.yourstream.library.api.SubtitleRepository,
+        ) = TrackSupport(store, loader, context) { media, analyzed ->
+            val mediaId = media.mediaId ?: return@TrackSupport
+            val target = media.target
+            audio.replaceProbed(mediaId, analyzed.filter { it.track.type == dev.yourstream.playback.tracks.TrackType.AUDIO }.map { a ->
+                dev.yourstream.library.api.AudioTrack(0, mediaId, a.track.index, dev.yourstream.library.api.AudioTrackSource.PROBED,
+                    a.language.code, a.track.codec, a.track.channels?.toString(), a.track.label, a.track.isDefault)
+            })
+            subtitles.replaceEmbedded(mediaId, analyzed.filter { it.track.type == dev.yourstream.playback.tracks.TrackType.SUBTITLE && it.track.origin == dev.yourstream.playback.tracks.TrackOrigin.EMBEDDED }.map { t ->
+                dev.yourstream.library.api.SubtitleTrack(0, target?.itemId, target?.episodeId, dev.yourstream.library.api.SubtitleSource.EMBEDDED, null, mediaId,
+                    t.track.index, t.language.code, t.track.label, t.track.codec, t.track.isForced, t.track.isHearingImpaired, null)
+            })
+        }
 
         @Provides
         fun progressSink(history: WatchHistoryRepository) = PlaybackProgressSink { target, mediaId, position, duration ->
