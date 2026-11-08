@@ -42,6 +42,10 @@ val metadataLanguage = secret("metadata.language", "METADATA_LANGUAGE").ifEmpty 
 // ("none") leaves the local library only. Custom add-ons: comma-separated manifest URLs.
 val catalogProviders = secret("catalog.providers", "CATALOG_PROVIDERS").ifEmpty { "indiastreams,indian_regional" }
 val catalogCustomManifests = secret("catalog.customManifests", "CATALOG_CUSTOM_MANIFESTS")
+// Playback (docs/ADAPTIVE_STREAMING.md): adaptive streaming on/off, download concurrency, prefetch on mobile data.
+val playbackAdaptive = secret("playback.adaptive", "PLAYBACK_ADAPTIVE").ifEmpty { "true" }
+val playbackMaxDownloads = secret("playback.maxConcurrentDownloads", "PLAYBACK_MAX_CONCURRENT_DOWNLOADS").ifEmpty { "2" }
+val playbackPrefetchOnMobile = secret("playback.prefetchOnMobileData", "PLAYBACK_PREFETCH_ON_MOBILE_DATA").ifEmpty { "false" }
 
 fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -68,6 +72,9 @@ android {
         buildConfigField("String", "METADATA_LANGUAGE", quoted(metadataLanguage))
         buildConfigField("String", "CATALOG_PROVIDERS", quoted(catalogProviders))
         buildConfigField("String", "CATALOG_CUSTOM_MANIFESTS", quoted(catalogCustomManifests))
+        buildConfigField("boolean", "PLAYBACK_ADAPTIVE", playbackAdaptive.toBoolean().toString())
+        buildConfigField("int", "PLAYBACK_MAX_CONCURRENT_DOWNLOADS", (playbackMaxDownloads.toIntOrNull() ?: 2).coerceIn(1, 4).toString())
+        buildConfigField("boolean", "PLAYBACK_PREFETCH_ON_MOBILE_DATA", playbackPrefetchOnMobile.toBoolean().toString())
     }
 
     buildFeatures {

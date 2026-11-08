@@ -1,6 +1,6 @@
 # YourStream — Architecture & Roadmap (Stage 0 blueprint)
 
-Status: **Phases 1–7 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine). This document is the reference
+Status: **Phases 1–8 implemented** (Telegram layer; indexing; filename parsing; local library; external metadata; catalog providers; playback engine; adaptive streaming). This document is the reference
 for every later phase. Decisions marked **DECISION** still need sign-off; until then the
 recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 
@@ -16,6 +16,7 @@ recommended defaults are used (minSdk 26, `dev.yourstream`, `tdl-coroutines`).
 | P5 Metadata + matching | **done** | `:core:network`, `:metadata:{api,core,tmdb,cinemeta,sync}`, DB v4. See [METADATA.md](METADATA.md) |
 | P6 Catalogs | **done** | `:catalog:{api,stremio,core,indian,sync}`, DB v5 (`catalog_cache`). IndiaStreams + Indian Regional Catalog as Stremio add-on definitions; custom add-ons by manifest URL; TMDB/Cinemeta used as metadata fallback (not yet as catalog providers). As built, the blueprint's `:catalog:indiastreams/regional/custom` became one generic protocol module + definitions. See [CATALOGS.md](CATALOGS.md) |
 | P7 Playback engine | **done** | `:playback:{stream,media3,testing}`: Media3/ExoPlayer over a custom `TelegramMediaDataSource` with range reads while downloading (sliding download window, seek re-points the Telegram download), retry/stall handling, state + metrics controller, minimal test player. Telegram range primitives added to `:telegram:api`. See [PLAYBACK.md](PLAYBACK.md) |
+| P8 Adaptive streaming | **done** | `:playback:adaptive`: NetworkMonitor (bandwidth EWMA, connectivity, outages), BufferManager (adaptive RAM/disk buffering, rebuffer prediction, device/memory bounds), SeekManager (coalescing, transfer cancellation, ramping window), PrefetchManager (next-episode head+tail), DownloadGovernor (concurrency limits). Media3 AdaptiveLoadControl; benchmarks. See [ADAPTIVE_STREAMING.md](ADAPTIVE_STREAMING.md) |
 
 ---
 

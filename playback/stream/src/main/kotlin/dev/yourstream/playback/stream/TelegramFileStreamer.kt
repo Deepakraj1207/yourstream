@@ -36,6 +36,17 @@ class TelegramFileStreamer(
     private val cache: StreamCache? = null,
 ) {
     private val sessions = ConcurrentHashMap<Int, FileSession>()
+    private val observers = java.util.concurrent.CopyOnWriteArrayList<StreamObserver>()
+
+    /**
+     * True while the device is known to be offline (set by the network monitor). Waiting for data
+     * then does not count towards the stall timeout (up to [StreamingConfig.maxOfflineWaitMs]):
+     * the player keeps buffering and continues by itself when the connection returns.
+     */
+    @Volatile var offlineSignal: () -> Boolean = { false }
+
+    fun addObserver(observer: StreamObserver) { observers += observer }
+    fun removeObserver(observer: StreamObserver) { observers -= observer }
 
     init {
         // Subscribe before any session exists so no progress update is ever missed.
@@ -68,6 +79,37 @@ class TelegramFileStreamer(
     /** Current numbers for a file streamed in this process, or null. */
     fun stats(fileId: Int): StreamStats? = sessions[fileId]?.stats()
 
+    /** Files with an open session. */
+    val activeFileIds: Set<Int> get() = sessions.keys.toSet()
+
+    /** Changes how far ahead of the reader [fileId] is downloaded (adaptive buffering). */
+    fun setReadAhead(fileId: Int, bytes: Long) {
+        sessions[fileId]?.let { it.readAhead = bytes.coerceAtLeast(config.minWindowBytes) }
+    }
+
+    /**
+     * Re-issues the current download of every unfinished session. Used after a network switch or
+     * reconnect: a request made on the old network may sit on a dead connection until it times out.
+     */
+    suspend fun refreshDownloads() {
+        for (s in sessions.values) runCatching { s.reissue() }
+    }
+
+    /**
+     * Playback is focusing on [fileId] (e.g. after a seek): stop downloads of other files nobody is
+     * reading right now, so all bandwidth goes to the requested region.
+     */
+    suspend fun focus(fileId: Int): List<Int> {
+        val cancelled = mutableListOf<Int>()
+        for (s in sessions.values) {
+            if (s.fileId == fileId || s.openStreams.get() > 0 || s.file.isDownloadingCompleted || !s.file.isDownloadingActive) continue
+            repo.cancelDownload(s.fileId)
+            s.forgetRequest()
+            cancelled += s.fileId
+        }
+        return cancelled
+    }
+
     /**
      * Playback of [fileId] ended (player released / switched media): stop its download and let the
      * cache decide whether to keep the partial copy.
@@ -79,7 +121,21 @@ class TelegramFileStreamer(
     }
 
     /** One file's shared state: latest Telegram file info, download window, counters. */
-    inner class FileSession(initial: TelegramFile, val readAhead: Long) {
+    inner class FileSession(initial: TelegramFile, initialReadAhead: Long) {
+        /** Upper bound of the download window (set by adaptive buffering). */
+        @Volatile var readAhead: Long = initialReadAhead
+        /**
+         * Current window: starts at [StreamingConfig.initialWindowBytes] after every jump and grows by
+         * [StreamingConfig.windowGrowth] on each extension up to [readAhead]. Scrubbing therefore wastes
+         * at most a small window per position, while steady playback quickly reaches full read-ahead.
+         */
+        private fun startWindow() = if (config.initialWindowBytes > 0) minOf(config.initialWindowBytes, readAhead) else readAhead
+        @Volatile var window: Long = startWindow()
+        private val effectiveWindow get() = minOf(window, readAhead).coerceAtLeast(config.minWindowBytes)
+        @Volatile private var lastReader = 0L
+        private var markNanos = 0L
+        private var markBytes = -1L
+        val served = RangeSet()
         val fileId = initial.id
         @Volatile var file: TelegramFile = initial; private set
         val wasCompleteAtStart = initial.isDownloadingCompleted
@@ -102,8 +158,50 @@ class TelegramFileStreamer(
         val size: Long get() = file.size.takeIf { it > 0 } ?: file.expectedSize.takeIf { it > 0 } ?: -1L
 
         fun update(f: TelegramFile) {
+            val previous = file
             file = f
             version.value++
+            measure(previous, f)
+        }
+
+        /** Throughput samples for the network monitor: bytes that arrived since the last mark while downloading. */
+        private fun measure(previous: TelegramFile, f: TelegramFile) {
+            val now = ticker.nanos()
+            synchronized(this) {
+                if (offlineSignal() || markBytes < 0) {
+                    if (f.isDownloadingActive) { markNanos = now; markBytes = f.downloadedSize }
+                    return
+                }
+                val bytes = f.downloadedSize - markBytes
+                if (bytes > 0 && now > markNanos) {
+                    val nanos = now - markNanos
+                    observers.forEach { it.onTransfer(fileId, bytes, nanos) }
+                }
+                if (f.isDownloadingActive && !f.isDownloadingCompleted) { markNanos = now; markBytes = f.downloadedSize } else markBytes = -1
+            }
+            if (previous.downloadedSize > f.downloadedSize) synchronized(this) { markBytes = -1 } // local copy deleted
+        }
+
+        private fun markRequest() = synchronized(this) { markNanos = ticker.nanos(); markBytes = file.downloadedSize }
+
+        internal fun forgetRequest() { requestedOffset = -1; requestedEnd = -1; lastRequestNanos = 0 }
+
+        /**
+         * Sends the current request again, unchanged: a no-op for a healthy download, a restart for
+         * one stuck on a dead connection. (Changing the offset would throw away the part in flight.)
+         */
+        suspend fun reissue() {
+            val offset: Long
+            val end: Long
+            windowLock.withLock {
+                if (file.isDownloadingCompleted || requestedOffset < 0) return
+                offset = requestedOffset; end = requestedEnd
+                lastRequestNanos = ticker.nanos()
+            }
+            when (val r = repo.download(fileId, config.priority, offset, (end - offset).coerceAtLeast(1))) {
+                is AppResult.Ok -> refreshIfNewer(r.value)
+                is AppResult.Err -> Unit // the next read re-requests through maintainWindow
+            }
         }
 
         fun checkAvailable() {
@@ -142,9 +240,11 @@ class TelegramFileStreamer(
          *  - the download stopped before reaching the window end (error/cancel): restart it.
          */
         suspend fun maintainWindow(reader: Long, knownEnd: Long) {
+            lastReader = reader
             if (file.isDownloadingCompleted) return
             val size = size
-            val wantEnd = if (size >= 0) minOf(size, reader + readAhead) else reader + readAhead
+            val win = effectiveWindow
+            val wantEnd = if (size >= 0) minOf(size, reader + win) else reader + win
             val f = file
             val frontier = f.downloadOffset + f.downloadedPrefixSize
             // First byte at/after the reader that is not on the device yet.
@@ -158,18 +258,35 @@ class TelegramFileStreamer(
                 val running = f.isDownloadingActive || fresh
                 val requestedCovers = requestedOffset in 0..target && target < requestedEnd
                 val headAtTarget = head <= target + PART_SLACK && target - head <= config.maxGapBytes
-                val extendBelow = (readAhead * config.extendAtFraction).toLong()
+                val extendBelow = (win * config.extendAtFraction).toLong()
                 val farEnough = requestedEnd >= wantEnd || requestedEnd - reader >= extendBelow
                 if (running && requestedCovers && headAtTarget && farEnough) return
                 // Window fully fetched and the reader still far from its end: wait (bounds background use).
                 if (!f.isDownloadingActive && requestedOffset in 0..target && target >= requestedEnd && requestedEnd - reader >= extendBelow) return
                 if (fresh && requestedOffset == target && requestedEnd == wantEnd) return
-                val limit = (wantEnd - target).coerceAtLeast(1)
-                requestedOffset = target
-                requestedEnd = wantEnd
+                // A jump (seek, first request, restart elsewhere) starts a small window; an extension grows it.
+                // Continuing the current window (target inside it or just past its end) is an extension;
+                // anything else (seek, first request) is a jump.
+                val extension = requestedOffset >= 0 && target >= requestedOffset && target <= requestedEnd + config.maxGapBytes
+                var end = wantEnd
+                if (extension) {
+                    window = minOf(readAhead, (window * config.windowGrowth).toLong())
+                    end = if (size >= 0) minOf(size, reader + effectiveWindow) else reader + effectiveWindow
+                } else if (requestedOffset >= 0 || requests.isNotEmpty()) {
+                    window = startWindow().coerceAtMost(readAhead)
+                    end = if (size >= 0) minOf(size, reader + effectiveWindow) else reader + effectiveWindow
+                }
+                if (end <= target) end = if (size >= 0) minOf(size, target + config.minWindowBytes) else target + config.minWindowBytes
+                // Extending a running download keeps its offset and only raises the limit: Telegram then
+                // continues the transfer instead of restarting the part in flight.
+                val offset = if (extension && f.isDownloadingActive && requestedOffset in 0..target) requestedOffset else target
+                val limit = (end - offset).coerceAtLeast(1)
+                requestedOffset = offset
+                requestedEnd = offset + limit
                 lastRequestNanos = now
-                requests += DownloadRequest(target, limit, reader)
-                when (val r = repo.download(fileId, config.priority, target, limit)) {
+                requests += DownloadRequest(offset, limit, reader)
+                if (offset == target) markRequest()
+                when (val r = repo.download(fileId, config.priority, offset, limit)) {
                     is AppResult.Ok -> refreshIfNewer(r.value)
                     is AppResult.Err -> {
                         requestedOffset = -1; requestedEnd = -1; lastRequestNanos = 0
@@ -189,6 +306,8 @@ class TelegramFileStreamer(
             val start = ticker.nanos()
             var deadline = start + config.stallTimeoutMs * 1_000_000
             val hardDeadline = start + config.stallTimeoutMs * 3 * 1_000_000
+            var hard = hardDeadline
+            val offlineLimit = start + config.maxOfflineWaitMs * 1_000_000
             var lastProgress = file.downloadedSize
             waits.incrementAndGet()
             try {
@@ -198,12 +317,24 @@ class TelegramFileStreamer(
                     val seen = version.value
                     withTimeoutOrNull(config.pollIntervalMs) { version.first { it != seen } }
                     val available = prefixAt(position)
-                    if (available > 0) return available
+                    if (available > 0) {
+                        val waited = ticker.nanos() - start
+                        observers.forEach { it.onDataArrived(fileId, waited) }
+                        return available
+                    }
                     val now = ticker.nanos()
                     val progressed = file.downloadedSize
                     // Progress somewhere in the file (our part on its way) earns more time, within limits.
-                    if (progressed > lastProgress) { lastProgress = progressed; deadline = minOf(hardDeadline, now + config.stallTimeoutMs * 1_000_000) }
-                    if (now >= deadline) throw TelegramStreamException.Stalled(fileId, position, (now - start) / 1_000_000)
+                    if (progressed > lastProgress) { lastProgress = progressed; deadline = minOf(hard, now + config.stallTimeoutMs * 1_000_000) }
+                    // Known offline: waiting is expected, not a stall (bounded).
+                    if (offlineSignal() && now < offlineLimit) {
+                        deadline = maxOf(deadline, now + config.stallTimeoutMs * 1_000_000)
+                        hard = maxOf(hard, deadline)
+                    }
+                    if (now >= deadline) {
+                        observers.forEach { it.onStall(fileId) }
+                        throw TelegramStreamException.Stalled(fileId, position, (now - start) / 1_000_000)
+                    }
                 }
             } finally {
                 waitNanos.addAndGet(ticker.nanos() - start)
@@ -214,6 +345,8 @@ class TelegramFileStreamer(
             fileId = fileId,
             size = size,
             readAheadBytes = readAhead,
+            windowBytes = effectiveWindow,
+            uniqueBytesServed = served.total(),
             downloadedBytes = (file.downloadedSize - downloadedAtStart).coerceAtLeast(0),
             totalDownloadedBytes = file.downloadedSize,
             bytesServed = bytesServed.get(),
@@ -246,6 +379,10 @@ data class StreamStats(
     val fileId: Int,
     val size: Long,
     val readAheadBytes: Long,
+    /** Current (ramping) download window. */
+    val windowBytes: Long = readAheadBytes,
+    /** Distinct bytes handed to the player; downloaded − this = bytes never used (so far). */
+    val uniqueBytesServed: Long = 0,
     /** Downloaded since streaming started (excludes what was already on the device). */
     val downloadedBytes: Long,
     val totalDownloadedBytes: Long,
@@ -260,3 +397,33 @@ data class StreamStats(
     val partReads: Long,
     val completed: Boolean,
 )
+
+/** Notified by the streamer; the network monitor measures throughput and latency from this. */
+interface StreamObserver {
+    /** [bytes] arrived in [nanos] while a download was running. */
+    fun onTransfer(fileId: Int, bytes: Long, nanos: Long) {}
+    /** A reader waited [nanos] for the first byte at a position (request → data). */
+    fun onDataArrived(fileId: Int, nanos: Long) {}
+    fun onStall(fileId: Int) {}
+}
+
+/** Set of byte ranges (merged), for counting distinct bytes. Thread-safe. */
+class RangeSet {
+    private val ranges = java.util.TreeMap<Long, Long>() // start -> end (exclusive)
+
+    @Synchronized fun add(start: Long, length: Long) {
+        if (length <= 0) return
+        var s = start
+        var e = start + length
+        ranges.floorEntry(s)?.let { if (it.value >= s) { s = it.key; e = maxOf(e, it.value) } }
+        while (true) {
+            val next = ranges.ceilingEntry(s) ?: break
+            if (next.key > e) break
+            e = maxOf(e, next.value)
+            ranges.remove(next.key)
+        }
+        ranges[s] = e
+    }
+
+    @Synchronized fun total(): Long = ranges.entries.sumOf { it.value - it.key }
+}

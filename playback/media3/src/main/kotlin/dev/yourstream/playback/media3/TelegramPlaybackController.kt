@@ -16,6 +16,11 @@ import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.MediaSource
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.library.api.PlaybackTarget
+import dev.yourstream.playback.adaptive.AdaptiveStreaming
+import dev.yourstream.playback.adaptive.PlaybackPhase
+import dev.yourstream.playback.adaptive.PlaybackSample
+import dev.yourstream.playback.adaptive.SeekManager
+import dev.yourstream.playback.adaptive.SeekTarget
 import dev.yourstream.playback.stream.TelegramFileStreamer
 import dev.yourstream.playback.stream.TelegramStreamException
 import dev.yourstream.playback.stream.Ticker
@@ -74,13 +79,20 @@ class TelegramPlaybackController(
     playerFactory: PlayerFactory = DefaultPlayerFactory,
     /** For work that must outlive the controller (cancelling the download, saving progress). */
     private val backgroundScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /**
+     * Phase 8 adaptive streaming (buffer manager, network monitor, seek manager, prefetch), built
+     * with the controller's scope. Null = Phase 7 fixed buffering.
+     */
+    adaptive: ((CoroutineScope) -> AdaptivePlayback)? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /** The adaptive parts in use, if any (for the test player's diagnostics). */
+    val adaptive: AdaptivePlayback? = adaptive?.invoke(scope)
 
     val mediaSourceFactory = TelegramMediaSourceFactory.withDefaults(
         streamer, context, TelegramLoadErrorHandlingPolicy(config.loadRetries, config.retryBaseDelayMs, config.retryMaxDelayMs),
     )
-    val loadControl: LoadControl = DefaultLoadControl.Builder()
+    val loadControl: LoadControl = this.adaptive?.let { a -> AdaptiveLoadControl({ a.streaming.policy }) } ?: DefaultLoadControl.Builder()
         .setBufferDurationsMs(config.minBufferMs, config.maxBufferMs, config.bufferForPlaybackMs, config.bufferForPlaybackAfterRebufferMs)
         .setTargetBufferBytes(config.targetBufferBytes)
         .setPrioritizeTimeOverSizeThresholds(false)
@@ -104,6 +116,24 @@ class TelegramPlaybackController(
     private var lastProgressSaveNanos = 0L
     private var released = false
     private var samplerJob: Job? = null
+
+    private val seekManager: SeekManager? = this.adaptive?.let { a ->
+        SeekManager(
+            target = object : SeekTarget {
+                override fun applySeek(positionMs: Long) = rawSeek(positionMs)
+                override fun setFastSeek(enabled: Boolean) = setFastSeeking(enabled)
+            },
+            scope = scope,
+            clock = { System.nanoTime() / 1_000_000 },
+            governor = a.streaming.governor,
+            onFocus = { media?.let { streamer.focus(it.fileId).size } ?: 0 },
+        )
+    }
+    private var droppedFrames = 0L
+    private var droppedAtLastSample = 0L
+    private var lastSampleNanos = 0L
+    private var fastSeekByPolicy = false
+    private var scrubbing = false
 
     private val listener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -160,6 +190,11 @@ class TelegramPlaybackController(
 
     init {
         player.addListener(listener)
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onDroppedVideoFrames(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, count: Int, elapsedMs: Long) {
+                droppedFrames += count
+            }
+        })
         networkAvailable?.let { flow ->
             scope.launch {
                 flow.distinctUntilChanged().collect { available ->
@@ -193,6 +228,11 @@ class TelegramPlaybackController(
         val previous = this.media
         if (previous != null && previous.fileId != media.fileId) releaseFile(previous)
         this.media = media
+        this.adaptive?.let { a ->
+            a.prefetch?.onPlaying(media.fileId)
+            a.prefetch?.reset()
+            a.next?.current = media
+        }
         everReady = false
         pendingSeekStartNanos = null
         rebufferStartNanos = null
@@ -209,7 +249,20 @@ class TelegramPlaybackController(
     fun pause() { player.pause() }
     fun togglePlayPause() { if (player.playWhenReady) pause() else resume() }
 
+    /** User seek. With adaptive streaming, bursts are coalesced and background transfers make way (SeekManager). */
     fun seekTo(positionMs: Long) {
+        seekManager?.seekTo(positionMs) ?: rawSeek(positionMs)
+    }
+
+    /** Seek-bar drag start / end: key-frame previews at a bounded rate, then one exact seek. */
+    fun beginScrub() { scrubbing = true; seekManager?.beginScrub() ?: setFastSeeking(true) }
+
+    fun endScrub(positionMs: Long) {
+        scrubbing = false
+        seekManager?.endScrub(positionMs) ?: run { setFastSeeking(false); rawSeek(positionMs) }
+    }
+
+    private fun rawSeek(positionMs: Long) {
         startSeek()
         player.seekTo(positionMs.coerceAtLeast(0))
         publish()
@@ -243,6 +296,7 @@ class TelegramPlaybackController(
 
     fun release() {
         if (released) return
+        this.adaptive?.prefetch?.cancel()
         saveProgress(force = true)
         released = true
         media?.let(::releaseFile)
@@ -318,6 +372,36 @@ class TelegramPlaybackController(
             )
         }
         if (player.isPlaying) saveProgress(force = false)
+        adaptiveSample()
+    }
+
+    /** Feeds the adaptive engine; its policy drives the load control (read live) and the download window. */
+    private fun adaptiveSample() {
+        val a = this.adaptive ?: return
+        val m = media ?: return
+        val now = ticker.nanos()
+        val elapsedSec = if (lastSampleNanos == 0L) 0.0 else (now - lastSampleNanos) / 1e9
+        val dropRate = if (elapsedSec > 0) (droppedFrames - droppedAtLastSample) / elapsedSec else 0.0
+        lastSampleNanos = now; droppedAtLastSample = droppedFrames
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+        val bitrate = player.videoFormat?.bitrate?.takeIf { it > 0 }?.let { it / 8L }
+            ?: duration?.let { m.sizeBytes * 1000 / it } ?: m.durationMs?.takeIf { it > 0 }?.let { m.sizeBytes * 1000 / it }
+        val phase = when {
+            player.playerError != null || player.playbackState == Player.STATE_IDLE -> PlaybackPhase.IDLE
+            player.playbackState == Player.STATE_ENDED -> PlaybackPhase.ENDED
+            pendingSeekStartNanos != null -> PlaybackPhase.SEEKING
+            player.playbackState == Player.STATE_BUFFERING -> if (everReady) PlaybackPhase.BUFFERING else PlaybackPhase.STARTING
+            player.playWhenReady -> PlaybackPhase.PLAYING
+            else -> PlaybackPhase.PAUSED
+        }
+        val policy = a.streaming.onSample(
+            PlaybackSample(now / 1_000_000, phase, player.currentPosition, player.bufferedPosition, duration, bitrate, dropRate, player.isLoading),
+            m.fileId,
+        )
+        if (!scrubbing && policy.preferFastSeek != fastSeekByPolicy) {
+            fastSeekByPolicy = policy.preferFastSeek
+            setFastSeeking(policy.preferFastSeek)
+        }
     }
 
     private fun startSeek() {
@@ -329,6 +413,7 @@ class TelegramPlaybackController(
     private fun completeSeek(now: Long) {
         val start = pendingSeekStartNanos ?: return
         pendingSeekStartNanos = null
+        seekManager?.onSeekCompleted()
         updateMetrics { it.copy(seekLatenciesMs = it.seekLatenciesMs + ms(now - start)) }
     }
 
@@ -372,4 +457,13 @@ fun PlaybackException.toPlaybackError(): PlaybackError {
         in 4000..4999 -> PlaybackError(PlaybackErrorKind.DECODER, message ?: errorCodeName, false, errorCode)
         else -> PlaybackError(PlaybackErrorKind.UNKNOWN, message ?: errorCodeName, false, errorCode)
     }
+}
+
+/** The adaptive parts used by one controller. */
+class AdaptivePlayback(
+    val streaming: AdaptiveStreaming,
+    /** Tells the prefetcher what plays now (it looks up the next episode from that). */
+    val next: NextEpisodeProvider? = null,
+) {
+    val prefetch get() = streaming.prefetch
 }

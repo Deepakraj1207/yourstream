@@ -1,5 +1,7 @@
 # Playback engine (Phase 7)
 
+> Phase 8 adds adaptive buffering, smart seeking, prefetch and download limits on top of this: see [ADAPTIVE_STREAMING.md](ADAPTIVE_STREAMING.md). The fixed values below are the Phase 7 defaults, which remain in force when `playback.adaptive=false`.
+
 Plays Telegram media with AndroidX Media3 / ExoPlayer **while the file is being downloaded**,
 with random access: a seek moves the Telegram download to the new position instead of fetching
 everything in between. TDLib stays inside `:telegram:tdlib`; Media3 never sees a TDLib type.

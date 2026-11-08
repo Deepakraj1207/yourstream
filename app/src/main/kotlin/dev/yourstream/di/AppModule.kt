@@ -72,6 +72,17 @@ object AppModule {
         return CatalogProviders(known + custom)
     }
 
+    @Provides
+    @Singleton
+    fun playbackSettings(): dev.yourstream.playback.media3.PlaybackSettings = dev.yourstream.playback.media3.PlaybackSettings(
+        adaptive = BuildConfig.PLAYBACK_ADAPTIVE,
+        limits = dev.yourstream.playback.adaptive.TransferLimits(
+            maxConcurrentDownloads = BuildConfig.PLAYBACK_MAX_CONCURRENT_DOWNLOADS,
+            maxConcurrentPrefetches = minOf(1, BuildConfig.PLAYBACK_MAX_CONCURRENT_DOWNLOADS - 1),
+        ),
+        buffer = dev.yourstream.playback.adaptive.BufferConfig(allowMeteredPrefetch = BuildConfig.PLAYBACK_PREFETCH_ON_MOBILE_DATA),
+    )
+
     /**
      * Telegram configuration. API id/hash come from BuildConfig, which the build fills from
      * local.properties / secrets.properties / environment (docs/TELEGRAM_SETUP.md).

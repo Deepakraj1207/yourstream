@@ -67,6 +67,9 @@ class SimulatedTelegramFiles(
 
     fun file(id: Int): SimFile = files.getValue(id)
 
+    /** Downloads running right now (for concurrency measurements). */
+    fun activeDownloads(): Int = files.values.count { it.isActive() }
+
     /** Makes a file impossible to download (deleted message / expired reference). */
     fun makeUnavailable(id: Int) { file(id).canBeDownloaded = false; emit(file(id)) }
 
@@ -162,6 +165,8 @@ class SimulatedTelegramFiles(
 
         @Synchronized fun prefix(offset: Long): Long = prefixLocked(offset)
 
+        @Synchronized fun isActive(): Boolean = active && done.cardinality() < parts
+
         private fun prefixLocked(offset: Long): Long {
             if (offset >= size) return 0
             var p = (offset / partSize).toInt()
@@ -181,6 +186,10 @@ class SimulatedTelegramFiles(
         }
 
         fun start(offset: Long, limit: Long) {
+            synchronized(this) {
+                // Same offset while running: only the limit changes, the transfer goes on.
+                if (active && job?.isActive == true && offset == reqOffset) { reqLimit = limit; return }
+            }
             val previous: Job?
             val gen: Int
             synchronized(this) {
@@ -194,21 +203,25 @@ class SimulatedTelegramFiles(
             job = scope.launch {
                 previous?.join()
                 val first = (offset / partSize).toInt()
-                val endByte = if (limit == 0L) size else minOf(size, offset + limit)
-                val last = ((endByte - 1) / partSize).toInt()
-                for (p in first..last) {
+                var p = first
+                while (true) {
+                    val lim = synchronized(this@SimFile) { reqLimit }
+                    val endByte = if (lim == 0L) size else minOf(size, offset + lim)
+                    val last = ((endByte - 1) / partSize).toInt()
+                    if (p > last) break
+                    val current = p++
                     if (!isActive) return@launch
-                    if (synchronized(this@SimFile) { done[p] }) continue
-                    val bytes = partBytes(p)
+                    if (synchronized(this@SimFile) { done[current] }) continue
+                    val bytes = partBytes(current)
                     while (!online && isActive) delay(10)
                     if (latencyMs > 0) delay(latencyMs)
                     val bw = bandwidthBytesPerSecond
                     if (bw > 0) delay(bytes * 1000 / bw)
                     while (!online && isActive) delay(10)
                     if (!isActive) return@launch
-                    synchronized(this@SimFile) { copyPart(p) }
+                    synchronized(this@SimFile) { copyPart(current) }
                     bytesDownloaded.addAndGet(bytes.toLong())
-                    downloadedParts += p
+                    downloadedParts += current
                     emit(this@SimFile)
                 }
                 synchronized(this@SimFile) { if (generation == gen) active = false }

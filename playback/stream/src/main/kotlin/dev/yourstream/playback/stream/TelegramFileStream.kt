@@ -51,6 +51,7 @@ class TelegramFileStream internal constructor(
         if (timeToFirstByteNanos == null) timeToFirstByteNanos = session.clock.nanos() - openedAt
         position += read
         session.bytesServed.addAndGet(read.toLong())
+        session.served.add(position - read, read.toLong())
         // Keep the download window ahead of where the reader is now.
         session.maintainWindow(position, availableEnd)
         return read

@@ -113,6 +113,18 @@ class PlayerDebugViewModel @Inject constructor(
         repeat(5) { controller.seekTo(Random.nextLong(0, duration.coerceAtLeast(1))) }
     }
 
+    /** Simulated seek-bar drag: 20 positions over ~1 s, then release (shows coalescing in the metrics). */
+    fun scrubTest() {
+        val duration = controller.state.value.durationMs ?: return
+        val from = controller.state.value.positionMs
+        viewModelScope.launch {
+            controller.beginScrub()
+            var pos = from
+            repeat(20) { pos = (pos + duration / 100).coerceAtMost(duration - 1); controller.seekTo(pos); kotlinx.coroutines.delay(50) }
+            controller.endScrub(pos)
+        }
+    }
+
     fun toggleFastSeek() { fastSeek = !fastSeek; controller.setFastSeeking(fastSeek) }
 
     override fun onCleared() = controller.release()
@@ -130,12 +142,14 @@ private fun PlayerScreen(vm: PlayerDebugViewModel) {
         Text(state.line(), fontSize = 12.sp)
         state.error?.let { Text("ERROR ${it.kind}: ${it.message}${if (it.retryable) " (retryable)" else ""}", color = Color(0xFFB00020), fontSize = 12.sp) }
         metrics.lines().forEach { Text(it, fontSize = 11.sp) }
+        vm.controller.adaptive?.let { a -> a.lines(state).forEach { Text(it, fontSize = 10.sp) } } ?: Text("adaptive streaming off", fontSize = 10.sp)
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             TextButton(onClick = vm.controller::togglePlayPause) { Text(if (state.playWhenReady) "Pause" else "Play") }
             TextButton(onClick = { vm.controller.seekBy(-10_000) }) { Text("-10s") }
             TextButton(onClick = { vm.controller.seekBy(30_000) }) { Text("+30s") }
             TextButton(onClick = vm::seekFar) { Text("→ 01:20:00") }
             TextButton(onClick = vm::randomSeeks) { Text("5 random seeks") }
+            TextButton(onClick = vm::scrubTest) { Text("scrub test") }
             TextButton(onClick = vm.controller::retry) { Text("Retry") }
             TextButton(onClick = vm::toggleFastSeek) { Text(if (vm.fastSeek) "[fast seek]" else "fast seek") }
             TextButton(onClick = vm.controller::stop) { Text("Stop") }
@@ -161,3 +175,21 @@ private fun PlaybackMetrics.lines() = listOf(
     "served ${bytesServed / 1024} KB · downloaded ${downloadedBytes / 1024} KB in $downloadRequests requests · waited for data $dataWaitMs ms",
     "memory peak: java ${peakJavaHeapBytes / (1 shl 20)} MB · native ${peakNativeHeapBytes / (1 shl 20)} MB",
 )
+
+/** Diagnostics of the adaptive engine (Stage 1 only). */
+private fun dev.yourstream.playback.media3.AdaptivePlayback.lines(@Suppress("UNUSED_PARAMETER") tick: PlaybackState): List<String> {
+    val p = streaming.policy
+    val n = streaming.network.state.value
+    val g = streaming.governor.stats.value
+    val pf = prefetch?.state
+    return listOf(
+        "network: ${n.connectivity.type}${if (n.isMetered) " (metered)" else ""} · ${n.quality} · ${n.bytesPerSecond?.let { "${it * 8 / 1000} kbit/s" } ?: "measuring"}" +
+            (n.latencyMs?.let { " · ${it} ms" } ?: "") + (if (n.recentStalls > 0) " · ${n.recentStalls} stalls" else ""),
+        "buffer: start ${p.startPlaybackMs / 1000.0}s · resume ${p.resumeAfterRebufferMs / 1000.0}s · RAM ${p.minBufferMs / 1000}-${p.maxBufferMs / 1000}s (≤${p.targetBufferBytes / (1 shl 20)} MB) · disk ${p.readAheadBytes / (1 shl 20)} MB · risk ${p.risk}" +
+            (streaming.buffer.timeToEmptyMs?.let { " · empty in ${it / 1000}s" } ?: ""),
+        "why: ${p.reason}",
+        "downloads: ${g.active.size} active ${g.active.values.groupingBy { it }.eachCount()} · peak ${g.peakConcurrent} · preempted ${g.preempted} · refused ${g.rejected}" +
+            " · prefetch ${if (g.prefetchPaused) "paused" else "allowed=${p.prefetchAllowed}"}",
+        "next episode: ${pf?.status ?: "–"}${pf?.candidate?.let { " ${it.label}" } ?: ""}${pf?.let { if (it.prefetchedBytes > 0) " ${it.prefetchedBytes / 1024} KB" else "" } ?: ""}${pf?.reason?.let { " ($it)" } ?: ""}",
+    )
+}

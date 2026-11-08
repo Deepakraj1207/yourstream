@@ -23,6 +23,15 @@ data class StreamingConfig(
      * download is re-pointed instead of letting it fetch the gap (a seek inside the window).
      */
     val maxGapBytes: Long = 2L * MB,
+    /**
+     * Window after a jump (start, seek). 0 = start with the full read-ahead (Phase 7 behaviour).
+     * Grows by [windowGrowth] per extension. Small values waste less while scrubbing.
+     */
+    val initialWindowBytes: Long = 4L * MB,
+    val windowGrowth: Double = 2.0,
+    val minWindowBytes: Long = 1L * MB,
+    /** While the device is known offline, a reader waits up to this long without failing. */
+    val maxOfflineWaitMs: Long = 120_000,
     /** Telegram download priority (1..32). Playback must win over background downloads. */
     val priority: Int = 32,
     /** No new data at the read position for this long = stalled (network down, server not answering). */
