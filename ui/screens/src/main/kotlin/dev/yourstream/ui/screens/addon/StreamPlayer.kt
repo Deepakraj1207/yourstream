@@ -203,8 +203,10 @@ private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
 @Composable
 fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var landscape by rememberSaveable { mutableStateOf(true) }
-    var fit by rememberSaveable { mutableStateOf(VideoFit.FIT) }
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    val step = settings.seekMs
+    var landscape by rememberSaveable { mutableStateOf(settings.playerLandscape) }
+    var fit by rememberSaveable { mutableStateOf(settings.defaultFit) }
     ImmersiveMode()
     Orientation(landscape)
     RestoreBrightnessOnExit()
@@ -232,9 +234,9 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
             Modifier.fillMaxSize().playerGestures(
                 context,
                 onTap = { if (controls) controls = false else show() },
-                onSeek = { forward -> vm.seekBy(if (forward) 10_000 else -10_000); hint = PlayerHint(if (forward) AppIcons.FastForward else AppIcons.FastRewind, if (forward) "+10 s" else "−10 s") },
+                onSeek = { forward -> vm.seekBy(if (forward) step else -step); hint = PlayerHint(if (forward) AppIcons.FastForward else AppIcons.FastRewind, if (forward) "+${settings.seekSeconds} s" else "−${settings.seekSeconds} s") },
                 onHoldSpeed = { holding ->
-                    if (holding) { speedBeforeHold = state.speed; vm.setSpeed(2f); hint = PlayerHint(AppIcons.FastForward, hold) }
+                    if (holding) { speedBeforeHold = state.speed; vm.setSpeed(settings.holdSpeed); hint = PlayerHint(AppIcons.FastForward, hold) }
                     else { vm.setSpeed(speedBeforeHold ?: 1f); speedBeforeHold = null; hint = null }
                 },
                 onHint = { hint = it },
@@ -263,12 +265,12 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                 }
                 // Centre: back 10 s, play/pause, forward 10 s.
                 Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp) { vm.seekBy(-10_000); show() }
+                    RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp) { vm.seekBy(-step); show() }
                     FilledIconButton(
                         onClick = { vm.toggle(); show() }, modifier = Modifier.size(80.dp).testTag("stream-play"),
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
                     ) { Icon(if (state.playing) AppIcons.Pause else Icons.Filled.PlayArrow, stringResource(if (state.playing) R.string.player_pause else R.string.player_play), Modifier.size(40.dp)) }
-                    RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp) { vm.seekBy(10_000); show() }
+                    RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp) { vm.seekBy(step); show() }
                 }
                 // Bottom: timeline, times, speed.
                 Column(

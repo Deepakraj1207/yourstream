@@ -179,6 +179,12 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettings() = shot("phone-settings", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.5.1", {}, {}, {},
+            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.5.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.FAVORITES) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }

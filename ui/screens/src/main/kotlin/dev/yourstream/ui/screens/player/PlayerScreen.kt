@@ -129,8 +129,9 @@ fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: Playe
     ImmersiveMode()
     // Phones and tablets open the player in landscape; the rotate button switches to portrait and back.
     val tv = LocalWindowLayout.current == WindowLayout.TV
-    var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
-    var fit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VideoFit.FIT) }
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(settings.playerLandscape) }
+    var fit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(settings.defaultFit) }
     if (!tv) Orientation(landscape)
     RestoreBrightnessOnExit()
     PlayerScreen(
@@ -174,7 +175,6 @@ internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = Vid
 
 enum class PlayerPanel { EPISODES, AUDIO, SUBTITLES, SPEED, INFO }
 
-private const val SEEK_STEP_MS = 10_000L
 private const val UP_NEXT_BEFORE_END_MS = 30_000L
 private const val UP_NEXT_COUNTDOWN_S = 10
 
@@ -206,6 +206,8 @@ fun PlayerScreen(
 ) {
     val layout = LocalWindowLayout.current
     val tv = layout == WindowLayout.TV
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    val seekStepMs = settings.seekMs
     var controls by remember { mutableStateOf(true) }
     var interactions by remember { mutableIntStateOf(0) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
@@ -260,8 +262,8 @@ fun PlayerScreen(
                     Key.MediaPlayPause, Key.Spacebar -> { onAction(PlayerAction.TogglePlay); poke(); true }
                     Key.MediaPlay -> { if (!state.isPlaying) onAction(PlayerAction.TogglePlay); true }
                     Key.MediaPause -> { onAction(PlayerAction.Pause); poke(); true }
-                    Key.MediaFastForward -> { seek(SEEK_STEP_MS); true }
-                    Key.MediaRewind -> { seek(-SEEK_STEP_MS); true }
+                    Key.MediaFastForward -> { seek(seekStepMs); true }
+                    Key.MediaRewind -> { seek(-seekStepMs); true }
                     Key.MediaNext -> { state.next?.let { onPlay(it.play) }; true }
                     Key.MediaPrevious -> { state.previous?.let { onPlay(it.play) }; true }
                     else -> false
@@ -271,8 +273,8 @@ fun PlayerScreen(
                 // Only reached with nothing else focused, i.e. while the controls are hidden.
                 if (controls || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
-                    Key.DirectionLeft -> { seek(-SEEK_STEP_MS); true }
-                    Key.DirectionRight -> { seek(SEEK_STEP_MS); true }
+                    Key.DirectionLeft -> { seek(-seekStepMs); true }
+                    Key.DirectionRight -> { seek(seekStepMs); true }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { onAction(PlayerAction.TogglePlay); poke(); true }
                     Key.DirectionUp, Key.DirectionDown, Key.Menu, Key.Info -> { poke(); true }
                     else -> false
@@ -291,9 +293,9 @@ fun PlayerScreen(
             Modifier.fillMaxSize().testTag("player-gestures").playerGestures(
                 context,
                 onTap = { if (controls) controls = false else poke() },
-                onSeek = { forward -> seek(if (forward) SEEK_STEP_MS else -SEEK_STEP_MS) },
+                onSeek = { forward -> seek(if (forward) seekStepMs else -seekStepMs) },
                 onHoldSpeed = { holding ->
-                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(2f)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
+                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
                     else { onAction(PlayerAction.SetSpeed(speedBeforeHold ?: 1f)); speedBeforeHold = null; hint = null }
                 },
                 onHint = { hint = it },
@@ -330,7 +332,7 @@ fun PlayerScreen(
         val nearEnd = duration > 5 * 60_000 && duration - state.positionMs in 0..UP_NEXT_BEFORE_END_MS
         if (next != null && !upNextDismissed && state.error == null && (state.ended || nearEnd)) {
             UpNext(
-                next, countdown = state.ended,
+                next, countdown = state.ended && settings.autoplayNext,
                 onPlay = { onPlay(next.play) },
                 onCancel = { upNextDismissed = true; poke() },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = if (controls) 168.dp else 32.dp),
@@ -398,6 +400,7 @@ private fun Controls(
     onRotate: (() -> Unit)? = null,
     onFit: (() -> Unit)? = null,
 ) {
+    val seekStepMs = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekMs
     val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
     Box(Modifier.fillMaxSize()) {
         // Top: back, title, quality.
@@ -433,11 +436,11 @@ private fun Controls(
         // Centre: large touch transport (phones and tablets).
         if (!tv) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 32.dp else 56.dp)) {
-                RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp, Modifier.testTag("rewind")) { seek(-SEEK_STEP_MS) }
+                RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp, Modifier.testTag("rewind")) { seek(-seekStepMs) }
                 Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                     if (state.loading) Buffering(Modifier) else PlayPause(state, 80.dp, playFocus, onAction)
                 }
-                RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp, Modifier.testTag("forward")) { seek(SEEK_STEP_MS) }
+                RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp, Modifier.testTag("forward")) { seek(seekStepMs) }
             }
         }
 
@@ -469,9 +472,9 @@ private fun Controls(
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (tv) 12.dp else 4.dp)) {
                 state.previous?.let { p -> BarIcon(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
                 if (tv) {
-                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-SEEK_STEP_MS) }
+                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
                     PlayPause(state, 56.dp, playFocus, onAction)
-                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(SEEK_STEP_MS) }
+                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
                 }
                 state.next?.let { n -> BarIcon(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
                 Spacer(Modifier.weight(1f))

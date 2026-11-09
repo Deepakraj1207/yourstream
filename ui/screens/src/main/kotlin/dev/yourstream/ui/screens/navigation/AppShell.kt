@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -42,7 +43,15 @@ import dev.yourstream.ui.core.rememberWindowLayout
  */
 @Composable
 fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWindowLayout()) {
-    YourStreamTheme(layout) {
+    val prefs: dev.yourstream.ui.screens.settings.AppPreferencesViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
+    val settings by prefs.settings.collectAsStateWithLifecycle()
+    val dark = when (settings.theme) {
+        dev.yourstream.ui.screens.settings.ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+        dev.yourstream.ui.screens.settings.ThemeMode.DARK -> true
+        dev.yourstream.ui.screens.settings.ThemeMode.LIGHT -> false
+    }
+    androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
+    YourStreamTheme(layout, darkTheme = dark) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
             val navigator = remember(nav) { AppNavigator(nav) }
@@ -56,6 +65,7 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
             // A newer version on the Releases page: offered once per session (not over the player).
             if (!fullScreen && !androidx.compose.ui.platform.LocalInspectionMode.current) dev.yourstream.ui.screens.update.UpdatePrompt()
         }
+    }
     }
 }
 
