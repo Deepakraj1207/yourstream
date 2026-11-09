@@ -80,7 +80,6 @@ class HomeViewModel @Inject constructor(
 
     val recentlyAdded: Flow<PagingData<Tile>> = paged { media.recentlyAdded(pageSize = 20) }
     val series: Flow<PagingData<Tile>> = paged { series.series(LibraryQuery(sort = LibrarySort.RECENTLY_WATCHED), 20) }
-    val favorites: Flow<PagingData<Tile>> = paged { media.favorites(20) }
 
     private val continueWatching: Flow<UiState<List<Tile>>> = retry.flatMapLatest {
         watch.continueWatching(20)

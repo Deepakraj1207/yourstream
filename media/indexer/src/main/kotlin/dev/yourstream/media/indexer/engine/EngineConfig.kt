@@ -10,8 +10,15 @@ data class EngineConfig(
     /** Telegram search filters walked per chat, in order. */
     val filters: List<MediaSearchFilter> = listOf(MediaSearchFilter.VIDEO, MediaSearchFilter.DOCUMENT, MediaSearchFilter.AUDIO),
     val pageSize: Int = 100,
-    /** Pause between pages so a big backfill stays clear of FLOOD_WAIT. */
-    val pageDelay: Duration = 200.milliseconds,
+    /**
+     * Pause between pages. Short: Telegram's FLOOD_WAIT answers are waited out (below), so a
+     * big channel (100k+ files) is not slowed down for nothing.
+     */
+    val pageDelay: Duration = 30.milliseconds,
+    /** Search filters of one chat are walked side by side instead of one after another. */
+    val parallelFilters: Boolean = true,
+    /** The library is told about new files every this many pages (not only when a run ends). */
+    val notifyEveryPages: Int = 10,
     /** Network/timeout retries per request before the run gives up (WorkManager retries later). */
     val maxAttempts: Int = 5,
     val retryBaseDelay: Duration = 2.seconds,
@@ -22,5 +29,5 @@ data class EngineConfig(
     val verifyMaxPerIncrementalRun: Int = 2_000,
     val verifyInterval: Duration = 24.hours,
     /** How many chats may scan at once (process-wide). */
-    val maxConcurrentChats: Int = 2,
+    val maxConcurrentChats: Int = 3,
 )

@@ -31,7 +31,6 @@ import dev.yourstream.ui.screens.browse.SeriesRoute as SeriesScreenRoute
 import dev.yourstream.ui.screens.continuewatching.ContinueWatchingRoute as ContinueWatchingScreenRoute
 import dev.yourstream.ui.screens.details.DetailsRoute as DetailsScreenRoute
 import dev.yourstream.ui.screens.episodes.EpisodesRoute as EpisodesScreenRoute
-import dev.yourstream.ui.screens.browse.FavoritesRoute as FavoritesScreenRoute
 import dev.yourstream.ui.screens.browse.RecentlyAddedRoute as RecentlyAddedScreenRoute
 import dev.yourstream.ui.screens.home.HomeRoute as HomeScreenRoute
 import dev.yourstream.ui.screens.home.HomeSection
@@ -117,7 +116,6 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
                         HomeSection.RECENTLY_ADDED -> TopLevel.RECENT
                         HomeSection.MOVIES -> TopLevel.MOVIES
                         HomeSection.SERIES -> TopLevel.SERIES
-                        HomeSection.FAVORITES -> TopLevel.FAVORITES
                     })
                 },
                 onSignIn = navigator::account,
@@ -131,7 +129,6 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
-        page<FavoritesRoute> { FavoritesScreenRoute(navigator::open) }
         page<SettingsRoute> {
             SettingsScreenRoute(
                 appVersion, navigator::account, navigator::sources, navigator::languages,

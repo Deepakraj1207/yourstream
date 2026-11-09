@@ -26,7 +26,6 @@ import kotlinx.serialization.Serializable
 @Serializable data class SearchRoute(val query: String = "") : Route
 @Serializable data object ContinueWatchingRoute : Route
 @Serializable data object RecentlyAddedRoute : Route
-@Serializable data object FavoritesRoute : Route
 @Serializable data object SettingsRoute : Route
 
 /** A movie, video or series. */
@@ -70,7 +69,6 @@ enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: Image
     SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search, true),
     CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
     RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
-    FAVORITES(FavoritesRoute, R.string.nav_favorites, Icons.Filled.Favorite, true),
     SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings, true),
 }
 

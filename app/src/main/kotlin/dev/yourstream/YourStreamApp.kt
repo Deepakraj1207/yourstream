@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
-class YourStreamApp : Application(), Configuration.Provider {
+class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImageLoader.Factory {
 
     @Inject lateinit var telegram: TelegramInitializer
     @Inject lateinit var telegramManager: TelegramManager
@@ -40,6 +40,9 @@ class YourStreamApp : Application(), Configuration.Provider {
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+
+    /** Posters: see [dev.yourstream.ui.core.appImageLoader]. */
+    override fun newImageLoader(context: coil3.PlatformContext): coil3.ImageLoader = dev.yourstream.ui.core.appImageLoader(this)
 
     override fun onCreate() {
         // Before Hilt: a crash while building the object graph is still recorded.

@@ -51,13 +51,12 @@ import dev.yourstream.ui.screens.tileCard
 class HomeRows(
     val recentlyAdded: LazyPagingItems<Tile>,
     val series: LazyPagingItems<Tile>,
-    val favorites: LazyPagingItems<Tile>,
 )
 
 @Composable
 fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit = {}, vm: HomeViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val rows = HomeRows(vm.recentlyAdded.collectAsLazyPagingItems(), vm.series.collectAsLazyPagingItems(), vm.favorites.collectAsLazyPagingItems())
+    val rows = HomeRows(vm.recentlyAdded.collectAsLazyPagingItems(), vm.series.collectAsLazyPagingItems())
     HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
 }
 
@@ -131,7 +130,6 @@ private fun HomeContent(
         }
         paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
         paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
-        paged("favorites", R.string.home_favorites, rows.favorites, HomeSection.FAVORITES, card, actions, onOpen, onSeeAll)
         // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
         state.catalogs.forEach { c ->
             item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }

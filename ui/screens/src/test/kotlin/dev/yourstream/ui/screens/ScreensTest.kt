@@ -85,7 +85,7 @@ class ScreensTest {
     private fun rows(vararg recent: Tile): HomeRows {
         val r = kotlinx.coroutines.flow.flowOf(PagingData.from(recent.toList())).collectAsLazyPagingItems()
         val none = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>())).collectAsLazyPagingItems()
-        return HomeRows(r, none, none)
+        return HomeRows(r, none)
     }
 
     @Test
@@ -179,7 +179,7 @@ class ScreensTest {
     }
 
     @Test
-    fun detailsShowsResumeAndTogglesFavorite() {
+    fun detailsShowsResumeAndAddsToLibrary() {
         val actions = mutableListOf<DetailsAction>()
         val opened = mutableListOf<OpenTarget>()
         val play = OpenTarget.Play(PlaybackTarget(1))
@@ -191,8 +191,9 @@ class ScreensTest {
         }
         compose.onNodeWithText("Resume from 1:02:03").performClick()
         assertEquals(listOf<OpenTarget>(play), opened)
-        compose.onNodeWithTag("favorite").performScrollTo().performClick()
-        assertEquals(listOf<DetailsAction>(DetailsAction.ToggleFavorite), actions)
+        compose.onNodeWithTag("my-library").performScrollTo().performClick()
+        assertEquals(listOf<DetailsAction>(DetailsAction.ToggleLibrary), actions)
+        compose.onNodeWithTag("favorite").assertDoesNotExist()
     }
 
     @Test

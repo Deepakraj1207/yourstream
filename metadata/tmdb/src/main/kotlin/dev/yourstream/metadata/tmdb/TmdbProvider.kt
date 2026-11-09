@@ -178,7 +178,8 @@ class TmdbProvider(
         val ID = ProviderId("tmdb")
         private const val MAX_RESULTS = 10
         private const val MAX_CAST = 15
-        private const val POSTER = "w500"
+        /** w342 is sharp on phone/TV cards and a third of w500's size: faster lists. */
+        private const val POSTER = "w342"
         private const val BACKDROP = "w1280"
         private const val STILL = "w300"
         private const val PROFILE = "w185"

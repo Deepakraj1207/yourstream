@@ -44,6 +44,25 @@ class IndexingEngineTest {
     }
 
     @Test
+    fun parallelFiltersIndexTheSameFiles() = runTest {
+        val parallel = IndexerTestEnv(parallelFilters = true)
+        parallel.enable(chat)
+        (1L..7L).forEach { parallel.telegram.add(mediaMessage(chat, it * 10, "Movie.$it.2020.1080p.mkv")) }
+        parallel.telegram.add(mediaMessage(chat, 75, "clip.mp4", type = VIDEO))
+        parallel.telegram.add(mediaMessage(chat, 85, "trailer.mp4", type = VIDEO))
+        parallel.telegram.add(mediaMessage(chat, 90, "Movie.1.2020.srt", size = 40_000))
+        parallel.telegram.add(mediaMessage(chat, 95, "manual.pdf", mime = "application/pdf"))
+        val result = parallel.engine.run(chat, IndexMode.INCREMENTAL, 5.minutes)
+        assertEquals(Outcome.COMPLETED, result.outcome)
+        assertEquals(10, result.mediaAdded)
+        assertEquals(10, parallel.repository.count(MediaQuery(chatId = chat)).first())
+        parallel.config.filters.forEach { f -> assertTrue(parallel.store.cursor(chat, f).backfillComplete, "$f done") }
+        // A second run finds nothing new.
+        assertEquals(0, parallel.engine.run(chat, IndexMode.INCREMENTAL, 5.minutes).mediaAdded)
+        parallel.close()
+    }
+
+    @Test
     fun initialScanWalksEveryPageOfEveryFilter() = runTest {
         env.enable(chat); seed()
         val result = env.engine.run(chat, IndexMode.INCREMENTAL, 5.minutes)

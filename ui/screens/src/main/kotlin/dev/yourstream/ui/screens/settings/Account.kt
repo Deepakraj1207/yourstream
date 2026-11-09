@@ -264,12 +264,7 @@ private fun SignInFrame(onBack: () -> Unit, content: @Composable () -> Unit) {
 @Composable
 private fun BrandHeader() {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(56.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(30.dp))
-                Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp).width(30.dp).height(3.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
-            }
-        }
+        Image(androidx.compose.ui.res.painterResource(dev.yourstream.ui.core.R.drawable.ys_logo), contentDescription = null, modifier = Modifier.size(56.dp))
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
     }
 }

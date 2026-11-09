@@ -21,6 +21,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:label="YourStream"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">

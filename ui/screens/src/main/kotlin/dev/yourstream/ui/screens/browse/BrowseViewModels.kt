@@ -108,11 +108,3 @@ class RecentlyAddedViewModel @Inject constructor(saved: SavedStateHandle, media:
         { q -> media.recentlyAdded(q.kinds) }) {
     override fun query(f: BrowseFilters) = LibraryQuery(kinds = setOfNotNull(f.kind), sort = LibrarySort.RECENTLY_ADDED)
 }
-
-/** Favorites with filters off (the order is the user's: newest favorite first). */
-@HiltViewModel
-class FavoritesViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
-    BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions,
-        { _ -> media.favorites() }) {
-    override fun query(f: BrowseFilters) = LibraryQuery(kinds = setOfNotNull(f.kind), favoritesOnly = true)
-}

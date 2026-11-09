@@ -87,7 +87,7 @@ class ScreenshotTest {
             Tile(MediaCardModel("fy:32", "Super Deluxe", "2019"), OpenTarget.Details(32), 32, caption = TileCaption.Reason("Tamil · ★ 8.3")),
             Tile(MediaCardModel("fy:33", "Soorarai Pottru", "2020"), OpenTarget.Details(33), 33, caption = TileCaption.Reason("Tamil · drama · ★ 8.7")),
         ))
-        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s, none), {}, {}, {}, {}, {})
+        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s), {}, {}, {}, {}, {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -127,7 +127,7 @@ class ScreenshotTest {
         HomeScreen(
             HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
                 IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), catalogs = listOf(catalog)),
-            HomeRows(r, none, none), {}, {}, {}, {}, {},
+            HomeRows(r, none), {}, {}, {}, {}, {},
         )
     }
 
@@ -185,7 +185,7 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.FAVORITES) {
+    fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.LIBRARY) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }
 

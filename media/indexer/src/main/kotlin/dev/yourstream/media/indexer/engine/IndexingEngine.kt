@@ -20,7 +20,11 @@ import dev.yourstream.telegram.api.model.MediaSearchFilter
 import dev.yourstream.telegram.api.model.MessageLookup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -75,6 +79,10 @@ class IndexingEngine @Inject constructor(
         var updated = 0
         var deleted = 0
         var estimatedTotal = -1
+        /** Pages with new/changed files since the library was last told. */
+        var pagesSinceNotify = 0
+        /** Filters write and count from parallel coroutines. */
+        val lock = kotlinx.coroutines.sync.Mutex()
 
         fun publish() = tracker.update(
             IndexProgress(chatId, mode, phase, filter?.name, pages, seen, added, updated, deleted, estimatedTotal, startedAt),
@@ -102,7 +110,8 @@ class IndexingEngine @Inject constructor(
         val result = try {
             if (mode == IndexMode.FULL_RESCAN) store.resetCursors(chatId)
             if (mode != IndexMode.VERIFY) {
-                for (filter in config.filters) scanFilter(run, filter)
+                if (config.parallelFilters) coroutineScope { config.filters.map { f -> async { scanFilter(run, f) } }.awaitAll() }
+                else for (filter in config.filters) scanFilter(run, filter)
             }
             val verifyDue = mode == IndexMode.VERIFY || chat.verifyCursor > 0 ||
                 clock.nowMillis() - (chat.lastVerifiedAt ?: 0L) >= config.verifyInterval.inWholeMilliseconds
@@ -149,7 +158,7 @@ class IndexingEngine @Inject constructor(
 
     // ---------------- scanning ----------------
 
-    private suspend fun scanFilter(run: Run, filter: MediaSearchFilter) {
+    private suspend fun scanFilter(run: Run, filter: MediaSearchFilter): Unit = coroutineScope {
         run.filter = filter
         var cursor = store.cursor(run.chatId, filter)
 
@@ -178,13 +187,19 @@ class IndexingEngine @Inject constructor(
             store.saveCursor(cursor)
         }
 
-        // BACKFILL: continue towards the oldest message.
+        // BACKFILL: continue towards the oldest message. The next page is fetched while the
+        // current one is parsed and written (network and database overlap).
         if (!cursor.backfillComplete) {
             run.phase = IndexPhase.BACKFILL
             var from = cursor.backfillFromMessageId
+            var pending = async { fetchPage(run, filter, from) }
             while (true) {
                 run.checkBudget()
-                val page = fetchPage(run, filter, from)
+                val page = pending.await()
+                if (page.nextFromMessageId != 0L && page.messages.isNotEmpty()) {
+                    val next = page.nextFromMessageId
+                    pending = async { delay(config.pageDelay); fetchPage(run, filter, next) }
+                }
                 val pageNewest = page.messages.maxOfOrNull { it.messageId } ?: 0
                 val done = page.nextFromMessageId == 0L || page.messages.isEmpty()
                 cursor = cursor.copy(
@@ -197,7 +212,6 @@ class IndexingEngine @Inject constructor(
                 write(run, page, page.messages.mapNotNull { normalizer.normalize(it, run.chatTitle) }, cursor)
                 if (done) break
                 from = page.nextFromMessageId
-                delay(config.pageDelay)
             }
         }
     }
@@ -208,11 +222,17 @@ class IndexingEngine @Inject constructor(
         } else if (items.isNotEmpty() || cursor != null) {
             store.savePage(items, cursor)
         } else null
-        run.pages++
-        run.seen += page.messages.size
-        run.estimatedTotal = page.totalCount
-        result?.let { run.added += it.added; run.updated += it.updated }
-        run.publish()
+        val notify = run.lock.withLock {
+            run.pages++
+            run.seen += page.messages.size
+            run.estimatedTotal = page.totalCount
+            result?.let { run.added += it.added; run.updated += it.updated }
+            run.publish()
+            if (result != null && result.added + result.updated > 0) run.pagesSinceNotify++
+            (run.pagesSinceNotify >= config.notifyEveryPages).also { if (it) run.pagesSinceNotify = 0 }
+        }
+        // New titles show up while a big channel is still being read.
+        if (notify) listeners.forEach { it.onIndexChanged() }
     }
 
     private suspend fun fetchPage(run: Run, filter: MediaSearchFilter, from: Long): MediaMessagePage =
