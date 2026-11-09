@@ -221,6 +221,14 @@ fun SettingsScreen(
                 }
             }
 
+            item { Group(R.string.settings_group_streaming) }
+            item {
+                Card {
+                    Toggle(stringResource(R.string.settings_torrents), stringResource(R.string.settings_torrents_detail), dev.yourstream.ui.core.AppIcons.Speed,
+                        prefs.torrentStreaming, "pref-torrents") { onPrefs(prefs.copy(torrentStreaming = it)) }
+                }
+            }
+
             item { Group(R.string.settings_group_appearance) }
             item {
                 Card {

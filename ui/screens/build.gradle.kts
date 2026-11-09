@@ -26,6 +26,7 @@ dependencies {
     implementation(projects.watch.engine)
     implementation(projects.search.engine)
     implementation(projects.playback.media3)
+    implementation(projects.playback.torrent)
     implementation(projects.playback.tracks)
     implementation(projects.telegram.api)
     implementation(projects.media.api)

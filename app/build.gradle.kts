@@ -112,7 +112,20 @@ android {
     }
 
     packaging {
-        jniLibs { useLegacyPackaging = false }
+        // Native libraries (TDLib, libtorrent, FFmpeg) are compressed in the APK: a much smaller
+        // download for in-app updates; Android unpacks them once at install.
+        jniLibs { useLegacyPackaging = true }
+    }
+
+    // Releases (CI sets SPLIT_APKS=true): one APK per CPU type plus a universal one. The in-app
+    // updater downloads the one for the device, a fraction of the universal APK's size.
+    splits {
+        abi {
+            isEnable = System.getenv("SPLIT_APKS") == "true"
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
+        }
     }
 }
 

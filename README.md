@@ -28,6 +28,7 @@ test player. Catalogs are information only; what you can watch is always your ow
 - Adaptive streaming (algorithms, trade-offs, benchmarks): [docs/ADAPTIVE_STREAMING.md](docs/ADAPTIVE_STREAMING.md)
 - Playback engine (Media3, Telegram streaming, seeking, buffering, errors, metrics): [docs/PLAYBACK.md](docs/PLAYBACK.md)
 - Catalog providers (architecture, languages, add-on integration, fallback, caching): [docs/CATALOGS.md](docs/CATALOGS.md)
+- Stream add-ons, torrent streaming, web-stream playback, FFmpeg audio, per-device APKs: [docs/STREAMS.md](docs/STREAMS.md)
 - External metadata (providers, matching, caching, failures): [docs/METADATA.md](docs/METADATA.md)
 - Library (relationships, indexes, queries, migrations): [docs/LIBRARY.md](docs/LIBRARY.md)
 - Filename parser (patterns, confidence, limitations): [docs/PARSER.md](docs/PARSER.md)

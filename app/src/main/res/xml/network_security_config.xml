@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Streams from add-ons are sometimes plain http:// (a self-hosted add-on, an HLS server on the
+  home network), like in any media player. Certificates: the system's trusted CAs only.
+  Telegram traffic goes through TDLib's own encryption either way.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -37,6 +37,8 @@ data class AppSettings(
     val subtitleScale: Float = 1f,
     /** Subtitles on a dark box (else white text with a black outline). */
     val subtitleBox: Boolean = false,
+    /** Torrent results from stream add-ons play with the built-in torrent engine. */
+    val torrentStreaming: Boolean = true,
 ) {
     val seekMs: Long get() = seekSeconds * 1000L
 
@@ -69,6 +71,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("pip", s.pictureInPicture)
             .putFloat("subtitle_scale", s.subtitleScale)
             .putBoolean("subtitle_box", s.subtitleBox)
+            .putBoolean("torrents", s.torrentStreaming)
             .apply()
         _settings.value = s
     }
@@ -84,6 +87,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         pictureInPicture = prefs.getBoolean("pip", true),
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
+        torrentStreaming = prefs.getBoolean("torrents", true),
     )
 }
 

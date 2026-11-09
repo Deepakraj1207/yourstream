@@ -24,12 +24,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
 
 /**
- * The Stremio add-on protocol, for its CATALOG and META resources only:
+ * The Stremio add-on protocol (also what Nuvio add-ons speak):
  *   GET {base}/manifest.json
  *   GET {base}/catalog/{type}/{id}[/{extra=value&…}].json
  *   GET {base}/meta/{type}/{id}.json
- * There is intentionally no method for the stream or subtitles resources, even when an add-on
- * offers them: this app never takes media from catalogs.
+ *   GET {base}/stream/{type}/{id}.json   (only when the user opens a title)
+ * Catalog listings never carry media; streams are asked for only from add-ons that declare the
+ * stream resource, and only for the types and id prefixes they declare.
  */
 class StremioCatalogProvider(
     private val client: HttpClient,
@@ -55,8 +56,9 @@ class StremioCatalogProvider(
             limiter.acquire()
             when (val r = client.getJson("$base/manifest.json", JsonElement.serializer())) {
                 is AppResult.Ok -> {
-                    val parsed = (r.value as? JsonObject)?.let { parseManifest(it, base) }
-                        ?: return AppResult.Err(AppError.Unknown("Manifest at $base is not an object"))
+                    val obj = r.value as? JsonObject ?: return AppResult.Err(AppError.Unknown("Manifest at $base is not an object"))
+                    if (isNuvioPluginRepository(obj)) return AppResult.Err(AppError.InvalidInput("NUVIO_PLUGINS", NUVIO_PLUGINS))
+                    val parsed = parseManifest(obj, base)
                     activeBase = base
                     info = parsed
                     return AppResult.Ok(parsed)
@@ -69,14 +71,25 @@ class StremioCatalogProvider(
 
     private fun parseManifest(m: JsonObject, base: String): CatalogProviderInfo {
         val topPrefixes = m.strings("idPrefixes")
+        val topTypes = m.strings("types")
         val resources = mutableListOf<String>()
         val metaPrefixes = mutableListOf<String>()
+        val streamPrefixes = mutableListOf<String>()
+        val streamTypes = mutableListOf<String>()
         for (r in m.array("resources")) {
             when (r) {
-                is JsonPrimitive -> { resources += r.content; if (r.content == "meta") metaPrefixes += topPrefixes }
+                is JsonPrimitive -> {
+                    resources += r.content
+                    if (r.content == "meta") metaPrefixes += topPrefixes
+                    if (r.content == "stream") { streamPrefixes += topPrefixes; streamTypes += topTypes }
+                }
                 is JsonObject -> r.str("name")?.let { name ->
                     resources += name
                     if (name == "meta") metaPrefixes += r.strings("idPrefixes").ifEmpty { topPrefixes }
+                    if (name == "stream") {
+                        streamPrefixes += r.strings("idPrefixes").ifEmpty { topPrefixes }
+                        streamTypes += r.strings("types").ifEmpty { topTypes }
+                    }
                 }
                 else -> Unit
             }
@@ -97,7 +110,7 @@ class StremioCatalogProvider(
             CatalogDescriptor(id, entry.id, type, entry.name, definition.catalogLanguages(entry), definition.catalogTags(entry), extras)
         }
         return CatalogProviderInfo(id, m.str("name") ?: displayName, m.str("version"), m.str("description"), catalogs,
-            resources.distinct(), metaPrefixes.distinct(), base)
+            resources.distinct(), metaPrefixes.distinct(), base, streamTypes.map { it.lowercase() }.distinct(), streamPrefixes.distinct())
     }
 
     private suspend fun knownInfo(): AppResult<CatalogProviderInfo> = info?.let { AppResult.Ok(it) } ?: describe()
@@ -153,7 +166,8 @@ class StremioCatalogProvider(
 
     override suspend fun metadata(ref: CatalogItemRef): AppResult<CatalogMetadata> {
         val info = when (val r = knownInfo()) { is AppResult.Ok -> r.value; is AppResult.Err -> return r }
-        if (!info.supportsMeta || info.metaIdPrefixes.none { ref.id.startsWith(it) }) {
+        // No idPrefixes in the manifest means the add-on answers for any id.
+        if (!info.supportsMeta || (info.metaIdPrefixes.isNotEmpty() && info.metaIdPrefixes.none { ref.id.startsWith(it) })) {
             return AppResult.Err(AppError.InvalidState("$displayName has no metadata for ${ref.id.take(20)}"))
         }
         return when (val r = getWithFailover("/meta/${typePath(ref.type)}/${enc(ref.id)}.json")) {
@@ -166,7 +180,14 @@ class StremioCatalogProvider(
 
     // ------------------------------------------------------------------ streams
 
-    override suspend fun hasStreams(): Boolean = (knownInfo() as? AppResult.Ok)?.value?.resources?.contains("stream") == true
+    override suspend fun hasStreams(): Boolean = (knownInfo() as? AppResult.Ok)?.value?.supportsStreams == true
+
+    override suspend fun handles(type: CatalogType, id: String): Boolean {
+        val info = (knownInfo() as? AppResult.Ok)?.value ?: return false
+        if (!info.supportsStreams) return false
+        val typeOk = info.streamTypes.isEmpty() || typePath(type) in info.streamTypes || (type == CatalogType.SERIES && "tv" in info.streamTypes)
+        return typeOk && (info.streamIdPrefixes.isEmpty() || info.streamIdPrefixes.any { id.startsWith(it) })
+    }
 
     override suspend fun streams(type: CatalogType, id: String): AppResult<List<AddonStream>> {
         if (!hasStreams()) return AppResult.Err(AppError.InvalidState("$displayName has no streams"))
@@ -179,17 +200,28 @@ class StremioCatalogProvider(
     private fun toStream(s: JsonObject): AddonStream? {
         val hints = s.obj("behaviorHints")
         val headers = hints?.obj("proxyHeaders")?.obj("request")?.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.content?.let { k to it } }?.toMap().orEmpty()
-        val url = s.str("url")
+        val rawUrl = s.str("url")
+        // Some add-ons give torrents as magnet links instead of infoHash + sources.
+        val magnet = rawUrl?.takeIf { it.startsWith("magnet:", ignoreCase = true) }?.let(Magnets::parse)
+        val url = rawUrl?.takeIf { magnet == null }
         val external = s.str("externalUrl") ?: s.str("ytId")?.let { "https://www.youtube.com/watch?v=$it" }
-        val hash = s.str("infoHash")
+        val hash = s.str("infoHash")?.lowercase() ?: magnet?.infoHash
         if (url == null && external == null && hash == null) return null
         return AddonStream(
             addon = displayName,
             name = s.str("name") ?: displayName,
             description = s.str("description") ?: s.str("title"),
             url = url, externalUrl = external, infoHash = hash, headers = headers,
+            fileIdx = s.str("fileIdx")?.toIntOrNull()?.takeIf { it >= 0 },
+            sources = (s.strings("sources") + magnet?.trackers.orEmpty().map { "tracker:$it" }).distinct(),
+            fileName = hints?.str("filename"),
+            sizeBytes = hints?.str("videoSize")?.toLongOrNull()?.takeIf { it > 0 },
         )
     }
+
+    /** A Nuvio plugin repository lists JavaScript "scrapers" and none of the add-on resources. */
+    private fun isNuvioPluginRepository(m: JsonObject): Boolean =
+        m["scrapers"] is kotlinx.serialization.json.JsonArray && m["resources"] == null && m["catalogs"] == null
 
     // ------------------------------------------------------------------ plumbing
 
@@ -233,8 +265,10 @@ class StremioCatalogProvider(
 
     private fun toMetadata(m: JsonObject, ref: CatalogItemRef): CatalogMetadata {
         val ids = StremioIds.parse(ref.id)
+        // Add-ons keyed on other ids (tmdb:, kitsu:) often still say the IMDb id: stream add-ons need it.
+        val imdb = ref.imdbId ?: listOfNotNull(m.str("imdb_id"), m.str("imdbId"), m.str("id")).firstOrNull { IMDB.matches(it) }
         return CatalogMetadata(
-            ref = ref,
+            ref = ref.copy(imdbId = imdb),
             title = m.str("name") ?: ids.title ?: ref.id,
             year = firstYear(m.str("year")) ?: firstYear(m.str("releaseInfo")) ?: ids.year,
             description = m.str("description") ?: ids.description,
@@ -271,4 +305,10 @@ class StremioCatalogProvider(
     private fun typePath(type: CatalogType) = if (type == CatalogType.MOVIE) "movie" else "series"
 
     private fun enc(value: String) = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+
+    companion object {
+        private val IMDB = Regex("tt\\d{5,}")
+        const val NUVIO_PLUGINS = "This is a Nuvio plugin repository (scripts that scrape streaming websites). YourStream doesn't run plugins. " +
+            "Add-ons work: paste a Stremio or Nuvio add-on link (it ends in manifest.json)."
+    }
 }

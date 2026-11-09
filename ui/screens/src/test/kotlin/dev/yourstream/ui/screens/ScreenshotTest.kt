@@ -132,15 +132,22 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS) {
-        dev.yourstream.ui.screens.settings.AddonsScreen(
-            dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indiastreams", "IndiaStreams", null, true, true), 9, true),
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false)),
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:x", "Cinemeta Catalogs", "https://v3-cinemeta.strem.io/manifest.json", false, true), 6, true),
-            ), added = "Cinemeta Catalogs"), {}, {},
-        )
+    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {})
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneAddonsPlugins() = shot("phone-addons-plugins", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {}, initialTab = dev.yourstream.ui.screens.settings.AddonsTab.PLUGINS)
+    }
+
+    private fun addonsState() = dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false), 12, true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:nuvio.example.com", "Example Nuvio Add-on", "https://nuvio.example.com/manifest.json", false, true,
+            dev.yourstream.catalog.sync.AddonSource.NUVIO), 0, true, streams = true),
+    ), added = "Example Streams")
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneDetails() = shot("phone-details", WindowLayout.COMPACT, TopLevel.LIBRARY) {
@@ -171,10 +178,10 @@ class ScreenshotTest {
                 streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
-                    dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Torrent", null, null, "abc"),
+                    dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Breaking.Bad.S01E02.2160p.mkv · 6.1 GB · 👤 120", null, null, "aabbccddeeff00112233445566778899aabbccdd"),
                 ))),
             ),
-            {}, {}, {}, {},
+            {}, {}, {}, onStream = {},
         )
     }
 

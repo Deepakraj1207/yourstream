@@ -51,7 +51,17 @@ import kotlinx.serialization.Serializable
     val year: Int? = null, val poster: String? = null, val imdb: String? = null,
 ) : Route
 /** Plays an add-on stream (HTTP file, HLS or DASH). [headers]: JSON object of request headers. */
-@Serializable data class StreamPlayerRoute(val url: String, val title: String, val subtitle: String? = null, val headers: String = "{}") : Route
+@Serializable data class StreamPlayerRoute(
+    val url: String,
+    val title: String,
+    val subtitle: String? = null,
+    val headers: String = "{}",
+    /** Torrent streams ([url] is then empty): the info hash, the file to play (-1: largest video), extra trackers (one per line). */
+    val infoHash: String? = null,
+    val fileIdx: Int = -1,
+    val sources: String = "",
+    val fileName: String? = null,
+) : Route
 /** Settings → TMDB key. */
 @Serializable data object TmdbRoute : Route
 /** Catalog add-ons: built-in ones and those added by link. */

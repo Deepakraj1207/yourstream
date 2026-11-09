@@ -1,8 +1,13 @@
 ## Install
 
-1. Download **YourStream-*.apk** below to your Android phone, tablet or TV (Android 8.0 or newer).
+1. Download the APK for your device below (Android 8.0 or newer):
+   - **YourStream-…-arm64-v8a.apk**: almost every phone and tablet from the last years.
+   - **YourStream-…-armeabi-v7a.apk**: older phones and many TV sticks and boxes (32-bit).
+   - **YourStream-….apk** (no suffix): works on any device, larger download. Not sure? Take this one.
 2. Open it and allow "Install unknown apps" for your browser or file manager when asked.
    On a TV: `adb install YourStream-*.apk`, or a file manager app.
+
+Already installed? The app offers updates itself and downloads only the APK for your device.
 
 ## First start
 

@@ -23,6 +23,9 @@ dependencies {
     api(projects.playback.adaptive)
     api(projects.playback.tracks)
     api(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.okhttp)
+    // Loaded by DefaultRenderersFactory by class name when extension renderers are on.
+    implementation(libs.media3.ffmpeg)
     implementation(projects.library)
     implementation(projects.core.database)
     implementation(libs.kotlinx.coroutines.android)

@@ -281,9 +281,23 @@
     </plurals>
     <string name="caption_in_library">In your library</string>
     <string name="settings_addons">Add-ons</string>
-    <string name="settings_addons_detail">Catalogs and streams (Stremio-compatible)</string>
-    <string name="addons_intro">Stremio-compatible add-ons, the same ones Stremio and Nuvio use. Catalog add-ons add title lists to Home; stream add-ons list ways to watch a title on its page. Find add-ons at stremio-addons.net and paste their install link here.</string>
+    <string name="settings_addons_detail">Stremio and Nuvio add-ons: catalogs and streams</string>
+    <string name="addons_intro">Add-ons made for Stremio: catalogs for Home, details, and streams, including torrents. Find more at stremio-addons.net and paste the install link here.</string>
+    <string name="addons_intro_nuvio">Nuvio add-ons use the same format as Stremio add-ons, so they work here the same way. Paste the add-on\'s link (it ends in manifest.json).</string>
     <string name="addons_add_label">Add-on link</string>
+    <string name="addons_add_label_nuvio">Nuvio add-on link</string>
+    <string name="addons_tab_stremio">Stremio · %1$d</string>
+    <string name="addons_tab_nuvio">Nuvio · %1$d</string>
+    <string name="addons_tab_plugins">Nuvio plugins</string>
+    <string name="addons_none">No add-ons here yet.</string>
+    <string name="addons_none_nuvio">No Nuvio add-ons yet. Paste a link above.</string>
+    <string name="addons_badge_streams">Streams</string>
+    <string name="addons_badge_details">Details</string>
+    <string name="addons_plugins_title">Nuvio plugins aren\'t supported</string>
+    <string name="addons_plugins_link">The link you pasted is a Nuvio plugin repository, not an add-on.</string>
+    <string name="addons_plugins_body">Nuvio plugins are scripts that scrape streaming websites. YourStream doesn\'t run them: those sites usually don\'t have the rights to what they show.</string>
+    <string name="addons_plugins_instead">Nuvio add-ons are different: they use the Stremio format and work here, like any Stremio add-on.</string>
+    <string name="addons_plugins_go">Add Nuvio add-ons</string>
     <string name="addons_add_hint">https://…/manifest.json or stremio://…</string>
     <string name="addons_add">Add</string>
     <string name="addons_added">%1$s added</string>
@@ -296,7 +310,7 @@
         <item quantity="one">%1$d catalog</item>
         <item quantity="other">%1$d catalogs</item>
     </plurals>
-    <string name="addons_only_catalogs">Catalog, details and stream add-ons work. Torrent-only streams are not supported.</string>
+    <string name="addons_what_works">Catalogs, details and streams work, torrent streams included (Settings → Streaming).</string>
     <string name="action_add_to_library">Add to library</string>
     <string name="action_remove_from_library">Remove from library</string>
     <string name="player_rotate">Rotate screen</string>
@@ -327,18 +341,29 @@
     <string name="addon_no_stream_addons">No stream add-on is installed. Add one in Settings → Add-ons to see streams here.</string>
     <string name="addon_no_streams">No streams found for this title.</string>
     <string name="addon_stream_external">Opens in another app</string>
-    <string name="addon_stream_torrent">Torrent: not supported</string>
+    <string name="addon_stream_torrent">Torrent · plays while it downloads</string>
+    <string name="addon_stream_torrent_off">Torrent: turned off in Settings → Streaming</string>
+    <string name="addon_stream_unsupported">Can\'t be played here</string>
     <string name="stream_tracks">Audio and subtitles</string>
     <string name="stream_audio">Audio</string>
     <string name="stream_subtitles">Subtitles</string>
     <string name="stream_subtitles_off">Off</string>
     <string name="stream_error">This stream cannot be played: %1$s</string>
-    <string name="addons_streams">streams</string>
-    <string name="addons_details_only">details</string>
+    <string name="stream_torrent_starting">Starting the torrent…</string>
+    <string name="stream_torrent_metadata">Finding peers</string>
+    <plurals name="stream_torrent_peers">
+        <item quantity="one">%1$d peer</item>
+        <item quantity="other">%1$d peers</item>
+    </plurals>
+    <string name="stream_torrent_done">%1$d%% downloaded</string>
+    <string name="stream_torrent_complete">fully downloaded</string>
     <string name="search_from_addons">From your add-ons</string>
     <string name="settings_group_content">Content</string>
     <string name="settings_group_player">Player</string>
     <string name="settings_group_appearance">Appearance</string>
+    <string name="settings_group_streaming">Streaming</string>
+    <string name="settings_torrents">Torrent streams</string>
+    <string name="settings_torrents_detail">Play torrent results from your add-ons. While one plays, it downloads from and uploads to other people, who can see your IP address.</string>
     <string name="settings_seek">Seek step</string>
     <string name="settings_seconds">%1$d seconds</string>
     <string name="settings_autoplay">Auto-play next episode</string>
