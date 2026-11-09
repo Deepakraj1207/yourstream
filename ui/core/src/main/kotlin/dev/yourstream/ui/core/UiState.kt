@@ -45,6 +45,8 @@ enum class EmptyKind {
     NO_SOURCES,
     /** Sources selected, nothing indexed (yet). */
     LIBRARY_EMPTY,
+    /** "My library" has nothing yet: the user adds titles. */
+    MY_LIBRARY_EMPTY,
     NO_RESULTS,
     NOTHING_IN_PROGRESS,
     NO_FAVORITES,

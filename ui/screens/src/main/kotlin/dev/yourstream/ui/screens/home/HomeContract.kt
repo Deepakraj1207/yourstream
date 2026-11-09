@@ -42,8 +42,6 @@ data class HomeUiState(
     val reviewCount: Int = 0,
     /** Chats being indexed right now (the status bar at the top). */
     val indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
-    /** Titles indexed since Home was last refreshed ("Load files" shows them). */
-    val newTitles: Int = 0,
     val catalogs: List<CatalogRow> = emptyList(),
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
@@ -60,7 +58,5 @@ enum class HomeSection { CONTINUE_WATCHING, RECENTLY_ADDED, MOVIES, SERIES, FAVO
 
 sealed interface HomeAction {
     data object Retry : HomeAction
-    /** Show what indexing has found so far. */
-    data object LoadFiles : HomeAction
     data class Tile(val action: TileAction) : HomeAction
 }

@@ -12,6 +12,7 @@ import dev.yourstream.core.common.err
 import dev.yourstream.core.common.ok
 import dev.yourstream.core.database.YourStreamDatabase
 import dev.yourstream.core.database.entity.FavoriteEntity
+import dev.yourstream.core.database.entity.UserLibraryEntity
 import dev.yourstream.core.database.entity.LibraryAliasEntity
 import dev.yourstream.core.database.entity.MediaLinkEntity
 import dev.yourstream.core.database.entity.SeasonEntity
@@ -89,6 +90,10 @@ class RoomMediaRepository @Inject constructor(
         if (favorite) dao.addFavorite(FavoriteEntity(itemId, clock.nowMillis())) else dao.removeFavorite(itemId)
     }
 
+    override suspend fun setInLibrary(itemId: Long, inLibrary: Boolean) {
+        if (inLibrary) dao.addToUserLibrary(UserLibraryEntity(itemId, clock.nowMillis())) else dao.removeFromUserLibrary(itemId)
+    }
+
     override suspend fun updateItem(itemId: Long, title: String?, year: Int?): AppResult<Unit> {
         val item = dao.item(itemId) ?: return AppError.NotFound("item $itemId").err()
         val newTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: item.title
@@ -108,6 +113,7 @@ class RoomMediaRepository @Inject constructor(
             dao.setHidden(itemId, true, clock.nowMillis())
             if (!keepUserData) {
                 dao.removeFavorite(itemId)
+                dao.removeFromUserLibrary(itemId)
                 watchDao.statesOf(itemId).forEach { watchDao.deleteState(it.itemId, it.episodeKey) }
                 trackDao.deletePreference(itemId)
                 watchDao.setItemWatchAggregates(itemId, 0, null)
@@ -131,6 +137,7 @@ class RoomMediaRepository @Inject constructor(
             mergeWatchState(sourceId, 0L, targetId, 0L)
             dao.moveLinks(sourceId, targetId)
             if (dao.isFavorite(sourceId) && !dao.isFavorite(targetId)) dao.addFavorite(FavoriteEntity(targetId, clock.nowMillis()))
+            if (dao.isInUserLibrary(sourceId)) dao.addToUserLibrary(UserLibraryEntity(targetId, clock.nowMillis()))
             if (trackDao.preference(targetId) == null) {
                 trackDao.preference(sourceId)?.let { trackDao.upsertPreference(it.copy(itemId = targetId)) }
             }

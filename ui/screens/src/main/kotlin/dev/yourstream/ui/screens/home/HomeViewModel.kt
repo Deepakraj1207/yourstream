@@ -45,7 +45,8 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import dev.yourstream.ui.screens.IndexingStatus
-import dev.yourstream.ui.screens.LibraryRefreshGate
+import dev.yourstream.ui.screens.IndexingMonitor
+import kotlinx.coroutines.flow.debounce
 import dev.yourstream.ui.screens.HomeCatalogs
 import javax.inject.Inject
 
@@ -54,7 +55,7 @@ import javax.inject.Inject
  * the poster rows from the library repositories (paged, with artwork), the library size from
  * [MediaRepository.count], and the status banner from Telegram/indexing state.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val watch: WatchIntelligence,
@@ -68,15 +69,14 @@ class HomeViewModel @Inject constructor(
     private val actions: TileActionHandler,
     private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
     private val reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
-    private val gate: LibraryRefreshGate,
+    private val indexingMonitor: IndexingMonitor,
     private val homeCatalogs: HomeCatalogs,
 ) : ViewModel() {
     private val retry = MutableStateFlow(0)
 
-    // While chats are indexed the rows stay as they are (no live reshuffling); "Load files" or the
-    // end of indexing applies what is new.
+    // Live: new files appear in the rows while chats are indexed.
     private fun paged(source: () -> Flow<PagingData<dev.yourstream.library.api.LibraryItemSummary>>): Flow<PagingData<Tile>> =
-        gate.hold(source()).map { p -> p.map(Presentation::tile) }.cachedIn(viewModelScope)
+        source().map { p -> p.map(Presentation::tile) }.cachedIn(viewModelScope)
 
     val recentlyAdded: Flow<PagingData<Tile>> = paged { media.recentlyAdded(pageSize = 20) }
     val movies: Flow<PagingData<Tile>> = paged { movies.movies(LibraryQuery(sort = LibrarySort.RECENTLY_ADDED, watch = WatchFilter.UNWATCHED), 20) }
@@ -91,7 +91,7 @@ class HomeViewModel @Inject constructor(
     }
 
     /** Continue the most recent thing; else feature the newest arrival. */
-    private val hero: Flow<UiState<HeroItem>> = combine(watch.continueWatching(1), gate.hold(watch.recentlyAdded(1))) { cw, added ->
+    private val hero: Flow<UiState<HeroItem>> = combine(watch.continueWatching(1), watch.recentlyAdded(1)) { cw, added ->
         cw.firstOrNull()?.let { heroOf(it, artwork.poster(it.target.itemId)) }
             ?: added.firstOrNull()?.let { a ->
                 HeroItem(HeroItem.Kind.NEW, "hero:${a.itemId}", a.title, a.year?.toString(), artwork.poster(a.itemId), null,
@@ -111,13 +111,10 @@ class HomeViewModel @Inject constructor(
         }
     }.catch { emit(null) }
 
-    private val liveCount: Flow<Int?> = media.count(LibraryQuery()).map<Int, Int?> { it }.catch { emit(null) }
-    private val count: Flow<Int?> = gate.hold(liveCount)
+    private val count: Flow<Int?> = media.count(LibraryQuery()).map<Int, Int?> { it }.catch { emit(null) }
 
-    /** Indexing progress and how many titles arrived that Home does not show yet. */
-    private val indexing: Flow<Pair<IndexingStatus, Int>> = combine(gate.indexing, liveCount, count) { s, live, shown ->
-        s to ((live ?: 0) - (shown ?: 0)).coerceAtLeast(0)
-    }.distinctUntilChanged()
+    /** Indexing progress for the status bar. */
+    private val indexing: Flow<IndexingStatus> = indexingMonitor.status
 
     /** Rows from the user's catalog add-ons (Settings → Add-ons); reloaded when they change. */
     private val catalogs: Flow<List<CatalogRow>> = homeCatalogs.rows().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
@@ -126,7 +123,7 @@ class HomeViewModel @Inject constructor(
      * Recommendations from the local watch profile (nothing leaves the device), recomputed when the
      * viewing history or the library changes.
      */
-    private val forYou: Flow<UiState<ForYou>> = combine(watch.recentlyWatched(1), count) { recent, n -> recent.firstOrNull()?.lastWatchedAt to n }
+    private val forYou: Flow<UiState<ForYou>> = combine(watch.recentlyWatched(1), count.debounce(RECOMMEND_DEBOUNCE_MS)) { recent, n -> recent.firstOrNull()?.lastWatchedAt to n }
         .distinctUntilChanged()
         .mapLatest {
             val r = assistant.recommendations(FOR_YOU)
@@ -138,26 +135,27 @@ class HomeViewModel @Inject constructor(
 
     private val review: Flow<Int> = reviewQueue.count()
 
-    private val extras = combine(forYou, review, indexing, catalogs) { f, r, i, c -> Extras(f, r, i.first, i.second, c) }
+    private val extras = combine(forYou, review, indexing, catalogs) { f, r, i, c -> Extras(f, r, i, c) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val indexing: IndexingStatus, val newTitles: Int, val catalogs: List<CatalogRow>)
+    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val indexing: IndexingStatus, val catalogs: List<CatalogRow>)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
         // Lowest-priority banner: only when nothing more urgent is shown.
-        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, e.indexing, e.newTitles, e.catalogs)
+        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, e.indexing, e.catalogs)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun onAction(action: HomeAction) {
         when (action) {
             HomeAction.Retry -> retry.value++
-            HomeAction.LoadFiles -> gate.load()
             is HomeAction.Tile -> viewModelScope.launch { actions.run(action.action) }
         }
     }
 
     companion object {
         const val FOR_YOU = 20
+        /** While indexing adds titles every moment, recommendations are recomputed at most this often. */
+        const val RECOMMEND_DEBOUNCE_MS = 5_000L
 
         fun heroOf(e: ContinueEntry, poster: String?) = HeroItem(
             HeroItem.Kind.CONTINUE, "hero:${e.target.itemId}:${e.target.episodeKey}", e.title,

@@ -52,6 +52,7 @@ data class LibraryItemRow(
     @ColumnInfo(name = "latest_added_at") val latestAddedAt: Long?,
     @ColumnInfo(name = "last_watched_at") val lastWatchedAt: Long?,
     @ColumnInfo(name = "is_favorite") val isFavorite: Boolean,
+    @ColumnInfo(name = "in_library") val inLibrary: Boolean = false,
     @ColumnInfo(name = "position_ms") val positionMs: Long?,
     @ColumnInfo(name = "duration_ms") val durationMs: Long?,
     val completed: Boolean,

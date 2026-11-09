@@ -15,6 +15,7 @@ import javax.inject.Singleton
 sealed interface TileAction {
     data class SetFavorite(val itemId: Long, val favorite: Boolean) : TileAction
     data class SetWatched(val itemId: Long, val watched: Boolean) : TileAction
+    data class SetInLibrary(val itemId: Long, val inLibrary: Boolean) : TileAction
     data class Dismiss(val itemId: Long) : TileAction
 }
 
@@ -28,6 +29,7 @@ class TileActionHandler @Inject constructor(
     suspend fun run(action: TileAction) {
         when (action) {
             is TileAction.SetFavorite -> media.setFavorite(action.itemId, action.favorite)
+            is TileAction.SetInLibrary -> media.setInLibrary(action.itemId, action.inLibrary)
             is TileAction.SetWatched -> history.markWatched(PlaybackTarget(action.itemId), action.watched)
             is TileAction.Dismiss -> watch.dismiss(action.itemId)
         }
@@ -43,10 +45,13 @@ fun tileActions(onAction: (TileAction) -> Unit, onOpen: (OpenTarget) -> Unit): (
     val watched = stringResource(R.string.action_mark_watched)
     val unwatched = stringResource(R.string.action_mark_unwatched)
     val remove = stringResource(R.string.action_remove_continue)
+    val addLib = stringResource(R.string.action_add_to_library)
+    val removeLib = stringResource(R.string.action_remove_from_library)
     return { t ->
         val id = t.itemId
         if (id == null) emptyList() else buildList {
             if (t.open !is OpenTarget.Details) add(CardAction(details) { onOpen(OpenTarget.Details(id)) })
+            t.inLibrary?.let { l -> add(CardAction(if (l) removeLib else addLib) { onAction(TileAction.SetInLibrary(id, !l)) }) }
             t.isFavorite?.let { f -> add(CardAction(if (f) unfav else fav) { onAction(TileAction.SetFavorite(id, !f)) }) }
             t.watched?.let { w -> add(CardAction(if (w) unwatched else watched) { onAction(TileAction.SetWatched(id, !w)) }) }
             if (t.dismissible) add(CardAction(remove) { onAction(TileAction.Dismiss(id)) })

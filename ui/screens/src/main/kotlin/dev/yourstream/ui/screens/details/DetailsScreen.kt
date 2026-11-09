@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package dev.yourstream.ui.screens.details
 
 import androidx.compose.foundation.layout.Arrangement
@@ -64,7 +66,8 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                             Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (c.percent in 1..99) ProgressLine(c.percent / 100f, Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.surfaceVariant)
-                            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Wraps on narrow phones instead of pushing buttons off-screen.
+                            androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 c.primary?.let { p ->
                                     Button(onClick = { onOpen(p.target) }, modifier = Modifier.focusRequester(primaryFocus).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("primary")) {
                                         Text(when (p) {
@@ -73,6 +76,9 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                                             is PrimaryAction.Episode -> stringResource(if (p.resume) R.string.action_resume_episode else R.string.action_play_episode, p.label)
                                         })
                                     }
+                                }
+                                FilledTonalButton(onClick = { onAction(DetailsAction.ToggleLibrary) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("my-library")) {
+                                    Text(stringResource(if (c.inLibrary) R.string.action_remove_from_library else R.string.action_add_to_library))
                                 }
                                 FilledTonalButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("favorite")) {
                                     Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))

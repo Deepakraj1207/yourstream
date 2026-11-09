@@ -272,7 +272,6 @@
     <string name="sync_problem_failed">Sync did not work this time. It will try again later.</string>
 
     <!-- Telegram API credentials -->
-    <string name="home_load_files">Load files</string>
     <plurals name="home_indexing_chats">
         <item quantity="one">Indexing %1$d chat</item>
         <item quantity="other">Indexing %1$d chats</item>
@@ -280,10 +279,6 @@
     <plurals name="home_indexing_found">
         <item quantity="one">%1$d file found</item>
         <item quantity="other">%1$d files found</item>
-    </plurals>
-    <plurals name="home_indexing_new">
-        <item quantity="one">%1$d new title</item>
-        <item quantity="other">%1$d new titles</item>
     </plurals>
     <string name="caption_in_library">In your library</string>
     <string name="settings_addons">Add-ons</string>
@@ -303,4 +298,7 @@
         <item quantity="other">%1$d catalogs</item>
     </plurals>
     <string name="addons_only_catalogs">Only catalog add-ons are supported (no stream add-ons).</string>
+    <string name="action_add_to_library">Add to library</string>
+    <string name="action_remove_from_library">Remove from library</string>
+    <string name="player_rotate">Rotate screen</string>
 </resources>

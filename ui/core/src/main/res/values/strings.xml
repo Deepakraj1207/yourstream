@@ -10,6 +10,8 @@
     <string name="empty_no_sources_message">Pick the Telegram chats and channels whose videos should appear in your library.</string>
     <string name="empty_no_sources_action">Choose chats</string>
     <string name="empty_library_title">Nothing here yet</string>
+    <string name="empty_my_library_title">Your library is empty</string>
+    <string name="empty_my_library_message">Add movies and series from Home, Search or a title\'s page: long-press a poster and choose Add to library.</string>
     <string name="empty_library_message">Your chats are being indexed. Videos appear as soon as they are found.</string>
     <string name="empty_no_results_title">No results</string>
     <string name="empty_no_results_message">Try a different spelling, fewer words, or another filter.</string>

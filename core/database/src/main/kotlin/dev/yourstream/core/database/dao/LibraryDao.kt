@@ -11,6 +11,7 @@ import androidx.room.Upsert
 import androidx.sqlite.db.SupportSQLiteQuery
 import dev.yourstream.core.database.entity.EpisodeEntity
 import dev.yourstream.core.database.entity.FavoriteEntity
+import dev.yourstream.core.database.entity.UserLibraryEntity
 import dev.yourstream.core.database.entity.ItemMetadataEntity
 import dev.yourstream.core.database.entity.LibraryAliasEntity
 import dev.yourstream.core.database.entity.LibraryItemEntity
@@ -156,6 +157,7 @@ interface LibraryDao {
     @Query(
         """DELETE FROM library_item WHERE available_count = 0 AND locked = 0
         AND NOT EXISTS (SELECT 1 FROM favorite f WHERE f.item_id = library_item.id)
+        AND NOT EXISTS (SELECT 1 FROM user_library u WHERE u.item_id = library_item.id)
         AND NOT EXISTS (SELECT 1 FROM watch_state w WHERE w.item_id = library_item.id)
         AND NOT EXISTS (SELECT 1 FROM track_preference t WHERE t.item_id = library_item.id)
         AND NOT EXISTS (SELECT 1 FROM media_link l JOIN media m ON m.id = l.media_id
@@ -305,14 +307,25 @@ interface LibraryDao {
     // ================================================================ lists
 
     /** Filtered/sorted lists are built by LibraryQueryBuilder (whitelisted SQL, bound arguments). */
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, UserLibraryEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     fun itemsPaged(query: SupportSQLiteQuery): PagingSource<Int, LibraryItemRow>
 
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, UserLibraryEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     suspend fun items(query: SupportSQLiteQuery): List<LibraryItemRow>
 
-    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
+    @RawQuery(observedEntities = [LibraryItemEntity::class, FavoriteEntity::class, UserLibraryEntity::class, WatchStateEntity::class, ItemMetadataEntity::class])
     fun count(query: SupportSQLiteQuery): Flow<Int>
+
+    // ================================================================ my library
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addToUserLibrary(entry: UserLibraryEntity)
+
+    @Query("DELETE FROM user_library WHERE item_id = :itemId")
+    suspend fun removeFromUserLibrary(itemId: Long)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM user_library WHERE item_id = :itemId)")
+    suspend fun isInUserLibrary(itemId: Long): Boolean
 
     // ================================================================ favorites
 

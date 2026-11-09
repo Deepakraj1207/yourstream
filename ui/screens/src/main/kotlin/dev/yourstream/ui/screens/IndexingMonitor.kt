@@ -4,13 +4,8 @@ import dev.yourstream.media.api.MediaIndexRepository
 import dev.yourstream.media.api.model.ChatIndexStatus
 import dev.yourstream.media.api.model.IndexState
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,39 +41,8 @@ data class IndexingStatus(
     }
 }
 
-/**
- * Keeps library lists still while Telegram chats are being indexed: every new file would otherwise
- * re-query and re-lay out the rows under the user's finger. Updates are applied when the user
- * asks ([load], the "Load files" button) and automatically once indexing has finished.
- */
+/** Live indexing progress for the status bar on Home. */
 @Singleton
-class LibraryRefreshGate @Inject constructor(private val index: MediaIndexRepository) {
-    private val loads = MutableStateFlow(0)
-
-    /** Increments on every "Load files". */
-    val loadRequests: StateFlow<Int> = loads.asStateFlow()
-
-    val indexing: Flow<IndexingStatus> = index.observeChats().map(IndexingStatus::of).distinctUntilChanged().catch { emit(IndexingStatus()) }
-
-    /** Shows what has been indexed so far. */
-    fun load() { loads.value++ }
-
-    /**
-     * [source], but while indexing only its first value and the values current at each [load];
-     * live again once indexing stops (the latest value is applied then).
-     */
-    fun <T> hold(source: Flow<T>): Flow<T> = flow {
-        var emitted = false
-        var last: Any? = null
-        var lastLoad = -1
-        combine(source, indexing.map { it.active }.distinctUntilChanged(), loads) { v, busy, n -> Triple(v, busy, n) }.collect { (v, busy, n) ->
-            val apply = !emitted || !busy || n != lastLoad
-            lastLoad = n
-            if (apply && (!emitted || v !== last)) {
-                emitted = true
-                last = v
-                emit(v)
-            }
-        }
-    }
+class IndexingMonitor @Inject constructor(private val index: MediaIndexRepository) {
+    val status: Flow<IndexingStatus> = index.observeChats().map(IndexingStatus::of).distinctUntilChanged().catch { emit(IndexingStatus()) }
 }

@@ -21,7 +21,7 @@ object LibraryQueryBuilder {
 
     private const val COLUMNS = """i.id, i.kind, i.title, i.year, i.available_count, i.season_count, i.episode_count, i.watched_count,
         i.max_resolution, i.total_size, i.added_at, i.latest_added_at, i.last_watched_at,
-        (f.item_id IS NOT NULL) AS is_favorite, ws.position_ms, ws.duration_ms, COALESCE(ws.completed, 0) AS completed,
+        (f.item_id IS NOT NULL) AS is_favorite, (ul.item_id IS NOT NULL) AS in_library, ws.position_ms, ws.duration_ms, COALESCE(ws.completed, 0) AS completed,
         im.poster_url, im.title AS metadata_title"""
 
     private const val SERIES_WATCHED = "(i.kind = 'SERIES' AND i.episode_count > 0 AND i.watched_count >= i.episode_count)"
@@ -30,7 +30,7 @@ object LibraryQueryBuilder {
     fun list(q: LibraryQuery, favoritesOrder: Boolean = false): Sql {
         val args = mutableListOf<Any?>()
         val where = mutableListOf<String>()
-        val joins = StringBuilder("LEFT JOIN favorite f ON f.item_id = i.id ")
+        val joins = StringBuilder("LEFT JOIN favorite f ON f.item_id = i.id LEFT JOIN user_library ul ON ul.item_id = i.id ")
         joins.append("LEFT JOIN watch_state ws ON ws.item_id = i.id AND ws.episode_key = 0 ")
         joins.append("LEFT JOIN item_metadata im ON im.item_id = i.id ")
 
@@ -45,6 +45,7 @@ object LibraryQueryBuilder {
             where += "i.kind IN (${q.kinds.joinToString(",") { "?" }})"; args.addAll(q.kinds.map { it.name })
         }
         if (q.favoritesOnly || favoritesOrder) where += "f.item_id IS NOT NULL"
+        if (q.myLibraryOnly) where += "ul.item_id IS NOT NULL"
         when (q.watch) {
             WatchFilter.ANY -> Unit
             WatchFilter.UNWATCHED -> where += "i.last_watched_at IS NULL"
@@ -65,7 +66,7 @@ object LibraryQueryBuilder {
 
     /** One item by id, unfiltered (details screens). */
     fun byId(id: Long): Sql = Sql(
-        "SELECT $COLUMNS FROM library_item i LEFT JOIN favorite f ON f.item_id = i.id " +
+        "SELECT $COLUMNS FROM library_item i LEFT JOIN favorite f ON f.item_id = i.id LEFT JOIN user_library ul ON ul.item_id = i.id " +
             "LEFT JOIN watch_state ws ON ws.item_id = i.id AND ws.episode_key = 0 LEFT JOIN item_metadata im ON im.item_id = i.id WHERE i.id = ?",
         listOf(id),
     )

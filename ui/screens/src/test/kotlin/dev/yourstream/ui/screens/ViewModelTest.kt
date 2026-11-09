@@ -93,7 +93,7 @@ class ViewModelTest {
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
         assistant,
         ReviewQueue { review },
-        LibraryRefreshGate(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
+        IndexingMonitor(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
         HomeCatalogs { flowOf(emptyList()) },
     )
 
@@ -220,14 +220,13 @@ class ViewModelTest {
                 else -> error(name)
             }
         }
-        val vm = LibraryViewModel(SavedStateHandle(), repo, TileActionHandler(repo, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
-            LibraryRefreshGate(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") flowOf(emptyList<ChatIndexStatus>()) else error(name) }))
+        val vm = LibraryViewModel(SavedStateHandle(), repo, TileActionHandler(repo, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }))
         backgroundScope.launch { vm.state.collect {} }
         backgroundScope.launch { vm.items.collect {} }
         advanceUntilIdle()
         assertEquals(42, vm.state.value.count)
         vm.onAction(BrowseAction.SetKind(LibraryKind.SERIES)); vm.onAction(BrowseAction.SetWatch(WatchFilter.UNWATCHED)); advanceUntilIdle()
-        assertEquals(LibraryQuery(kinds = setOf(LibraryKind.SERIES), sort = LibrarySort.TITLE, watch = WatchFilter.UNWATCHED), queries.last())
+        assertEquals(LibraryQuery(kinds = setOf(LibraryKind.SERIES), myLibraryOnly = true, sort = LibrarySort.TITLE, watch = WatchFilter.UNWATCHED), queries.last())
         vm.onAction(BrowseAction.Tile(TileAction.SetFavorite(4, true))); advanceUntilIdle()
         assertEquals(listOf(4L to true), favorites)
     }

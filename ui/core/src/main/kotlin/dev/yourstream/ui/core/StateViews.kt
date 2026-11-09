@@ -142,6 +142,7 @@ private fun emptyTexts(kind: EmptyKind): EmptyTexts = when (kind) {
     EmptyKind.NOT_SIGNED_IN -> EmptyTexts(R.string.empty_not_signed_in_title, R.string.empty_not_signed_in_message, R.string.empty_not_signed_in_action)
     EmptyKind.NO_SOURCES -> EmptyTexts(R.string.empty_no_sources_title, R.string.empty_no_sources_message, R.string.empty_no_sources_action)
     EmptyKind.LIBRARY_EMPTY -> EmptyTexts(R.string.empty_library_title, R.string.empty_library_message, null)
+    EmptyKind.MY_LIBRARY_EMPTY -> EmptyTexts(R.string.empty_my_library_title, R.string.empty_my_library_message, null)
     EmptyKind.NO_RESULTS -> EmptyTexts(R.string.empty_no_results_title, R.string.empty_no_results_message, null)
     EmptyKind.NOTHING_IN_PROGRESS -> EmptyTexts(R.string.empty_in_progress_title, R.string.empty_in_progress_message, null)
     EmptyKind.NO_FAVORITES -> EmptyTexts(R.string.empty_favorites_title, R.string.empty_favorites_message, null)
@@ -165,7 +166,7 @@ private fun errorText(kind: ErrorKind): Int = when (kind) {
 
 private fun emptyIcon(kind: EmptyKind): ImageVector = when (kind) {
     EmptyKind.NOT_SIGNED_IN -> Icons.Filled.AccountCircle
-    EmptyKind.NO_SOURCES, EmptyKind.NO_CHATS, EmptyKind.LIBRARY_EMPTY, EmptyKind.NO_EPISODES -> Icons.Filled.List
+    EmptyKind.NO_SOURCES, EmptyKind.NO_CHATS, EmptyKind.LIBRARY_EMPTY, EmptyKind.MY_LIBRARY_EMPTY, EmptyKind.NO_EPISODES -> Icons.Filled.List
     EmptyKind.NO_RESULTS -> Icons.Filled.Search
     EmptyKind.NOTHING_IN_PROGRESS -> Icons.Filled.PlayArrow
     EmptyKind.NO_FAVORITES -> Icons.Filled.Favorite

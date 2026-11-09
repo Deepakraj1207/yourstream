@@ -75,8 +75,8 @@ fun HomeScreen(
     onReview: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
-        // Pinned above the rows: what indexing is doing, and a way to show what it found.
-        if (state.indexing.active) IndexingBar(state.indexing, state.newTitles) { onAction(HomeAction.LoadFiles) }
+        // Pinned above the rows: what indexing is doing (the rows below update live).
+        if (state.indexing.active) IndexingBar(state.indexing)
         HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
     }
 }
@@ -201,9 +201,9 @@ private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, o
     }
 }
 
-/** "Indexing 2 chats · 134 files found", progress, and "Load files" to show what is new. */
+/** "Indexing 2 chats · 134 files found" with progress. Status only. */
 @Composable
-private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus, newTitles: Int, onLoad: () -> Unit) {
+private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
     val d = LocalDimens.current
     androidx.compose.material3.Surface(
         color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -212,7 +212,7 @@ private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus, newTit
     ) {
         Column {
             androidx.compose.foundation.layout.Row(
-                Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 8.dp),
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
                 androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -223,17 +223,11 @@ private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus, newTit
                         style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1,
                     )
                     Text(
-                        listOfNotNull(
-                            androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_found, status.found, status.found),
-                            if (newTitles > 0) androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_new, newTitles, newTitles) else null,
-                        ).joinToString(" · "),
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_found, status.found, status.found),
                         style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                         color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
                         modifier = Modifier.testTag("indexing-detail"),
                     )
-                }
-                androidx.compose.material3.FilledTonalButton(onClick = onLoad, modifier = Modifier.focusHighlight().testTag("load-files")) {
-                    Text(stringResource(R.string.home_load_files))
                 }
             }
             val fraction = status.fraction

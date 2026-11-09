@@ -37,6 +37,8 @@ data class Tile(
     /** Library item behind the card (null: no item actions). */
     val itemId: Long? = null,
     val isFavorite: Boolean? = null,
+    /** In "My library"; null = no add/remove action. */
+    val inLibrary: Boolean? = null,
     val watched: Boolean? = null,
     /** Continue Watching entries can be removed from the list. */
     val dismissible: Boolean = false,
@@ -59,7 +61,7 @@ object Presentation {
                 posterUrl = s.posterUrl,
                 watched = watched,
             ),
-            OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched,
+            OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched, inLibrary = s.inLibrary,
         )
     }
 

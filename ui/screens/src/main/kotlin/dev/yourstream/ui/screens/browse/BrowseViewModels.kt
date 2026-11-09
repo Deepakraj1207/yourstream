@@ -15,7 +15,6 @@ import dev.yourstream.library.api.MediaRepository
 import dev.yourstream.library.api.MovieRepository
 import dev.yourstream.library.api.SeriesRepository
 import dev.yourstream.library.api.WatchFilter
-import dev.yourstream.ui.screens.LibraryRefreshGate
 import dev.yourstream.ui.screens.Presentation
 import dev.yourstream.ui.screens.Tile
 import dev.yourstream.ui.screens.TileActionHandler
@@ -46,8 +45,6 @@ abstract class BrowseViewModel(
     defaultSort: LibrarySort,
     private val media: MediaRepository,
     private val actions: TileActionHandler,
-    /** Null: always live (Favorites change only by the user's own action). */
-    private val gate: LibraryRefreshGate?,
     private val source: (LibraryQuery) -> Flow<PagingData<LibraryItemSummary>>,
 ) : ViewModel() {
     private val filters = MutableStateFlow(
@@ -59,18 +56,15 @@ abstract class BrowseViewModel(
     )
 
     // The previous count stays until the new one is known, so the title does not blink on each filter change.
-    private val count: Flow<Int?> = filters.flatMapLatest { f -> held(media.count(query(f))) }.distinctUntilChanged().map<Int, Int?> { it }.catch { emit(null) }
+    private val count: Flow<Int?> = filters.flatMapLatest { f -> media.count(query(f)) }.distinctUntilChanged().map<Int, Int?> { it }.catch { emit(null) }
 
     val state: StateFlow<BrowseUiState> = combine(filters, count) { f, n -> BrowseUiState(f, controls, n) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BrowseUiState(filters.value, controls))
 
     val items: Flow<PagingData<Tile>> = filters
-        // Still while chats are indexed; applied with Home's "Load files" or when indexing ends.
-        .flatMapLatest { f -> held(source(query(f))) }
+        .flatMapLatest { f -> source(query(f)) }
         .map { page -> page.map(Presentation::tile) }
         .cachedIn(viewModelScope)
-
-    private fun <T> held(flow: Flow<T>): Flow<T> = gate?.hold(flow) ?: flow
 
     protected open fun query(f: BrowseFilters): LibraryQuery = f.toQuery(fixedKind)
 
@@ -93,21 +87,24 @@ private val ALL = BrowseControls(kind = true, sort = true, watch = true)
 private val FIXED_KIND = BrowseControls(kind = false, sort = true, watch = true)
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler, gate: LibraryRefreshGate) :
-    BrowseViewModel(saved, null, ALL, LibrarySort.TITLE, media, actions, gate, { media.search(it) })
+class LibraryViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
+    BrowseViewModel(saved, null, ALL, LibrarySort.TITLE, media, actions, { media.search(it) }) {
+    /** "My library": only what the user added (empty until they add a movie or series). */
+    override fun query(f: BrowseFilters) = f.toQuery(null).copy(myLibraryOnly = true)
+}
 
 @HiltViewModel
-class MoviesViewModel @Inject constructor(saved: SavedStateHandle, movies: MovieRepository, media: MediaRepository, actions: TileActionHandler, gate: LibraryRefreshGate) :
-    BrowseViewModel(saved, LibraryKind.MOVIE, FIXED_KIND, LibrarySort.RECENTLY_ADDED, media, actions, gate, { movies.movies(it) })
+class MoviesViewModel @Inject constructor(saved: SavedStateHandle, movies: MovieRepository, media: MediaRepository, actions: TileActionHandler) :
+    BrowseViewModel(saved, LibraryKind.MOVIE, FIXED_KIND, LibrarySort.RECENTLY_ADDED, media, actions, { movies.movies(it) })
 
 @HiltViewModel
-class SeriesViewModel @Inject constructor(saved: SavedStateHandle, series: SeriesRepository, media: MediaRepository, actions: TileActionHandler, gate: LibraryRefreshGate) :
-    BrowseViewModel(saved, LibraryKind.SERIES, FIXED_KIND, LibrarySort.RECENTLY_ADDED, media, actions, gate, { series.series(it) })
+class SeriesViewModel @Inject constructor(saved: SavedStateHandle, series: SeriesRepository, media: MediaRepository, actions: TileActionHandler) :
+    BrowseViewModel(saved, LibraryKind.SERIES, FIXED_KIND, LibrarySort.RECENTLY_ADDED, media, actions, { series.series(it) })
 
 /** Newest arrivals ("a new episode bumps its series"), by kind: `MediaRepository.recentlyAdded`. */
 @HiltViewModel
-class RecentlyAddedViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler, gate: LibraryRefreshGate) :
-    BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions, gate,
+class RecentlyAddedViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
+    BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions,
         { q -> media.recentlyAdded(q.kinds) }) {
     override fun query(f: BrowseFilters) = LibraryQuery(kinds = setOfNotNull(f.kind), sort = LibrarySort.RECENTLY_ADDED)
 }
@@ -115,7 +112,7 @@ class RecentlyAddedViewModel @Inject constructor(saved: SavedStateHandle, media:
 /** Favorites with filters off (the order is the user's: newest favorite first). */
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
-    BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions, null,
+    BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions,
         { _ -> media.favorites() }) {
     override fun query(f: BrowseFilters) = LibraryQuery(kinds = setOfNotNull(f.kind), favoritesOnly = true)
 }

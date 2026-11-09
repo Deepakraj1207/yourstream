@@ -21,6 +21,7 @@ import dev.yourstream.core.database.dao.SearchDao
 import dev.yourstream.core.database.dao.TrackDao
 import dev.yourstream.core.database.dao.WatchDao
 import dev.yourstream.core.database.entity.WatchDismissalEntity
+import dev.yourstream.core.database.entity.UserLibraryEntity
 import dev.yourstream.core.database.entity.AudioTrackEntity
 import dev.yourstream.core.database.entity.CatalogCacheEntity
 import dev.yourstream.core.database.entity.LanguageSettingsEntity
@@ -60,7 +61,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
  * data (favorites, watch state/history, track preferences) · v4 external metadata ·
- * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index · v8 Continue Watching dismissals · v9 title-order index.
+ * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index · v8 Continue Watching dismissals · v9 title-order index · v10 My library picks.
  */
 @Database(
     entities = [
@@ -96,8 +97,9 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         SearchFtsEntity::class,
         SearchDirtyEntity::class,
         WatchDismissalEntity::class,
+        UserLibraryEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -117,6 +119,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 7, to = 8),
         // v9: index for the default library list order (title). Adds an index only.
         AutoMigration(from = 8, to = 9),
+        // v10: "My library" picks (user data). Adds one table only; starts empty.
+        AutoMigration(from = 9, to = 10),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {

@@ -1,8 +1,23 @@
 package dev.yourstream.ui.screens.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.IntOffset
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraphBuilder
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -31,22 +46,60 @@ import dev.yourstream.ui.screens.settings.LanguagesRoute as LanguagesScreenRoute
 import dev.yourstream.ui.screens.settings.SettingsRoute as SettingsScreenRoute
 import dev.yourstream.ui.screens.settings.SourcesRoute as SourcesScreenRoute
 
-private const val NAV_FADE_MS = 120
+private const val NAV_SLIDE_MS = 280
+private const val NAV_FADE_MS = 150
 
-/** The whole graph. Each destination wires its screen's callbacks to the [AppNavigator]. */
+private fun NavDestination.isTopLevel() = TopLevel.entries.any { hasRoute(it.route::class) }
+private fun NavDestination.isPlayer() = hasRoute(PlayerRoute::class)
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabs() = initialState.destination.isTopLevel() && targetState.destination.isTopLevel()
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.player() = initialState.destination.isPlayer() || targetState.destination.isPlayer()
+private val slide = tween<IntOffset>(NAV_SLIDE_MS, easing = FastOutSlowInEasing)
+
+/** Every page draws its own opaque background, so pages never show through each other mid-transition. */
+private inline fun <reified T : Any> NavGraphBuilder.page(noinline content: @Composable (NavBackStackEntry) -> Unit) =
+    composable<T> { entry -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content(entry) } }
+
+/**
+ * The whole graph. Each destination wires its screen's callbacks to the [AppNavigator].
+ * Tabs switch instantly (like any bottom-bar app); opening a page slides it in from the right over
+ * the current one, which moves a little to the left; back is the reverse. The player fades, since
+ * it also leaves the navigation chrome.
+ */
 @Composable
 fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: String?, modifier: Modifier = Modifier) {
     val back: () -> Unit = { navigator.back() }
-    // Screens have transparent backgrounds, so a cross-fade draws both on top of each other
-    // (ghosted text, flicker). The old screen leaves at once; the new one fades in quickly.
     NavHost(
         nav, startDestination = HomeRoute, modifier = modifier,
-        enterTransition = { fadeIn(tween(NAV_FADE_MS)) },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { fadeIn(tween(NAV_FADE_MS)) },
-        popExitTransition = { ExitTransition.None },
+        enterTransition = {
+            when {
+                tabs() -> EnterTransition.None
+                player() -> fadeIn(tween(NAV_FADE_MS))
+                else -> slideInHorizontally(slide) { it }
+            }
+        },
+        exitTransition = {
+            when {
+                tabs() -> ExitTransition.None
+                player() -> fadeOut(tween(NAV_FADE_MS))
+                else -> slideOutHorizontally(slide) { -it / 4 }
+            }
+        },
+        popEnterTransition = {
+            when {
+                tabs() -> EnterTransition.None
+                player() -> fadeIn(tween(NAV_FADE_MS))
+                else -> slideInHorizontally(slide) { -it / 4 }
+            }
+        },
+        popExitTransition = {
+            when {
+                tabs() -> ExitTransition.None
+                player() -> fadeOut(tween(NAV_FADE_MS))
+                else -> slideOutHorizontally(slide) { it }
+            }
+        },
     ) {
-        composable<HomeRoute> {
+        page<HomeRoute> {
             HomeScreenRoute(
                 onOpen = navigator::open,
                 onSeeAll = { s ->
@@ -63,30 +116,30 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
                 onReview = navigator::review,
             )
         }
-        composable<LibraryRoute> { LibraryScreenRoute(navigator::open) }
-        composable<MoviesRoute> { MoviesScreenRoute(navigator::open) }
-        composable<SeriesRoute> { SeriesScreenRoute(navigator::open) }
-        composable<SearchRoute> { SearchScreenRoute(navigator::open) }
-        composable<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
-        composable<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
-        composable<FavoritesRoute> { FavoritesScreenRoute(navigator::open) }
-        composable<SettingsRoute> {
+        page<LibraryRoute> { LibraryScreenRoute(navigator::open) }
+        page<MoviesRoute> { MoviesScreenRoute(navigator::open) }
+        page<SeriesRoute> { SeriesScreenRoute(navigator::open) }
+        page<SearchRoute> { SearchScreenRoute(navigator::open) }
+        page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
+        page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
+        page<FavoritesRoute> { FavoritesScreenRoute(navigator::open) }
+        page<SettingsRoute> {
             SettingsScreenRoute(
                 appVersion, navigator::account, navigator::sources, navigator::languages,
                 SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons),
             )
         }
-        composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
-        composable<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
-        composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlay = navigator::replacePlayer) }
-        composable<AccountRoute> { AccountScreenRoute(back) }
-        composable<SourcesRoute> { SourcesScreenRoute(back) }
-        composable<LanguagesRoute> { LanguagesScreenRoute(back) }
-        composable<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
-        composable<MatchReviewRoute> { MatchReviewDestination(back) }
-        composable<FixMatchRoute> { FixMatchDestination(back) }
-        composable<StatsRoute> { StatsDestination(back) }
-        composable<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
-        composable<ProgressSyncRoute> { ProgressSyncDestination(back) }
+        page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
+        page<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
+        page<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlay = navigator::replacePlayer) }
+        page<AccountRoute> { AccountScreenRoute(back) }
+        page<SourcesRoute> { SourcesScreenRoute(back) }
+        page<LanguagesRoute> { LanguagesScreenRoute(back) }
+        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
+        page<MatchReviewRoute> { MatchReviewDestination(back) }
+        page<FixMatchRoute> { FixMatchDestination(back) }
+        page<StatsRoute> { StatsDestination(back) }
+        page<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
+        page<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }
 }

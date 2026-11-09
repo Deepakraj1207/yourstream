@@ -127,7 +127,25 @@ fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: Playe
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     ImmersiveMode()
-    PlayerScreen(state, vm::onAction, onBack, onPlay, vm.episodeItems.collectAsLazyPagingItems()) { PlayerSurface(vm.player, state.isPlaying) }
+    // Phones and tablets open the player in landscape; the rotate button switches to portrait and back.
+    val tv = LocalWindowLayout.current == WindowLayout.TV
+    var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+    if (!tv) Orientation(landscape)
+    PlayerScreen(
+        state, vm::onAction, onBack, onPlay, vm.episodeItems.collectAsLazyPagingItems(),
+        onRotate = if (tv) null else ({ landscape = !landscape }),
+    ) { PlayerSurface(vm.player, state.isPlaying) }
+}
+
+/** Locks the screen to landscape (either way up) or portrait while the player is shown; back to normal after. */
+@Composable
+private fun Orientation(landscape: Boolean) {
+    val activity = LocalActivity.current ?: return
+    DisposableEffect(activity, landscape) {
+        activity.requestedOrientation = if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        onDispose { activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
 }
 
 /** Full screen video: system bars hidden while the player is shown (a swipe brings them back briefly). */
@@ -176,6 +194,8 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onPlay: (OpenTarget.Play) -> Unit,
     episodes: LazyPagingItems<EpisodeItem>? = null,
+    /** Switches landscape/portrait; null hides the button (TV). */
+    onRotate: (() -> Unit)? = null,
     surface: @Composable () -> Unit,
 ) {
     val layout = LocalWindowLayout.current
@@ -265,7 +285,7 @@ fun PlayerScreen(
         if (showSpinner && !(controls && !tv)) Buffering(Modifier.align(Alignment.Center))
 
         AnimatedVisibility(controls && state.error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek)
+            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate)
         }
 
         state.recovery?.let { r ->
@@ -350,6 +370,7 @@ private fun Controls(
     openPanel: (PlayerPanel) -> Unit,
     poke: () -> Unit,
     seek: (Long) -> Unit,
+    onRotate: (() -> Unit)? = null,
 ) {
     val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
     Box(Modifier.fillMaxSize()) {
@@ -373,6 +394,11 @@ private fun Controls(
                     shape = MaterialTheme.shapes.small, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
                     modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).clickable { openPanel(PlayerPanel.INFO) }.testTag("quality-badge"),
                 ) { Text(b, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
+            }
+            onRotate?.let { rotate ->
+                IconButton(onClick = rotate, modifier = Modifier.focusHighlight().testTag("rotate")) {
+                    Icon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate), tint = Color.White)
+                }
             }
         }
 
