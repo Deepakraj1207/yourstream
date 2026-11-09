@@ -99,6 +99,27 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryDark() = shot("phone-library-dark", WindowLayout.COMPACT, TopLevel.LIBRARY) {
+        BrowseScreen("Library", EmptyKind.LIBRARY_EMPTY, BrowseUiState(dev.yourstream.ui.screens.browse.BrowseFilters(kind = dev.yourstream.library.api.LibraryKind.MOVIE), count = 240),
+            flowOf(PagingData.from(movies + series, done)).collectAsLazyPagingItems(), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSignIn() = shot("phone-sign-in", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Phone), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSignInCode() = shot("phone-sign-in-code", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Code("+91 98765 43210", 5, inApp = true)), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSignInQr() = shot("phone-sign-in-qr", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Qr("tg://login?token=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA")), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.FAVORITES) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }
@@ -111,7 +132,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
     fun tvSettings() = shot("tv-settings", WindowLayout.TV, TopLevel.SETTINGS) {
-        SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "0.1.0", {}, {}, {}, {})
+        SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "0.1.0", {}, {}, {})
     }
 
     // ---- Player (full screen: no shell). A gradient stands in for the video frame.
@@ -235,13 +256,6 @@ class ScreenshotTest {
                 "unwatched tamil movies", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(null, emptyList(), 0)),
                 brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched Tamil movies.", listOf("language Tamil", "unwatched", "movies"), tiles, 4),
             ), {}, {},
-        )
-    }
-
-    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneTelegramApi() = shot("phone-telegram-api", WindowLayout.COMPACT, TopLevel.SETTINGS) {
-        dev.yourstream.ui.screens.settings.TelegramApiScreen(
-            dev.yourstream.ui.screens.settings.TelegramApiUiState(dev.yourstream.telegram.api.CredentialsSource.BUILD, 12345678, hasBuiltIn = true), {}, {},
         )
     }
 }

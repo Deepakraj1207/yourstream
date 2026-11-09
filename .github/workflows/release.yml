@@ -2,9 +2,10 @@
 # pushed (git tag v0.2.0 && git push origin v0.2.0), or from Actions -> Release APK -> Run
 # workflow with a version (the release and its tag are then created at that commit).
 #
-# The published APK has NO Telegram API credentials built in (this repository is public and an
-# APK can be unpacked). Users enter their own API ID and hash once in Settings -> Telegram API.
-# The repository's TELEGRAM_* secrets are deliberately not used here.
+# The APK carries the app's Telegram API credentials from the repository secrets TELEGRAM_API_ID
+# and TELEGRAM_API_HASH (required), so users only sign in with their phone number or a QR code.
+# Like every Telegram client, anything in an APK can be extracted from it; the secrets keep the
+# values out of git.
 #
 # Optional, so updates install over earlier releases: repository secrets RELEASE_KEYSTORE_BASE64,
 # RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD. Without them the APK is signed
@@ -62,26 +63,33 @@ jobs:
         run: |
           case "$TAG" in v[0-9]*) ;; *) echo "::error::Version must look like v0.2.0, got '$TAG'"; exit 1 ;; esac
 
-      - name: Build APK (no built-in Telegram credentials)
+      - name: Build APK
         env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           VERSION_NAME: ${{ env.TAG }}
           VERSION_CODE: ${{ github.run_number }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          if [ -z "$TELEGRAM_API_ID" ] || [ -z "$TELEGRAM_API_HASH" ]; then
+            echo "::error::Set the repository secrets TELEGRAM_API_ID and TELEGRAM_API_HASH (my.telegram.org -> API development tools)"
+            exit 1
+          fi
           export VERSION_NAME="${VERSION_NAME#v}"
           ./gradlew --no-daemon assembleRelease
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
 
-      - name: Check that no credentials are built in
+      - name: Check that the Telegram credentials are built in
         run: |
           CONFIG=app/build/generated/source/buildConfig/release/dev/yourstream/BuildConfig.java
-          grep -q 'TELEGRAM_API_ID = 0;' "$CONFIG"
-          grep -q 'TELEGRAM_API_HASH = "";' "$CONFIG"
-          echo "OK: no Telegram API credentials in this APK"
+          if grep -q 'TELEGRAM_API_ID = 0;' "$CONFIG" || grep -q 'TELEGRAM_API_HASH = "";' "$CONFIG"; then
+            echo "::error::The APK has no Telegram API credentials"; exit 1
+          fi
+          echo "OK: Telegram API credentials built in"
 
       - name: Publish release
         env:

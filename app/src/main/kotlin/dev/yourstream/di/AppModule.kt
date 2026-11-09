@@ -89,26 +89,44 @@ object AppModule {
     )
 
     /**
-     * Telegram configuration. API id/hash: the ones the user entered in the app (Settings →
-     * Telegram API), else the ones built into the APK from local.properties / secrets.properties /
-     * environment (docs/TELEGRAM_SETUP.md). Missing both = "not configured" with a way to enter them.
+     * Telegram configuration. API id/hash are built into the APK (secrets.properties / CI secrets,
+     * docs/TELEGRAM_SETUP.md); users only sign in with their phone number or a QR code.
      *
      * The database lives in noBackupFilesDir: it holds the session and must persist across
      * launches, but never be backed up. Downloaded files go to the cache directory.
      */
     @Provides
     @Singleton
-    fun telegramConfig(@ApplicationContext context: Context, credentials: AndroidTelegramCredentialStore): TelegramConfig = credentials.forTelegram().let { c -> TelegramConfig(
-        apiId = c?.apiId ?: 0,
-        apiHash = c?.apiHash.orEmpty(),
-        databaseDirectory = File(context.noBackupFilesDir, "tdlib/db").absolutePath,
-        filesDirectory = File(context.cacheDir, "tdlib/files").absolutePath,
-        useTestDc = BuildConfig.TELEGRAM_USE_TEST_DC,
-        systemLanguageCode = Locale.getDefault().language.ifEmpty { "en" },
-        deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
-        systemVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-        applicationVersion = BuildConfig.VERSION_NAME,
-        tdlibLogVerbosity = if (BuildConfig.DEBUG) 2 else 1,
-        tdlibLogFile = File(context.cacheDir, "tdlib/tdlib.log").absolutePath,
-    ) }
+    fun telegramConfig(@ApplicationContext context: Context): TelegramConfig {
+        forgetLegacyCredentials(context)
+        return TelegramConfig(
+            apiId = BuildConfig.TELEGRAM_API_ID,
+            apiHash = BuildConfig.TELEGRAM_API_HASH,
+            databaseDirectory = File(context.noBackupFilesDir, "tdlib/db").absolutePath,
+            filesDirectory = File(context.cacheDir, "tdlib/files").absolutePath,
+            useTestDc = BuildConfig.TELEGRAM_USE_TEST_DC,
+            systemLanguageCode = Locale.getDefault().language.ifEmpty { "en" },
+            deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+            systemVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+            applicationVersion = BuildConfig.VERSION_NAME,
+            tdlibLogVerbosity = if (BuildConfig.DEBUG) 2 else 1,
+            tdlibLogFile = File(context.cacheDir, "tdlib/tdlib.log").absolutePath,
+        )
+    }
+
+    /**
+     * Earlier versions let users enter their own API id/hash. A Telegram session belongs to the
+     * api_id it was created with, so when one was entered and differs from the built-in id, the old
+     * TDLib session is cleared once (library, progress and settings stay) and the entry forgotten.
+     */
+    private fun forgetLegacyCredentials(context: Context) {
+        val prefs = context.getSharedPreferences("telegram_credentials", Context.MODE_PRIVATE)
+        if (prefs.all.isEmpty()) return
+        val entered = prefs.getInt("api_id", 0)
+        if (prefs.getBoolean("reset_session_on_start", false) || (entered > 0 && entered != BuildConfig.TELEGRAM_API_ID)) {
+            File(context.noBackupFilesDir, "tdlib/db").deleteRecursively()
+            File(context.cacheDir, "tdlib/files").deleteRecursively()
+        }
+        prefs.edit().clear().commit()
+    }
 }

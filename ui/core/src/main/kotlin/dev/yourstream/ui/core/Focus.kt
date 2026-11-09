@@ -21,11 +21,15 @@ import androidx.compose.ui.unit.dp
  */
 fun Modifier.focusHighlight(shape: Shape? = null): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) LocalDimens.current.focusScale else 1f, label = "focus-scale")
+    val lift = LocalDimens.current.focusScale
     val color = MaterialTheme.colorScheme.primary
     val s = shape ?: MaterialTheme.shapes.medium
-    this
-        .graphicsLayer { scaleX = scale; scaleY = scale }
+    // Phones and small tablets never lift: no animation or extra layer per card while scrolling.
+    val scaled = if (lift == 1f) this else {
+        val scale by animateFloatAsState(if (focused) lift else 1f, label = "focus-scale")
+        this.graphicsLayer { scaleX = scale; scaleY = scale }
+    }
+    scaled
         .onFocusChanged { focused = it.isFocused || it.hasFocus }
         .then(if (focused) Modifier.border(3.dp, color, s) else Modifier)
 }

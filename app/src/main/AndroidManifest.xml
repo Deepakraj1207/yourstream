@@ -36,18 +36,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Stage-1 debug screens (Settings → Developer tools). -->
-        <activity
-            android:name=".debug.DebugActivity"
-            android:exported="false"
-            android:label="YourStream debug"
-            android:windowSoftInputMode="adjustResize" />
-
-        <!-- Stage-1 test player. Handles rotation itself so playback is not interrupted. -->
-        <activity
-            android:name=".debug.PlayerActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
-            android:exported="false" />
 
         <!-- WorkManager is initialised by YourStreamApp (Hilt worker factory), not by App Startup. -->
         <provider

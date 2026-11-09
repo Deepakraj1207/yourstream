@@ -4,18 +4,10 @@
 2. Open it and allow "Install unknown apps" for your browser or file manager when asked.
    On a TV: `adb install YourStream-*.apk`, or a file manager app.
 
-## First start: your Telegram API ID and hash
+## First start
 
-This build has no Telegram API credentials built in. Telegram asks every app for an API ID and
-hash; you use your own, once:
-
-1. Open <https://my.telegram.org>, log in, choose **API development tools** and create an app
-   (any name, platform Android).
-2. In YourStream: **Settings → Telegram API** (or **Enter API ID and hash** on the sign-in
-   screen), enter **App api_id** and **App api_hash**, then **Save and restart**.
-3. Sign in to Telegram and choose the chats that hold your videos.
-
-They are stored only on your device, the hash encrypted.
+Sign in to Telegram with your phone number (or scan a QR code from Telegram on another device),
+then choose the chats that hold your videos.
 
 ## Privacy
 

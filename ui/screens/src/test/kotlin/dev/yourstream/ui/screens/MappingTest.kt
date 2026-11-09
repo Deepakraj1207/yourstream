@@ -147,7 +147,7 @@ class MappingTest {
     @Test
     fun accountStepsMirrorAuthState() {
         assertEquals(AccountStep.Phone, AccountViewModel.step(AuthState.WaitPhoneNumber, null))
-        assertEquals(AccountStep.Code("+49***67", 5), AccountViewModel.step(AuthState.WaitCode(CodeInfo("+49***67", CodeDeliveryType.TELEGRAM_MESSAGE, null, 60, 5)), null))
+        assertEquals(AccountStep.Code("+49***67", 5, inApp = true), AccountViewModel.step(AuthState.WaitCode(CodeInfo("+49***67", CodeDeliveryType.TELEGRAM_MESSAGE, null, 60, 5)), null))
         assertEquals(AccountStep.Password("cat"), AccountViewModel.step(AuthState.WaitPassword("cat", false, ""), null))
         assertEquals(AccountStep.Qr("tg://login?token=x"), AccountViewModel.step(AuthState.WaitOtherDeviceConfirmation("tg://login?token=x"), null))
         assertEquals(AccountStep.SignedIn("Asha"), AccountViewModel.step(AuthState.Ready, "Asha"))
