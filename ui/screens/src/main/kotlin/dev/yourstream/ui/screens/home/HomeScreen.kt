@@ -93,11 +93,29 @@ private fun HomeContent(
 ) {
     val blocking = state.blocking
     if (blocking != null) {
-        EmptyState(blocking, Modifier.testTag("home"), onAction = when (blocking) {
+        val setupAction = when (blocking) {
             EmptyKind.NOT_SIGNED_IN -> onSignIn
             EmptyKind.NO_SOURCES -> onChooseSources
             else -> null
-        })
+        }
+        if (state.catalogs.isEmpty()) {
+            EmptyState(blocking, Modifier.testTag("home"), onAction = setupAction)
+            return
+        }
+        // Nothing of your own yet: the add-on catalogs are still there to browse, under a short
+        // panel that says what to do next (sign in, choose chats).
+        val card = tileCard()
+        val actions = tileActions({ onAction(HomeAction.Tile(it)) }, onOpen)
+        LazyColumn(
+            Modifier.fillMaxSize().testTag("home"),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(LocalDimens.current.rowGap),
+        ) {
+            item(key = "setup") { SetupPanel(blocking, setupAction) }
+            state.catalogs.forEach { c ->
+                item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
+            }
+        }
         return
     }
     val actions = tileActions({ onAction(HomeAction.Tile(it)) }, onOpen)
@@ -232,6 +250,34 @@ private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
                 androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(3.dp), drawStopIndicator = {}, gapSize = 0.dp)
             } else {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp))
+            }
+        }
+    }
+}
+
+/** "Sign in to watch your own videos" above the catalogs, while the library is still empty. */
+@Composable
+private fun SetupPanel(kind: EmptyKind, action: (() -> Unit)?) {
+    val d = LocalDimens.current
+    val (title, message, button) = when (kind) {
+        EmptyKind.NOT_SIGNED_IN -> Triple(R.string.home_setup_sign_in_title, R.string.home_setup_sign_in_message, R.string.home_setup_sign_in)
+        EmptyKind.NO_SOURCES -> Triple(R.string.home_setup_sources_title, R.string.home_setup_sources_message, R.string.home_setup_sources)
+        else -> Triple(R.string.home_setup_indexing_title, R.string.home_setup_indexing_message, null)
+    }
+    androidx.compose.material3.Surface(
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
+        shape = androidx.compose.material3.MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter).padding(end = 4.dp, bottom = 4.dp)
+            .inkPanel(androidx.compose.material3.MaterialTheme.shapes.large).testTag("home-setup"),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(title), style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+            Text(stringResource(message), style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            if (button != null && action != null) {
+                androidx.compose.material3.Button(onClick = action, modifier = Modifier.padding(top = 4.dp).focusHighlight().testTag("home-setup-action")) {
+                    Text(stringResource(button))
+                }
             }
         }
     }

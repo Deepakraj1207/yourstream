@@ -1,6 +1,9 @@
 package dev.yourstream.ui.screens.navigation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -149,55 +152,48 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
     ) { content(Modifier.fillMaxSize()) }
 }
 
-/** A manga label: a slanted (parallelogram) caption box. */
-private val SlantShape = androidx.compose.foundation.shape.GenericShape { size, _ ->
-    val slant = size.width * 0.09f
-    moveTo(slant, 0f); lineTo(size.width, 0f); lineTo(size.width - slant, size.height); lineTo(0f, size.height); close()
-}
-
 /**
- * The phone's bottom bar in the manga style: a floating comic panel (ink border, hard shadow),
- * labels in comic lettering, and the current tab as a slanted ink caption box that pops in.
+ * The phone's bottom bar in the manga style: a floating capsule with an ink outline and a hard
+ * shadow. Tabs are icons; the current one grows into an ink pill that shows its name in comic
+ * lettering (spring animation).
  */
 @Composable
 private fun MangaNavBar(current: TopLevel?, onSelect: (TopLevel) -> Unit) {
     val ink = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
     val paper = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer
-    val panel = androidx.compose.material3.MaterialTheme.shapes.medium
+    val capsule = androidx.compose.foundation.shape.CircleShape
+    val springy = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntSize>(dampingRatio = 0.7f, stiffness = 500f)
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxWidth().background(androidx.compose.material3.MaterialTheme.colorScheme.background)
-            .navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
+            .navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(end = 4.dp, bottom = 4.dp)
-                .inkPanel(panel, shadow = 4.dp, border = 2.5.dp)
-                .clip(panel).background(paper).padding(horizontal = 4.dp).testTag("nav:bar"),
+            Modifier.fillMaxWidth().height(62.dp).padding(end = 4.dp, bottom = 4.dp)
+                .inkPanel(capsule, shadow = 4.dp, border = 2.5.dp)
+                .clip(capsule).background(paper).padding(horizontal = 8.dp).testTag("nav:bar"),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
             TopLevel.entries.filter { it.compact }.forEach { t ->
                 val selected = t == current
-                val pop by androidx.compose.animation.core.animateFloatAsState(
-                    if (selected) 1f else 0f,
-                    androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 500f), label = "tab-pop",
-                )
+                val fill by androidx.compose.animation.animateColorAsState(if (selected) ink else androidx.compose.ui.graphics.Color.Transparent, label = "tab-fill")
+                val tint by androidx.compose.animation.animateColorAsState(if (selected) paper else ink, label = "tab-tint")
                 val label = stringResource(t.label)
-                androidx.compose.foundation.layout.Box(
-                    Modifier.weight(1f).fillMaxSize().padding(vertical = 6.dp, horizontal = 2.dp)
+                Row(
+                    Modifier.height(44.dp).clip(capsule).background(fill)
                         .selectable(selected = selected, onClick = { onSelect(t) }, role = androidx.compose.ui.semantics.Role.Tab)
-                        .focusHighlight(SlantShape).testTag("nav:${t.name}"),
-                    contentAlignment = androidx.compose.ui.Alignment.Center,
+                        .focusHighlight(capsule)
+                        .semantics { contentDescription = label }
+                        .padding(horizontal = if (selected) 16.dp else 14.dp)
+                        .animateContentSize(springy)
+                        .testTag("nav:${t.name}"),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
-                    if (pop > 0.01f) androidx.compose.foundation.layout.Box(
-                        Modifier.fillMaxSize().graphicsLayer { scaleX = 0.7f + 0.3f * pop; scaleY = 0.7f + 0.3f * pop; alpha = pop.coerceIn(0f, 1f) }
-                            .background(ink, SlantShape),
+                    Icon(t.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                    if (selected) Text(
+                        label.uppercase(), fontFamily = dev.yourstream.ui.core.Manga.Lettering, fontSize = 16.sp, letterSpacing = 1.sp,
+                        maxLines = 1, color = tint, modifier = Modifier.padding(start = 8.dp),
                     )
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Icon(t.icon, contentDescription = null, tint = if (selected) paper else ink, modifier = Modifier.size(22.dp))
-                        Text(
-                            label.uppercase(), fontFamily = dev.yourstream.ui.core.Manga.Lettering, fontSize = 13.sp, letterSpacing = 1.sp, maxLines = 1,
-                            color = if (selected) paper else ink.copy(alpha = 0.8f),
-                        )
-                    }
                 }
             }
         }

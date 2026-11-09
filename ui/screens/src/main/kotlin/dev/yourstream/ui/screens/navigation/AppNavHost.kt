@@ -132,7 +132,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SettingsRoute> {
             SettingsScreenRoute(
                 appVersion, navigator::account, navigator::sources, navigator::languages,
-                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons),
+                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb),
             )
         }
         page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
@@ -147,6 +147,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<StatsRoute> { StatsDestination(back) }
         page<CatalogTitleRoute> { dev.yourstream.ui.screens.addon.CatalogTitleDestination(navigator::open, back) }
         page<StreamPlayerRoute> { dev.yourstream.ui.screens.addon.StreamPlayerDestination(back) }
+        page<TmdbRoute> { dev.yourstream.ui.screens.settings.TmdbDestination(back) }
         page<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
         page<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }

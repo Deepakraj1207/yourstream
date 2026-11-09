@@ -202,6 +202,18 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeSignedOutManga() = shot("phone-home-signed-out", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true) {
+        val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
+        val popular = dev.yourstream.ui.screens.home.CatalogRow("cat:pop", "Popular", movies)
+        val series = dev.yourstream.ui.screens.home.CatalogRow("cat:series", "Popular series", this.series)
+        HomeScreen(
+            HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 0,
+                catalogs = listOf(popular, series)),
+            HomeRows(none, none), {}, {}, {}, {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.LIBRARY) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }

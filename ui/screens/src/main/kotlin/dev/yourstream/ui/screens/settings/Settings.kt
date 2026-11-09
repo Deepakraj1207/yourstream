@@ -154,6 +154,7 @@ data class SettingsLinks(
     val stats: (() -> Unit)? = null,
     val sync: (() -> Unit)? = null,
     val addons: (() -> Unit)? = null,
+    val tmdb: (() -> Unit)? = null,
 )
 
 /**
@@ -188,6 +189,7 @@ fun SettingsScreen(
                     more.addons?.let { Row(stringResource(R.string.settings_addons), stringResource(R.string.settings_addons_detail), Icons.Filled.Add, onClick = it) }
                     Row(stringResource(R.string.settings_sources), pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
                         Icons.AutoMirrored.Filled.List, onClick = onSources)
+                    more.tmdb?.let { Row(stringResource(R.string.tmdb_title), stringResource(R.string.settings_tmdb_detail), Icons.Filled.Info, tag = "settings-tmdb", onClick = it) }
                     more.libraryStatus?.let { Row(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), dev.yourstream.ui.core.AppIcons.Episodes, onClick = it) }
                     more.review?.takeIf { state.reviewCount > 0 }?.let {
                         Row(stringResource(R.string.settings_review), pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount), Icons.Filled.Warning, onClick = it)

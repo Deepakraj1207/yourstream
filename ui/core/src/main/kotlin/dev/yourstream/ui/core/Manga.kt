@@ -167,8 +167,8 @@ fun MangaTitleArt(title: String, modifier: Modifier = Modifier, showInitials: Bo
     val seed = remember(title) { title.lowercase().hashCode().absoluteValue }
     Box(modifier.background(paper).screentone(ink.copy(alpha = 0.22f), seed), contentAlignment = Alignment.Center) {
         if (showInitials) Text(
-            initials(title), fontFamily = Manga.Lettering, color = ink, textAlign = TextAlign.Center, maxLines = 1,
-            style = MaterialTheme.typography.displaySmall.copy(fontFamily = Manga.Lettering, letterSpacing = 2.sp),
+            firstLetter(title), fontFamily = Manga.Lettering, color = ink, textAlign = TextAlign.Center, maxLines = 1,
+            style = MaterialTheme.typography.displayLarge.copy(fontFamily = Manga.Lettering, letterSpacing = 0.sp),
         )
     }
 }

@@ -58,12 +58,15 @@ fun TitleArt(title: String, modifier: Modifier = Modifier, showInitials: Boolean
     val (a, b) = remember(title) { TitleColors.of(title) }
     Box(modifier.background(Brush.linearGradient(listOf(a, b))), contentAlignment = Alignment.Center) {
         if (showInitials) Text(
-            initials(title), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Clip,
+            firstLetter(title), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.displayMedium, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Clip,
             modifier = Modifier.padding(8.dp),
         )
     }
 }
+
+/** The first letter of the title's first significant word ("The Dark Knight" → "D", "Leo" → "L"): what a missing poster shows. */
+fun firstLetter(title: String): String = initials(title).take(1)
 
 /** Initials of the first two significant words ("The Dark Knight" → "DK"). */
 fun initials(title: String): String {

@@ -52,6 +52,8 @@ import kotlinx.serialization.Serializable
 ) : Route
 /** Plays an add-on stream (HTTP file, HLS or DASH). [headers]: JSON object of request headers. */
 @Serializable data class StreamPlayerRoute(val url: String, val title: String, val subtitle: String? = null, val headers: String = "{}") : Route
+/** Settings → TMDB key. */
+@Serializable data object TmdbRoute : Route
 /** Catalog add-ons: built-in ones and those added by link. */
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */

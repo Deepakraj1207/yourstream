@@ -25,7 +25,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import kotlinx.serialization.KSerializer
 
-/** TMDB credentials. Supplied at build time (see docs/METADATA.md); never committed. */
+/** TMDB credentials: built in (CI secret) or entered by the user in Settings → TMDB. */
 data class TmdbConfig(
     /** v3 API key (sent as ?api_key=). */
     val apiKey: String = "",
@@ -35,6 +35,17 @@ data class TmdbConfig(
     val imageBaseUrl: String = "https://image.tmdb.org/t/p",
 ) {
     val isConfigured: Boolean get() = apiKey.isNotBlank() || readToken.isNotBlank()
+
+    /** The same settings with [key] as the credential: a v4 read token ("eyJ…") or a v3 API key. */
+    fun withKey(key: String): TmdbConfig = key.trim().let { k -> if (isReadToken(k)) copy(apiKey = "", readToken = k) else copy(apiKey = k, readToken = "") }
+
+    companion object {
+        /** v4 read access tokens are JWTs; v3 API keys are 32 hex characters. */
+        fun isReadToken(key: String) = key.startsWith("eyJ") && key.count { it == '.' } == 2
+
+        /** Plausible key format (pure; the TMDB check decides). */
+        fun looksValid(key: String): Boolean = key.trim().let { k -> isReadToken(k) || Regex("[0-9a-fA-F]{32}").matches(k) }
+    }
     override fun toString() = "TmdbConfig(apiKey=${if (apiKey.isBlank()) "missing" else "set"}, readToken=${if (readToken.isBlank()) "missing" else "set"})"
 }
 
@@ -44,9 +55,22 @@ data class TmdbConfig(
  */
 class TmdbProvider(
     private val client: HttpClient,
-    private val config: TmdbConfig,
+    /** Read on every request, so a key entered in Settings applies at once. */
+    private val configSource: () -> TmdbConfig,
     clock: Clock = Clock.System,
 ) : MetadataProvider {
+    constructor(client: HttpClient, config: TmdbConfig, clock: Clock = Clock.System) : this(client, { config }, clock)
+
+    private val config: TmdbConfig get() = configSource()
+
+    /** Asks TMDB whether [candidate]'s key is accepted (GET /authentication). */
+    suspend fun check(candidate: TmdbConfig): AppResult<Unit> =
+        when (val r = client.getJson(candidate.baseUrl + "/authentication", kotlinx.serialization.json.JsonElement.serializer()) {
+            if (candidate.readToken.isNotBlank()) header("Authorization", "Bearer ${candidate.readToken}") else parameter("api_key", candidate.apiKey)
+        }) {
+            is AppResult.Ok -> AppResult.Ok(Unit)
+            is AppResult.Err -> r
+        }
 
     override val id = ID
     override val displayName = "TMDB"

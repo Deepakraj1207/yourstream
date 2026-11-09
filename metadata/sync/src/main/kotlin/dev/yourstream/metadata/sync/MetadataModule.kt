@@ -40,9 +40,10 @@ abstract class MetadataModule {
 
     companion object {
         @Provides @Singleton
-        fun providers(tmdb: TmdbConfig, order: MetadataProviderOrder, clock: Clock): List<@JvmSuppressWildcards MetadataProvider> {
+        fun providers(tmdb: TmdbKeys, order: MetadataProviderOrder, clock: Clock): List<@JvmSuppressWildcards MetadataProvider> {
             val available = mapOf(
-                "tmdb" to { TmdbProvider(HttpClients.create(), tmdb, clock) as MetadataProvider },
+                // The key is read per request: one entered in Settings works without a restart.
+                "tmdb" to { TmdbProvider(HttpClients.create(), { tmdb.current() }, clock) as MetadataProvider },
                 "cinemeta" to { CinemetaProvider(HttpClients.create(), clock = clock) as MetadataProvider },
             )
             return order.ids.mapNotNull { available[it.trim().lowercase()]?.invoke() }
