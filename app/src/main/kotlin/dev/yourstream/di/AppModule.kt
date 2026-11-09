@@ -89,17 +89,18 @@ object AppModule {
     )
 
     /**
-     * Telegram configuration. API id/hash come from BuildConfig, which the build fills from
-     * local.properties / secrets.properties / environment (docs/TELEGRAM_SETUP.md).
+     * Telegram configuration. API id/hash: the ones the user entered in the app (Settings →
+     * Telegram API), else the ones built into the APK from local.properties / secrets.properties /
+     * environment (docs/TELEGRAM_SETUP.md). Missing both = "not configured" with a way to enter them.
      *
      * The database lives in noBackupFilesDir: it holds the session and must persist across
      * launches, but never be backed up. Downloaded files go to the cache directory.
      */
     @Provides
     @Singleton
-    fun telegramConfig(@ApplicationContext context: Context): TelegramConfig = TelegramConfig(
-        apiId = BuildConfig.TELEGRAM_API_ID,
-        apiHash = BuildConfig.TELEGRAM_API_HASH,
+    fun telegramConfig(@ApplicationContext context: Context, credentials: AndroidTelegramCredentialStore): TelegramConfig = credentials.forTelegram().let { c -> TelegramConfig(
+        apiId = c?.apiId ?: 0,
+        apiHash = c?.apiHash.orEmpty(),
         databaseDirectory = File(context.noBackupFilesDir, "tdlib/db").absolutePath,
         filesDirectory = File(context.cacheDir, "tdlib/files").absolutePath,
         useTestDc = BuildConfig.TELEGRAM_USE_TEST_DC,
@@ -109,5 +110,5 @@ object AppModule {
         applicationVersion = BuildConfig.VERSION_NAME,
         tdlibLogVerbosity = if (BuildConfig.DEBUG) 2 else 1,
         tdlibLogFile = File(context.cacheDir, "tdlib/tdlib.log").absolutePath,
-    )
+    ) }
 }

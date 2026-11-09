@@ -21,7 +21,7 @@
         android:label="YourStream"
         android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@android:style/Theme.Material.NoActionBar">
 
         <!-- The app. Handles size changes itself (foldables, multi-window, rotation) with adaptive layouts. -->
         <activity

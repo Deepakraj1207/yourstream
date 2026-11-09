@@ -20,34 +20,36 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Brand palette: cinematic dark with a warm amber accent; a matching light scheme. */
+/**
+ * Brand palette: monochrome. Black, white and greys only; the one exception is errors, which keep
+ * a muted red so a failure is noticed at a glance (the message says what it is too).
+ */
 object Brand {
-    val Amber = Color(0xFFF2B84B)
-    val AmberDark = Color(0xFF7A5300)
-    val Teal = Color(0xFF63D2C6)
-    val Ink = Color(0xFF0E1015)
-    val Night = Color(0xFF151821)
-    val NightHigh = Color(0xFF1E2230)
-    val NightHigher = Color(0xFF272C3C)
-    val Mist = Color(0xFFE7E9F0)
-    val Fog = Color(0xFFAAB0C0)
+    val Black = Color(0xFF0A0A0A)
+    val White = Color(0xFFFAFAFA)
 
     val dark: ColorScheme = darkColorScheme(
-        primary = Amber, onPrimary = Color(0xFF2B1D00), primaryContainer = Color(0xFF4A3300), onPrimaryContainer = Color(0xFFFFDEA6),
-        secondary = Teal, onSecondary = Color(0xFF00201D), secondaryContainer = Color(0xFF0F3B37), onSecondaryContainer = Color(0xFFB4F0E8),
-        background = Ink, onBackground = Mist, surface = Ink, onSurface = Mist,
-        surfaceVariant = NightHigh, onSurfaceVariant = Fog, surfaceContainerLowest = Ink, surfaceContainerLow = Night,
-        surfaceContainer = Night, surfaceContainerHigh = NightHigh, surfaceContainerHighest = NightHigher,
-        outline = Color(0xFF4A5064), outlineVariant = Color(0xFF2E3344), error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+        primary = Color(0xFFF5F5F5), onPrimary = Color(0xFF0A0A0A), primaryContainer = Color(0xFF2E2E2E), onPrimaryContainer = Color(0xFFF5F5F5),
+        secondary = Color(0xFFBDBDBD), onSecondary = Color(0xFF0A0A0A), secondaryContainer = Color(0xFF2A2A2A), onSecondaryContainer = Color(0xFFEDEDED),
+        tertiary = Color(0xFFD6D6D6), onTertiary = Color(0xFF0A0A0A),
+        background = Black, onBackground = Color(0xFFEDEDED), surface = Black, onSurface = Color(0xFFEDEDED),
+        surfaceVariant = Color(0xFF242424), onSurfaceVariant = Color(0xFFA6A6A6),
+        surfaceContainerLowest = Color(0xFF050505), surfaceContainerLow = Color(0xFF121212), surfaceContainer = Color(0xFF161616),
+        surfaceContainerHigh = Color(0xFF1E1E1E), surfaceContainerHighest = Color(0xFF282828),
+        inverseSurface = Color(0xFFEDEDED), inverseOnSurface = Color(0xFF161616), inversePrimary = Color(0xFF2E2E2E),
+        outline = Color(0xFF5E5E5E), outlineVariant = Color(0xFF333333), error = Color(0xFFE6A0A0), onError = Color(0xFF2B0000),
     )
 
     val light: ColorScheme = lightColorScheme(
-        primary = AmberDark, onPrimary = Color.White, primaryContainer = Color(0xFFFFDEA6), onPrimaryContainer = Color(0xFF271900),
-        secondary = Color(0xFF00696F), onSecondary = Color.White, secondaryContainer = Color(0xFFB4F0E8), onSecondaryContainer = Color(0xFF00201D),
-        background = Color(0xFFFAF8F4), onBackground = Color(0xFF1C1B18), surface = Color(0xFFFAF8F4), onSurface = Color(0xFF1C1B18),
-        surfaceVariant = Color(0xFFEDE6DA), onSurfaceVariant = Color(0xFF4D4639),
-        surfaceContainerLow = Color(0xFFF4F1EB), surfaceContainer = Color(0xFFEEEBE4), surfaceContainerHigh = Color(0xFFE8E5DE),
-        surfaceContainerHighest = Color(0xFFE2DFD8), outline = Color(0xFF7F7667), outlineVariant = Color(0xFFD0C5B4),
+        primary = Color(0xFF111111), onPrimary = White, primaryContainer = Color(0xFFE0E0E0), onPrimaryContainer = Color(0xFF111111),
+        secondary = Color(0xFF4A4A4A), onSecondary = White, secondaryContainer = Color(0xFFE6E6E6), onSecondaryContainer = Color(0xFF1A1A1A),
+        tertiary = Color(0xFF333333), onTertiary = White,
+        background = White, onBackground = Color(0xFF141414), surface = White, onSurface = Color(0xFF141414),
+        surfaceVariant = Color(0xFFE8E8E8), onSurfaceVariant = Color(0xFF555555),
+        surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF4F4F4), surfaceContainer = Color(0xFFEFEFEF),
+        surfaceContainerHigh = Color(0xFFE9E9E9), surfaceContainerHighest = Color(0xFFE3E3E3),
+        inverseSurface = Color(0xFF1E1E1E), inverseOnSurface = Color(0xFFF0F0F0), inversePrimary = Color(0xFFE0E0E0),
+        outline = Color(0xFF8A8A8A), outlineVariant = Color(0xFFCFCFCF), error = Color(0xFF9A2B2B), onError = White,
     )
 }
 

@@ -85,6 +85,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Not debuggable: Compose runs far faster than in debug, and the libraries' baseline
+            // profiles are installed. Signed with the debug key so it can be sideloaded (and
+            // installs over a debug build) until a release keystore is set up.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

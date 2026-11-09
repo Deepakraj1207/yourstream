@@ -121,17 +121,21 @@ class AccountViewModel @Inject constructor(
 }
 
 @Composable
-fun AccountRoute(onBack: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
+fun AccountRoute(onBack: () -> Unit, onApiSetup: (() -> Unit)? = null, vm: AccountViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    AccountScreen(state, vm::onAction, onBack)
+    AccountScreen(state, vm::onAction, onBack, onApiSetup)
 }
 
 @Composable
-fun AccountScreen(state: AccountUiState, onAction: (AccountAction) -> Unit, onBack: () -> Unit) {
+fun AccountScreen(state: AccountUiState, onAction: (AccountAction) -> Unit, onBack: () -> Unit, onApiSetup: (() -> Unit)? = null) {
     ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) {
         when (val step = state.step) {
             AccountStep.Starting -> LoadingState()
-            is AccountStep.NotConfigured -> ErrorState(UiError(dev.yourstream.ui.core.ErrorKind.TELEGRAM, step.reason, retryable = false))
+            is AccountStep.NotConfigured -> ErrorState(UiError(dev.yourstream.ui.core.ErrorKind.TELEGRAM, step.reason, retryable = false), extraActions = onApiSetup?.let { open ->
+                {
+                    androidx.compose.material3.Button(onClick = open, modifier = Modifier.focusHighlight().testTag("api-setup")) { Text(stringResource(R.string.api_enter)) }
+                }
+            })
             AccountStep.Unsupported -> ErrorState(UiError(dev.yourstream.ui.core.ErrorKind.TELEGRAM, stringResource(R.string.account_unsupported), retryable = false))
             else -> Column(Modifier.padding(LocalWindowLayout.current.gutter).widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (step) {

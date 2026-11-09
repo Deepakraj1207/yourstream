@@ -249,4 +249,35 @@
     <string name="sync_problem_signed_out">Sign in to Telegram first.</string>
     <string name="sync_problem_network">Telegram is not reachable. Sync will try again later.</string>
     <string name="sync_problem_failed">Sync did not work this time. It will try again later.</string>
+
+    <!-- Telegram API credentials -->
+    <string name="api_title">Telegram API</string>
+    <string name="api_intro">Telegram asks every app for an API ID and hash. You can use your own: they identify the app to Telegram, not your account, and keep this app independent of anyone else\'s.</string>
+    <string name="api_using_app">In use: your own (ID %1$d)</string>
+    <string name="api_using_built_in">In use: built into this app (ID %1$d)</string>
+    <string name="api_using_none">Not set yet: enter an API ID and hash to sign in.</string>
+    <string name="api_how_title">How to get them</string>
+    <string name="api_how_1">Open my.telegram.org and log in with your phone number.</string>
+    <string name="api_how_2">Choose API development tools and create an app (any name; platform Android).</string>
+    <string name="api_how_3">Copy App api_id and App api_hash here.</string>
+    <string name="api_open_site">Open my.telegram.org</string>
+    <string name="api_id">API ID</string>
+    <string name="api_hash">API hash</string>
+    <string name="api_hash_help">32 characters, letters a–f and digits</string>
+    <string name="api_hash_invalid">An API hash has 32 characters: letters a–f and digits</string>
+    <string name="api_show">Show</string>
+    <string name="api_hide">Hide</string>
+    <string name="api_save">Save and restart</string>
+    <string name="api_remove">Remove</string>
+    <string name="api_use_built_in">Use built-in</string>
+    <string name="api_signed_in_warning">Changing them signs you out of Telegram on this device, and you sign in again. Your library, progress and settings stay.</string>
+    <string name="api_privacy">Stored only on this device, the hash encrypted. Never synced or uploaded.</string>
+    <string name="api_confirm_title">Sign in again?</string>
+    <string name="api_confirm_message">The app restarts with the new API ID and hash, and you sign in to Telegram again. Your library, progress and settings stay.</string>
+    <string name="api_confirm">Restart</string>
+    <string name="api_enter">Enter API ID and hash</string>
+    <string name="settings_api">Telegram API</string>
+    <string name="settings_api_app">Your own (ID %1$d)</string>
+    <string name="settings_api_built_in">Built-in (ID %1$d)</string>
+    <string name="settings_api_none">Not set</string>
 </resources>

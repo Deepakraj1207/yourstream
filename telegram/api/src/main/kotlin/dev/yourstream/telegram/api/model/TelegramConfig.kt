@@ -26,8 +26,8 @@ public data class TelegramConfig(
 ) {
     /** Null when usable, otherwise a human-readable reason (never echoes the hash itself). */
     public fun validationError(): String? = when {
-        apiId <= 0 -> "Telegram API id is missing. Set telegram.apiId (see docs/TELEGRAM_SETUP.md)."
-        apiHash.isBlank() -> "Telegram API hash is missing. Set telegram.apiHash (see docs/TELEGRAM_SETUP.md)."
+        apiId <= 0 -> "Telegram API ID and hash are not set. Enter yours in Settings → Telegram API."
+        apiHash.isBlank() -> "Telegram API hash is not set. Enter it in Settings → Telegram API."
         !apiHash.matches(HASH_PATTERN) -> "Telegram API hash must be 32 hexadecimal characters."
         databaseDirectory.isBlank() -> "TDLib database directory is not set."
         else -> null

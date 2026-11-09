@@ -67,10 +67,11 @@ fun initials(title: String): String {
 }
 
 object TitleColors {
+    /** Grey gradients of different lightness (monochrome theme), so neighbouring cards still differ. */
     private val palette = listOf(
-        Color(0xFF7A4A2A) to Color(0xFF2B1A12), Color(0xFF2E5A7A) to Color(0xFF10202E), Color(0xFF5A2E7A) to Color(0xFF1F102E),
-        Color(0xFF2E7A5E) to Color(0xFF0F2A21), Color(0xFF7A2E3E) to Color(0xFF2A1015), Color(0xFF6A6A2E) to Color(0xFF26260F),
-        Color(0xFF2E3E7A) to Color(0xFF10152A), Color(0xFF7A5A2E) to Color(0xFF2A1F10),
+        Color(0xFF4A4A4A) to Color(0xFF161616), Color(0xFF3A3A3A) to Color(0xFF101010), Color(0xFF5A5A5A) to Color(0xFF1C1C1C),
+        Color(0xFF2E2E2E) to Color(0xFF0C0C0C), Color(0xFF666666) to Color(0xFF222222), Color(0xFF424242) to Color(0xFF1A1A1A),
+        Color(0xFF545454) to Color(0xFF121212), Color(0xFF363636) to Color(0xFF141414),
     )
 
     /** Stable per title (the same title always gets the same colours). */

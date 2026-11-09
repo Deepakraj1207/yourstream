@@ -1,5 +1,8 @@
 package dev.yourstream.ui.screens.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -28,11 +31,21 @@ import dev.yourstream.ui.screens.settings.LanguagesRoute as LanguagesScreenRoute
 import dev.yourstream.ui.screens.settings.SettingsRoute as SettingsScreenRoute
 import dev.yourstream.ui.screens.settings.SourcesRoute as SourcesScreenRoute
 
+private const val NAV_FADE_MS = 90
+
 /** The whole graph. Each destination wires its screen's callbacks to the [AppNavigator]. */
 @Composable
 fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools: (() -> Unit)?, appVersion: String?, modifier: Modifier = Modifier) {
     val back: () -> Unit = { navigator.back() }
-    NavHost(nav, startDestination = HomeRoute, modifier = modifier) {
+    // Navigation Compose cross-fades every change over 700 ms by default, which makes tab switches
+    // feel sluggish (and composes both screens for that long). A short fade feels instant.
+    NavHost(
+        nav, startDestination = HomeRoute, modifier = modifier,
+        enterTransition = { fadeIn(tween(NAV_FADE_MS)) },
+        exitTransition = { fadeOut(tween(NAV_FADE_MS)) },
+        popEnterTransition = { fadeIn(tween(NAV_FADE_MS)) },
+        popExitTransition = { fadeOut(tween(NAV_FADE_MS)) },
+    ) {
         composable<HomeRoute> {
             HomeScreenRoute(
                 onOpen = navigator::open,
@@ -60,13 +73,13 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
         composable<SettingsRoute> {
             SettingsScreenRoute(
                 appVersion, navigator::account, navigator::sources, navigator::languages, onDeveloperTools,
-                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync),
+                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::telegramApi),
             )
         }
         composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         composable<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
         composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlay = navigator::replacePlayer) }
-        composable<AccountRoute> { AccountScreenRoute(back) }
+        composable<AccountRoute> { AccountScreenRoute(back, navigator::telegramApi) }
         composable<SourcesRoute> { SourcesScreenRoute(back) }
         composable<LanguagesRoute> { LanguagesScreenRoute(back) }
         composable<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
@@ -74,5 +87,6 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
         composable<FixMatchRoute> { FixMatchDestination(back) }
         composable<StatsRoute> { StatsDestination(back) }
         composable<ProgressSyncRoute> { ProgressSyncDestination(back) }
+        composable<TelegramApiRoute> { dev.yourstream.ui.screens.settings.TelegramApiDestination(back) }
     }
 }

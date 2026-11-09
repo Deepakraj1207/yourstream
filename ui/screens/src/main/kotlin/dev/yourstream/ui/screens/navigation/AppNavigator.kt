@@ -38,5 +38,6 @@ class AppNavigator(private val nav: NavHostController) {
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
+    fun telegramApi() = nav.navigate(TelegramApiRoute) { launchSingleTop = true }
     fun back(): Boolean = nav.popBackStack()
 }

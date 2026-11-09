@@ -47,6 +47,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object StatsRoute : Route
 /** Optional multi-device progress sync. */
 @Serializable data object ProgressSyncRoute : Route
+/** The user's own Telegram API ID and hash. */
+@Serializable data object TelegramApiRoute : Route
 
 /**
  * Top-level destinations. [compact] = shown in the phone's bottom bar (max 5); all appear in the

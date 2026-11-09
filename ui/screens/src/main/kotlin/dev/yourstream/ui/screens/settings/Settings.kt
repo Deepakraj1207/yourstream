@@ -59,6 +59,8 @@ data class SettingsUiState(
     val reviewCount: Int = 0,
     /** Multi-device progress sync: on/off (it is optional and off until the user turns it on). */
     val syncOn: Boolean = false,
+    val apiSource: dev.yourstream.telegram.api.CredentialsSource = dev.yourstream.telegram.api.CredentialsSource.NONE,
+    val apiId: Int? = null,
 )
 
 @HiltViewModel
@@ -69,6 +71,7 @@ class SettingsViewModel @Inject constructor(
     private val tracks: TrackPreferenceStore,
     reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
     sync: dev.yourstream.sync.ProgressSync,
+    private val credentials: dev.yourstream.telegram.api.TelegramCredentialStore,
 ) : ViewModel() {
     private val languages = MutableStateFlow("")
 
@@ -82,6 +85,8 @@ class SettingsViewModel @Inject constructor(
             languages = langs,
             reviewCount = r,
             syncOn = syncOn,
+            apiSource = credentials.activeSource,
+            apiId = credentials.activeApiId,
         )
     }.catch { emit(SettingsUiState()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -108,6 +113,7 @@ data class SettingsLinks(
     val review: (() -> Unit)? = null,
     val stats: (() -> Unit)? = null,
     val sync: (() -> Unit)? = null,
+    val telegramApi: (() -> Unit)? = null,
 )
 
 /** Grouped settings; content width is capped on large screens and TV for readability. */
@@ -141,6 +147,15 @@ fun SettingsScreen(
                 item {
                     ListRow(stringResource(R.string.settings_review), supporting = pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
                         leading = { Icon(Icons.Filled.Warning, contentDescription = null) }, onClick = open)
+                }
+            }
+            more.telegramApi?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_api), supporting = when (state.apiSource) {
+                        dev.yourstream.telegram.api.CredentialsSource.APP -> stringResource(R.string.settings_api_app, state.apiId ?: 0)
+                        dev.yourstream.telegram.api.CredentialsSource.BUILD -> stringResource(R.string.settings_api_built_in, state.apiId ?: 0)
+                        dev.yourstream.telegram.api.CredentialsSource.NONE -> stringResource(R.string.settings_api_none)
+                    }, leading = { Icon(Icons.Filled.Build, contentDescription = null) }, onClick = open)
                 }
             }
             item { Group(R.string.settings_group_playback) }

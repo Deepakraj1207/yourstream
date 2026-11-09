@@ -237,4 +237,11 @@ class ScreenshotTest {
             ), {}, {},
         )
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneTelegramApi() = shot("phone-telegram-api", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.TelegramApiScreen(
+            dev.yourstream.ui.screens.settings.TelegramApiUiState(dev.yourstream.telegram.api.CredentialsSource.BUILD, 12345678, hasBuiltIn = true), {}, {},
+        )
+    }
 }
