@@ -1,5 +1,7 @@
 package dev.yourstream.media.filename
 
+import dev.yourstream.media.filename.internal.RandomNames
+
 import dev.yourstream.media.filename.internal.Analysis
 import dev.yourstream.media.filename.internal.Analyzer
 import dev.yourstream.media.filename.internal.TitleNormalizer
@@ -25,7 +27,8 @@ import dev.yourstream.media.filename.internal.Vocabulary
 public object MediaFilenameParser {
 
     /** Bump when results change, so stored metadata can be recomputed. */
-    public const val VERSION: Int = 2
+    /** 3: random file names (hashes, UUIDs, Telegram ids) count as generic; their tokens never become titles. */
+    public const val VERSION: Int = 3
 
     private val GENERIC_NAME = Regex(
         "^(video|vid|file|movie|document|doc|telegram|tg|img|mov|clip|media|untitled|new|downloaded|download|v|output|record(ing)?|screen\\s?recording)?" +
@@ -47,7 +50,7 @@ public object MediaFilenameParser {
     }
 
     private fun parseInternal(fileName: String, hints: ParseHints): FilenameMetadata {
-        val fromName = Analyzer.analyze(fileName, isFileName = true, FieldSource.FILE_NAME)
+        val fromName = stripRandomTokens(Analyzer.analyze(fileName, isFileName = true, FieldSource.FILE_NAME))
         val warnings = mutableListOf<String>()
         var result = fromName
 
@@ -75,7 +78,18 @@ public object MediaFilenameParser {
         val title = a.title?.value ?: return true
         if (GENERIC_NAME.matches(title)) return true
         if (title.count(Char::isLetter) < 2) return true
+        if (RandomNames.isJunkTitle(title)) return true
         return false
+    }
+
+    /** "Vikram a7F3k9Qz2LmP8xY1" → "Vikram": random tokens are dropped when real words remain. */
+    private fun stripRandomTokens(a: Analysis): Analysis {
+        val t = a.title ?: return a
+        val words = t.value.split(' ')
+        if (words.none(RandomNames::isRandomToken)) return a
+        val kept = words.filterNot(RandomNames::isRandomToken)
+        if (kept.joinToString("").count(Char::isLetter) < 2) return a // all junk: isGeneric handles it
+        return a.copy(title = t.copy(value = kept.joinToString(" ")))
     }
 
     private fun captionLine(caption: String?): String? = caption
