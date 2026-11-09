@@ -56,12 +56,24 @@ android {
     namespace = "dev.yourstream"
     compileSdk = 37
 
+    // Optional release key (CI secrets): with it every release installs as an update of the last.
+    val releaseStore = System.getenv("RELEASE_STORE_FILE")?.let(::file)?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseStore != null) create("release") {
+            storeFile = releaseStore
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         applicationId = "dev.yourstream"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-phase1"
+        // CI passes the tag ("v0.2.0" -> 0.2.0) and the run number; local builds use these defaults.
+        versionCode = (System.getenv("VERSION_CODE") ?: "2").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "0.2.0"
 
         buildConfigField("int", "TELEGRAM_API_ID", telegramApiId)
         buildConfigField("String", "TELEGRAM_API_HASH", "\"$telegramApiHash\"")
@@ -86,9 +98,9 @@ android {
         release {
             isMinifyEnabled = false
             // Not debuggable: Compose runs far faster than in debug, and the libraries' baseline
-            // profiles are installed. Signed with the debug key so it can be sideloaded (and
-            // installs over a debug build) until a release keystore is set up.
-            signingConfig = signingConfigs.getByName("debug")
+            // profiles are installed. Signed with the release key when one is configured (CI),
+            // else with the debug key so it can still be sideloaded.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
