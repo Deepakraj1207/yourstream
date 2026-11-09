@@ -1,6 +1,5 @@
 package dev.yourstream.playback.torrent
 
-import android.os.SystemClock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +9,9 @@ import org.libtorrent4j.TorrentHandle
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+
+/** Milliseconds on a monotonic clock (timeouts and settle times; not wall time). */
+internal fun monotonicMs(): Long = System.nanoTime() / 1_000_000
 
 /** Where a torrent stream is. */
 enum class TorrentPhase {
@@ -76,8 +78,8 @@ class TorrentStream internal constructor(
     @Volatile internal var closed = false
     /** Where the player last read: the download window follows it. */
     @Volatile internal var readPosition = 0L
-    /** Last time any payload arrived (elapsed realtime). */
-    @Volatile internal var lastActivity = SystemClock.elapsedRealtime()
+    /** Last time any payload arrived ([monotonicMs]). */
+    @Volatile internal var lastActivity = monotonicMs()
     internal var jobs: Job? = null
 
     /** Pieces a reader is blocked on: always fetched first. */
@@ -89,7 +91,7 @@ class TorrentStream internal constructor(
     val stats: StateFlow<TorrentStats> = mutableStats.asStateFlow()
 
     internal fun onPieceFinished(piece: Int) {
-        val now = SystemClock.elapsedRealtime()
+        val now = monotonicMs()
         finishedAt[piece] = now
         lastActivity = now
     }
@@ -99,7 +101,7 @@ class TorrentStream internal constructor(
     override fun awaitReadable(position: Long): Long {
         readPosition = position
         val piece = map.pieceAt(position)
-        val started = SystemClock.elapsedRealtime()
+        val started = monotonicMs()
         var asked = false
         while (true) {
             if (closed) throw TorrentException("The torrent stream was closed", retryable = false)
@@ -114,7 +116,7 @@ class TorrentStream internal constructor(
                 urgent(piece)
             }
             Thread.sleep(POLL_MS)
-            val now = SystemClock.elapsedRealtime()
+            val now = monotonicMs()
             if (now - started > noDataTimeoutMs && now - lastActivity > noDataTimeoutMs) {
                 waiting.remove(piece)
                 throw TorrentException("No peer sent any data for ${noDataTimeoutMs / 1000} seconds.")
@@ -128,7 +130,7 @@ class TorrentStream internal constructor(
      */
     private fun settle(piece: Int) {
         val at = finishedAt[piece] ?: return
-        val wait = SETTLE_MS - (SystemClock.elapsedRealtime() - at)
+        val wait = SETTLE_MS - (monotonicMs() - at)
         if (wait > 0) Thread.sleep(wait)
     }
 

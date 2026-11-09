@@ -43,7 +43,9 @@ plus `behaviorHints.filename` / `videoSize`.
 Built on libtorrent 2.0 (libtorrent4j, MIT). Can be switched off in Settings → Streaming.
 
 1. **Session**: started with the first torrent stream, stopped 2 minutes after the last one;
-   DHT, LSD, UPnP on; seeds are not disconnected when every wanted piece is present.
+   DHT, LSD, UPnP on; seeds are not disconnected when every wanted piece is present. Storage
+   uses plain file I/O, not memory-mapped files: no address-space limit on 32-bit devices, a
+   full disk is an error rather than a SIGBUS, and libtorrent installs no signal handlers.
 2. **Magnet**: the info hash, the add-on's trackers, then a short list of public trackers.
 3. **File list**: up to 90 s for peers to send it. The file played is the add-on's `fileIdx`,
    else its file name, else the largest video (never an archive).
@@ -59,7 +61,14 @@ Built on libtorrent 2.0 (libtorrent4j, MIT). Can be switched off in Settings →
    (leftovers from a crash are deleted when the next session starts). At least 256 MB free and
    twice the read-ahead are required before a stream starts.
 
-The player shows peers, download speed and how much of the file is on the device. While a
+The played file gets a normal file priority (pieces of priority-0 files would go to a hidden
+part file); which of its pieces download is steered piece by piece.
+
+The player shows peers, download speed and how much of the file is on the device.
+
+**Tested end to end** (`TorrentEngineLocalTest`): a libtorrent session on localhost seeds a 48 MB
+file; the engine gets the file list from it, reads the file's end, then the whole file through
+`TorrentDataSource` past the first read-ahead window, byte for byte, and cleans up (about 3 s). While a
 torrent plays, the device downloads from and uploads to other peers, who can see its IP address;
 the setting's description says so.
 

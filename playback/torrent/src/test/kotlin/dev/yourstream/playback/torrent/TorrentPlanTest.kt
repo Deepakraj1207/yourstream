@@ -24,6 +24,8 @@ class TorrentPlanTest {
         assertEquals(trackers.distinct(), trackers, "no tracker twice")
         assertTrue(trackers.containsAll(TorrentPlan.PUBLIC_TRACKERS))
         assertFailsWith<IllegalArgumentException> { TorrentPlan.magnet(TorrentRequest("not-a-hash")) }
+        val withPeer = TorrentPlan.magnet(TorrentRequest(hash, sources = listOf("peer:192.168.1.5:6881", "peer:[::1]:7000", "peer:bad value:1")))
+        assertTrue(withPeer.endsWith("&x.pe=192.168.1.5:6881&x.pe=[::1]:7000"), "peers unescaped, invalid ones dropped: $withPeer")
     }
 
     @Test

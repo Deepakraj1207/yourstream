@@ -1,7 +1,6 @@
 package dev.yourstream.playback.torrent
 
 import android.content.Context
-import android.os.SystemClock
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,8 +42,12 @@ import javax.inject.Singleton
  * - Data lives in the app's cache folder and is deleted when the stream closes.
  */
 @Singleton
-class TorrentEngine @Inject constructor(@ApplicationContext context: Context) {
-    private val root = File(context.cacheDir, "torrents")
+class TorrentEngine(
+    /** Where torrent data lives while it plays (the app's cache folder). */
+    private val root: File,
+) {
+    @Inject constructor(@ApplicationContext context: Context) : this(File(context.cacheDir, "torrents"))
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private val streams = ConcurrentHashMap<String, TorrentStream>()
@@ -87,6 +90,10 @@ class TorrentEngine @Inject constructor(@ApplicationContext context: Context) {
                 handle.resume()
                 awaitMetadata(handle, onStats)
                 val stream = prepare(request, handle, dir)
+                // The played file must not stay at priority 0: libtorrent keeps the pieces of such
+                // files in a hidden part file, not in the file itself. Which of its pieces download
+                // is steered piece by piece (steer).
+                handle.filePriority(stream.fileIndex, Priority.DEFAULT)
                 streams[request.key] = stream
                 stream.jobs = scope.launch {
                     launch { steer(stream) }
@@ -125,12 +132,12 @@ class TorrentEngine @Inject constructor(@ApplicationContext context: Context) {
     }
 
     private suspend fun awaitMetadata(handle: TorrentHandle, onStats: (TorrentStats) -> Unit) {
-        val start = SystemClock.elapsedRealtime()
+        val start = monotonicMs()
         while (true) {
             val st = handle.status()
             if (st.hasMetadata()) return
             onStats(TorrentStats(TorrentPhase.METADATA, peers = st.numPeers(), seeds = st.numSeeds(), downloadBps = st.downloadPayloadRate().toLong()))
-            if (SystemClock.elapsedRealtime() - start > METADATA_TIMEOUT_MS) {
+            if (monotonicMs() - start > METADATA_TIMEOUT_MS) {
                 throw TorrentException(
                     if (st.numPeers() == 0) "No one is sharing this torrent right now. Try another stream."
                     else "Peers did not send this torrent's file list. Try another stream.",
@@ -205,7 +212,7 @@ class TorrentEngine @Inject constructor(@ApplicationContext context: Context) {
                 val done = st.totalPayloadDownload()
                 if (done != lastDone) {
                     lastDone = done
-                    s.lastActivity = SystemClock.elapsedRealtime()
+                    s.lastActivity = monotonicMs()
                 }
                 val pieces = st.pieces()
                 val have = { p: Int -> p < pieces.size() && pieces.getBit(p) }
@@ -255,9 +262,22 @@ class TorrentEngine @Inject constructor(@ApplicationContext context: Context) {
         settings.setInteger(settings_pack.int_types.connection_speed.swigValue(), 60)
         val manager = SessionManager(false)
         manager.addListener(pieceAlerts)
-        manager.start(SessionParams(settings))
+        // Plain file reads and writes, not memory-mapped files: no address-space limits on 32-bit
+        // devices, a full disk is an error instead of a SIGBUS, and libtorrent installs no
+        // SIGSEGV/SIGBUS handlers of its own (its mmap storage does).
+        manager.start(SessionParams(settings).apply { setPosixDiskIO() })
         session = manager
         return manager
+    }
+
+    /** Stops every stream and the session now, and deletes all torrent data. */
+    suspend fun shutdown() = lock.withLock {
+        idleStop?.cancel()
+        streams.values.toList().forEach { closeNow(it) }
+        idleStop?.cancel()
+        session?.let { runCatching { it.stop() } }
+        session = null
+        root.deleteRecursively()
     }
 
     /** Stops the session when nothing has played for a while (DHT and trackers stay quiet). */

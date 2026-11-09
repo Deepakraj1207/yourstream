@@ -8,7 +8,7 @@ data class TorrentRequest(
     val infoHash: String,
     /** Which file of the torrent (null: the add-on's file name, else the largest video). */
     val fileIdx: Int? = null,
-    /** The add-on's peer sources: "tracker:udp://…", "dht:…". */
+    /** The add-on's peer sources: "tracker:udp://…", "dht:…" (and "peer:host:port" for a known peer). */
     val sources: List<String> = emptyList(),
     val fileName: String? = null,
 ) {
@@ -52,7 +52,15 @@ object TorrentPlan {
         }
     }.filter { it.isNotEmpty() }.distinct()
 
-    /** The magnet link for [request]: its hash, the add-on's trackers first, then [PUBLIC_TRACKERS]. */
+    /** Known peers from sources ("peer:192.168.1.5:6881", e.g. a seed on the local network). */
+    fun peers(sources: List<String>): List<String> = sources.mapNotNull { s ->
+        s.takeIf { it.startsWith("peer:", ignoreCase = true) }?.substring(5)?.trim()?.takeIf { PEER.matches(it) }
+    }.distinct()
+
+    /** host:port or [v6]:port; written into the magnet as is (libtorrent does not unescape x.pe). */
+    private val PEER = Regex("""(\[[0-9a-fA-F:.]+]|[0-9A-Za-z.-]+):\d{1,5}""")
+
+    /** The magnet link for [request]: its hash, the add-on's trackers first, then [PUBLIC_TRACKERS], and known peers. */
     fun magnet(request: TorrentRequest): String {
         require(isInfoHash(request.infoHash)) { "not an info hash: ${request.infoHash}" }
         val trackers = (trackers(request.sources) + PUBLIC_TRACKERS).distinct()
@@ -60,6 +68,7 @@ object TorrentPlan {
             append("magnet:?xt=urn:btih:").append(request.key)
             request.fileName?.let { append("&dn=").append(enc(it)) }
             trackers.forEach { append("&tr=").append(enc(it)) }
+            peers(request.sources).forEach { append("&x.pe=").append(it) }
         }
     }
 

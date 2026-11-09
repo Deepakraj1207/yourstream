@@ -30,6 +30,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // libtorrent's Linux build: the engine streams from a local seed in a JVM test.
+    testImplementation(libs.libtorrent4j.linux)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
