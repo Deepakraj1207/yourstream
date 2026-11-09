@@ -81,6 +81,11 @@ fun SearchScreen(state: SearchUiState, onAction: (SearchAction) -> Unit, onOpen:
                 Text(state.interpretation.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = d.gutter, vertical = 4.dp).testTag("interpretation"))
             }
+            // Titles from the add-ons: their page lists the streams.
+            if (state.addons.isNotEmpty()) {
+                dev.yourstream.ui.core.MediaRow(stringResource(R.string.search_from_addons), state.addons, dev.yourstream.ui.screens.tileCard(), { onOpen(it.open) },
+                    modifier = Modifier.testTag("addon-results"))
+            }
             val results = state.results
             if (results == null) {
                 Idle(onAction)

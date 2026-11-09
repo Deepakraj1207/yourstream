@@ -141,7 +141,11 @@ object Presentation {
      */
     fun tile(item: dev.yourstream.catalog.api.CatalogItem, presence: dev.yourstream.catalog.api.LibraryPresence?): Tile = Tile(
         MediaCardModel("cat:${item.ref.provider.value}:${item.ref.id}", item.title, item.year?.toString(), posterUrl = item.posterUrl),
-        presence?.let { OpenTarget.Details(it.itemId) } ?: OpenTarget.Search(item.title),
+        presence?.let { OpenTarget.Details(it.itemId) } ?: OpenTarget.CatalogTitle(
+            dev.yourstream.ui.screens.navigation.CatalogTitleRoute(
+                item.ref.provider.value, item.ref.type.name, item.ref.id, item.title, item.year, item.posterUrl, item.ref.imdbId,
+            ),
+        ),
         itemId = presence?.itemId,
         caption = if (presence != null) TileCaption.InLibrary else null,
     )

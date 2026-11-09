@@ -79,7 +79,6 @@ class HomeViewModel @Inject constructor(
         source().map { p -> p.map(Presentation::tile) }.cachedIn(viewModelScope)
 
     val recentlyAdded: Flow<PagingData<Tile>> = paged { media.recentlyAdded(pageSize = 20) }
-    val movies: Flow<PagingData<Tile>> = paged { movies.movies(LibraryQuery(sort = LibrarySort.RECENTLY_ADDED, watch = WatchFilter.UNWATCHED), 20) }
     val series: Flow<PagingData<Tile>> = paged { series.series(LibraryQuery(sort = LibrarySort.RECENTLY_WATCHED), 20) }
     val favorites: Flow<PagingData<Tile>> = paged { media.favorites(20) }
 

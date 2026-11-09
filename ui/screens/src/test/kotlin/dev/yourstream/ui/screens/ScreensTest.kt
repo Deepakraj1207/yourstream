@@ -85,7 +85,7 @@ class ScreensTest {
     private fun rows(vararg recent: Tile): HomeRows {
         val r = kotlinx.coroutines.flow.flowOf(PagingData.from(recent.toList())).collectAsLazyPagingItems()
         val none = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>())).collectAsLazyPagingItems()
-        return HomeRows(r, none, none, none)
+        return HomeRows(r, none, none)
     }
 
     @Test

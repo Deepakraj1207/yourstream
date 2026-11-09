@@ -49,10 +49,12 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
             val entry by nav.currentBackStackEntryAsState()
             val destination = entry?.destination
             val current = TopLevel.entries.firstOrNull { t -> destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true }
-            val fullScreen = destination?.hasRoute(PlayerRoute::class) == true
+            val fullScreen = destination?.hasRoute(PlayerRoute::class) == true || destination?.hasRoute(StreamPlayerRoute::class) == true
             val graph = remember(nav) { movableContentOf { m: Modifier -> AppNavHost(nav, navigator, appVersion, m) } }
             if (fullScreen) graph(Modifier.fillMaxSize())
             else AdaptiveShell(layout, current, navigator::top) { graph(it) }
+            // A newer version on the Releases page: offered once per session (not over the player).
+            if (!fullScreen && !androidx.compose.ui.platform.LocalInspectionMode.current) dev.yourstream.ui.screens.update.UpdatePrompt()
         }
     }
 }

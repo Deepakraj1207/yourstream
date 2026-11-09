@@ -6,7 +6,10 @@ import dev.yourstream.catalog.api.CatalogItem
 import dev.yourstream.catalog.api.CatalogItemRef
 import dev.yourstream.catalog.api.CatalogMetadata
 import dev.yourstream.catalog.api.CatalogPage
+import dev.yourstream.catalog.api.AddonStream
 import dev.yourstream.catalog.api.CatalogProvider
+import dev.yourstream.catalog.api.CatalogVideo
+import dev.yourstream.catalog.api.StreamProvider
 import dev.yourstream.catalog.api.CatalogProviderInfo
 import dev.yourstream.catalog.api.CatalogType
 import dev.yourstream.core.common.AppError
@@ -33,7 +36,7 @@ class StremioCatalogProvider(
     val definition: StremioAddonDefinition,
     clock: Clock = Clock.System,
     requestsPerSecond: Int = 4,
-) : CatalogProvider {
+) : CatalogProvider, StreamProvider {
 
     override val id = definition.id
     override val displayName = definition.displayName
@@ -161,6 +164,33 @@ class StremioCatalogProvider(
         }
     }
 
+    // ------------------------------------------------------------------ streams
+
+    override suspend fun hasStreams(): Boolean = (knownInfo() as? AppResult.Ok)?.value?.resources?.contains("stream") == true
+
+    override suspend fun streams(type: CatalogType, id: String): AppResult<List<AddonStream>> {
+        if (!hasStreams()) return AppResult.Err(AppError.InvalidState("$displayName has no streams"))
+        return when (val r = getWithFailover("/stream/${typePath(type)}/${enc(id)}.json")) {
+            is AppResult.Err -> r
+            is AppResult.Ok -> AppResult.Ok((r.value as? JsonObject)?.array("streams").orEmpty().mapNotNull { (it as? JsonObject)?.let(::toStream) })
+        }
+    }
+
+    private fun toStream(s: JsonObject): AddonStream? {
+        val hints = s.obj("behaviorHints")
+        val headers = hints?.obj("proxyHeaders")?.obj("request")?.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.content?.let { k to it } }?.toMap().orEmpty()
+        val url = s.str("url")
+        val external = s.str("externalUrl") ?: s.str("ytId")?.let { "https://www.youtube.com/watch?v=$it" }
+        val hash = s.str("infoHash")
+        if (url == null && external == null && hash == null) return null
+        return AddonStream(
+            addon = displayName,
+            name = s.str("name") ?: displayName,
+            description = s.str("description") ?: s.str("title"),
+            url = url, externalUrl = external, infoHash = hash, headers = headers,
+        )
+    }
+
     // ------------------------------------------------------------------ plumbing
 
     /** Primary base first; on network/server trouble the other mirrors, remembering the one that worked. */
@@ -217,6 +247,18 @@ class StremioCatalogProvider(
             rating = m.str("imdbRating")?.toDoubleOrNull(),
             releaseDate = m.str("released")?.take(10),
             originalLanguage = m.str("language"),
+            videos = m.array("videos").mapNotNull { it as? JsonObject }.mapNotNull { v ->
+                val vid = v.str("id") ?: return@mapNotNull null
+                CatalogVideo(
+                    id = vid,
+                    season = v.str("season")?.toIntOrNull(),
+                    episode = (v.str("episode") ?: v.str("number"))?.toIntOrNull(),
+                    title = v.str("name") ?: v.str("title"),
+                    released = v.str("released")?.take(10),
+                    thumbnail = v.str("thumbnail"),
+                    overview = v.str("overview") ?: v.str("description"),
+                )
+            }.sortedWith(compareBy({ it.season ?: 0 }, { it.episode ?: 0 })),
         )
     }
 

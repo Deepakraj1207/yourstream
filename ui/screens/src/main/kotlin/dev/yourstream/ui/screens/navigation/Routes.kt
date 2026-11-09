@@ -46,6 +46,13 @@ import kotlinx.serialization.Serializable
 /** Choose the right metadata for one title (from Details). */
 @Serializable data class FixMatchRoute(val itemId: Long) : Route
 @Serializable data object StatsRoute : Route
+/** A title from an add-on catalog: details, episodes and the add-ons' streams. */
+@Serializable data class CatalogTitleRoute(
+    val provider: String, val type: String, val id: String, val title: String,
+    val year: Int? = null, val poster: String? = null, val imdb: String? = null,
+) : Route
+/** Plays an add-on stream (HTTP file, HLS or DASH). [headers]: JSON object of request headers. */
+@Serializable data class StreamPlayerRoute(val url: String, val title: String, val subtitle: String? = null, val headers: String = "{}") : Route
 /** Catalog add-ons: built-in ones and those added by link. */
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
@@ -72,6 +79,10 @@ sealed interface OpenTarget {
     data class Details(val itemId: Long) : OpenTarget
     data class Episodes(val seriesId: Long, val seasonId: Long? = null) : OpenTarget
     data class Play(val target: PlaybackTarget, val mediaId: Long? = null) : OpenTarget
-    /** Look for a title in the library (catalog titles that are not in it). */
+    /** Look for a title in the library. */
     data class Search(val query: String) : OpenTarget
+    /** An add-on catalog title (not in the library). */
+    data class CatalogTitle(val route: CatalogTitleRoute) : OpenTarget
+    /** An add-on stream. */
+    data class Stream(val route: StreamPlayerRoute) : OpenTarget
 }

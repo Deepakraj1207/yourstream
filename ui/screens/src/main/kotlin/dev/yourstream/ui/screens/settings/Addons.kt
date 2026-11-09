@@ -45,7 +45,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.yourstream.catalog.core.AvailabilityState
 import dev.yourstream.catalog.sync.CatalogAddon
 import dev.yourstream.catalog.sync.CatalogAddons
 import dev.yourstream.core.common.AppResult
@@ -62,7 +61,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** An add-on row: what it is, and what its manifest said (null while checking). */
-data class AddonRow(val addon: CatalogAddon, val catalogs: Int? = null, val reachable: Boolean? = null)
+data class AddonRow(val addon: CatalogAddon, val catalogs: Int? = null, val reachable: Boolean? = null, val streams: Boolean = false)
 
 data class AddonsUiState(
     val addons: List<AddonRow> = emptyList(),
@@ -81,11 +80,11 @@ sealed interface AddonsAction {
 
 @HiltViewModel
 class AddonsViewModel @Inject constructor(private val store: CatalogAddons) : ViewModel() {
-    private val status = MutableStateFlow<Map<String, Pair<Int, Boolean>>>(emptyMap())
+    private val status = MutableStateFlow<Map<String, AddonRow>>(emptyMap())
     private val ui = MutableStateFlow(AddonsUiState())
 
     val state: StateFlow<AddonsUiState> = combine(store.addons, status, ui) { list, st, u ->
-        u.copy(addons = list.map { a -> st[a.id]?.let { (n, ok) -> AddonRow(a, n, ok) } ?: AddonRow(a) })
+        u.copy(addons = list.map { a -> st[a.id]?.copy(addon = a) ?: AddonRow(a) })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AddonsUiState())
 
     init { refreshStatus() }
@@ -105,11 +104,13 @@ class AddonsViewModel @Inject constructor(private val store: CatalogAddons) : Vi
         }
     }
 
-    /** Asks each enabled add-on for its manifest (cached by the catalog manager). */
+    /** Asks each enabled add-on what it offers (its manifest). */
     private fun refreshStatus() = viewModelScope.launch {
-        val found = runCatching { store.manager().refreshAvailability() }.getOrDefault(emptyList())
-        status.value = status.value + found.associate { p ->
-            p.provider.value to (p.catalogCount to (p.state == AvailabilityState.AVAILABLE || p.state == AvailabilityState.STALE))
+        store.addons.value.filter { it.enabled && status.value[it.id]?.reachable != true }.forEach { a ->
+            launch {
+                val info = runCatching { store.describe(a.id) }.getOrNull()
+                status.value = status.value + (a.id to AddonRow(a, info?.catalogs?.count { !it.requiresExtra }, info != null, info?.resources?.contains("stream") == true))
+            }
         }
     }
 }
@@ -177,7 +178,10 @@ private fun AddonCard(row: AddonRow, onAction: (AddonsAction) -> Unit) {
                 val health = when {
                     !a.enabled -> null
                     row.reachable == false -> stringResource(R.string.addons_unavailable)
-                    row.catalogs != null -> pluralStringResource(R.plurals.addons_catalogs, row.catalogs, row.catalogs)
+                    row.catalogs != null -> listOfNotNull(
+                        row.catalogs.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.addons_catalogs, it, it) },
+                        if (row.streams) stringResource(R.string.addons_streams) else null,
+                    ).joinToString(" · ").ifEmpty { stringResource(R.string.addons_details_only) }
                     else -> stringResource(R.string.addons_checking)
                 }
                 Text(listOfNotNull(origin, health).joinToString(" · "), style = MaterialTheme.typography.bodySmall,

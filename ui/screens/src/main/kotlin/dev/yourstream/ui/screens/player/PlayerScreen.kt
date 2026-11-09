@@ -130,16 +130,19 @@ fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: Playe
     // Phones and tablets open the player in landscape; the rotate button switches to portrait and back.
     val tv = LocalWindowLayout.current == WindowLayout.TV
     var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+    var fit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(VideoFit.FIT) }
     if (!tv) Orientation(landscape)
+    RestoreBrightnessOnExit()
     PlayerScreen(
         state, vm::onAction, onBack, onPlay, vm.episodeItems.collectAsLazyPagingItems(),
         onRotate = if (tv) null else ({ landscape = !landscape }),
-    ) { PlayerSurface(vm.player, state.isPlaying) }
+        fit = fit, onFit = { fit = fit.next() },
+    ) { PlayerSurface(vm.player, state.isPlaying, fit) }
 }
 
 /** Locks the screen to landscape (either way up) or portrait while the player is shown; back to normal after. */
 @Composable
-private fun Orientation(landscape: Boolean) {
+internal fun Orientation(landscape: Boolean) {
     val activity = LocalActivity.current ?: return
     DisposableEffect(activity, landscape) {
         activity.requestedOrientation = if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -150,7 +153,7 @@ private fun Orientation(landscape: Boolean) {
 
 /** Full screen video: system bars hidden while the player is shown (a swipe brings them back briefly). */
 @Composable
-private fun ImmersiveMode() {
+internal fun ImmersiveMode() {
     val activity = LocalActivity.current ?: return
     DisposableEffect(activity) {
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
@@ -161,10 +164,10 @@ private fun ImmersiveMode() {
 }
 
 @Composable
-private fun PlayerSurface(player: Player, playing: Boolean) {
+internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = VideoFit.FIT) {
     AndroidView(
         factory = { ctx -> PlayerView(ctx).apply { useController = false; this.player = player } },
-        update = { it.keepScreenOn = playing },
+        update = { it.keepScreenOn = playing; it.resizeMode = fit.resizeMode },
         modifier = Modifier.fillMaxSize(),
     )
 }
@@ -196,6 +199,9 @@ fun PlayerScreen(
     episodes: LazyPagingItems<EpisodeItem>? = null,
     /** Switches landscape/portrait; null hides the button (TV). */
     onRotate: (() -> Unit)? = null,
+    fit: VideoFit = VideoFit.FIT,
+    /** Cycles [VideoFit]; null hides the button. */
+    onFit: (() -> Unit)? = null,
     surface: @Composable () -> Unit,
 ) {
     val layout = LocalWindowLayout.current
@@ -207,6 +213,11 @@ fun PlayerScreen(
     var upNextDismissed by remember(state.next) { mutableStateOf(false) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    var hint by remember { mutableStateOf<PlayerHint?>(null) }
+    var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
+    val fitLabel = fit.label()
+    val fitChanged = remember { mutableStateOf(false) }
+    LaunchedEffect(fit) { if (fitChanged.value) hint = PlayerHint(AppIcons.AspectRatio, fitLabel) else fitChanged.value = true }
 
     fun poke() { controls = true; interactions++ }
     fun seek(deltaMs: Long) {
@@ -219,7 +230,7 @@ fun PlayerScreen(
     }
 
     val a11y = LocalAccessibilityManager.current
-    val hideAfter = remember(a11y) { a11y?.calculateRecommendedTimeoutMillis(4_000, containsIcons = true, containsText = true, containsControls = true) ?: 4_000 }
+    val hideAfter = remember(a11y) { a11y?.calculateRecommendedTimeoutMillis(3_000, containsIcons = true, containsText = true, containsControls = true) ?: 3_000 }
     val autoHide = state.isPlaying && panel == null && state.error == null && !state.ended
     LaunchedEffect(controls, interactions, autoHide) {
         if (controls && autoHide) { delay(hideAfter); controls = false }
@@ -272,21 +283,35 @@ fun PlayerScreen(
     ) {
         surface()
         // Gesture layer above the video (the video view itself does not take touches).
+        val context = androidx.activity.compose.LocalActivity.current ?: androidx.compose.ui.platform.LocalContext.current
+        val brightness = stringResource(R.string.player_brightness)
+        val volume = stringResource(R.string.player_volume)
+        val holdLabel = stringResource(R.string.player_speed_hold)
         Box(
-            Modifier.fillMaxSize().testTag("player-gestures").pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { if (controls && autoHide) controls = false else poke() },
-                    onDoubleTap = { o -> seek(if (o.x > size.width / 2) SEEK_STEP_MS else -SEEK_STEP_MS) },
-                )
-            },
+            Modifier.fillMaxSize().testTag("player-gestures").playerGestures(
+                context,
+                onTap = { if (controls) controls = false else poke() },
+                onSeek = { forward -> seek(if (forward) SEEK_STEP_MS else -SEEK_STEP_MS) },
+                onHoldSpeed = { holding ->
+                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(2f)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
+                    else { onAction(PlayerAction.SetSpeed(speedBeforeHold ?: 1f)); speedBeforeHold = null; hint = null }
+                },
+                onHint = { hint = it },
+                brightnessLabel = brightness, volumeLabel = volume,
+            ),
         )
 
         val showSpinner = state.loading && state.error == null
         if (showSpinner && !(controls && !tv)) Buffering(Modifier.align(Alignment.Center))
 
-        AnimatedVisibility(controls && state.error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate)
+        AnimatedVisibility(
+            controls && state.error == null,
+            enter = fadeIn(androidx.compose.animation.core.tween(150)), exit = fadeOut(androidx.compose.animation.core.tween(150)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate, onFit)
         }
+        PlayerHintBubble(hint, onDone = { if (speedBeforeHold == null) hint = null }, Modifier.align(Alignment.Center))
 
         state.recovery?.let { r ->
             Surface(
@@ -371,6 +396,7 @@ private fun Controls(
     poke: () -> Unit,
     seek: (Long) -> Unit,
     onRotate: (() -> Unit)? = null,
+    onFit: (() -> Unit)? = null,
 ) {
     val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
     Box(Modifier.fillMaxSize()) {
@@ -452,6 +478,7 @@ private fun Controls(
                 if (state.episodes != null) BarIcon(AppIcons.Episodes, stringResource(R.string.player_episodes), "episodes") { openPanel(PlayerPanel.EPISODES) }
                 if (state.audio.size > 1) BarIcon(AppIcons.Audio, stringResource(R.string.player_audio), "audio") { openPanel(PlayerPanel.AUDIO) }
                 if (state.subtitles.isNotEmpty()) BarIcon(AppIcons.Subtitles, stringResource(R.string.player_subtitles), "subtitles") { openPanel(PlayerPanel.SUBTITLES) }
+                onFit?.let { f -> BarIcon(AppIcons.AspectRatio, stringResource(R.string.player_fit), "aspect") { f(); poke() } }
                 BarIcon(AppIcons.Speed, stringResource(R.string.player_speed), "speed") { openPanel(PlayerPanel.SPEED) }
                 // On phones the quality badge in the top bar opens the info panel.
                 if (!compact || state.quality?.badge == null) BarIcon(Icons.Filled.Info, stringResource(R.string.player_quality), "info") { openPanel(PlayerPanel.INFO) }

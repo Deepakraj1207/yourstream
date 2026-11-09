@@ -99,7 +99,19 @@ fun SettingsRoute(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
-    SettingsScreen(state, appVersion, onAccount, onSources, onLanguages, more)
+    val updates: dev.yourstream.ui.screens.update.UpdateViewModel = hiltViewModel()
+    val update by updates.state.collectAsStateWithLifecycle()
+    SettingsScreen(
+        state, appVersion, onAccount, onSources, onLanguages, more,
+        updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
+        onUpdate = {
+            when (update) {
+                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.Ready -> updates.install()
+                is dev.yourstream.ui.screens.update.UpdateState.Downloading, dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
+                else -> updates.check()
+            }
+        },
+    )
 }
 
 /** The advanced screens reachable from Settings. */
@@ -116,6 +128,9 @@ data class SettingsLinks(
 fun SettingsScreen(
     state: SettingsUiState, appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit,
     more: SettingsLinks = SettingsLinks(),
+    /** "Version 0.4.0 · Up to date", "Update to 0.5.0"; null shows the plain version. */
+    updateLine: String? = null,
+    onUpdate: (() -> Unit)? = null,
 ) {
     ScreenScaffold(stringResource(R.string.nav_settings)) {
         LazyColumn(
@@ -172,6 +187,12 @@ fun SettingsScreen(
             item {
                 ListRow(stringResource(R.string.app_name), supporting = appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(R.string.settings_about_line),
                     leading = { Icon(Icons.Filled.Info, contentDescription = null) })
+            }
+            onUpdate?.let { click ->
+                item {
+                    ListRow(stringResource(R.string.update_row), supporting = updateLine,
+                        leading = { Icon(dev.yourstream.ui.core.AppIcons.Update, contentDescription = null) }, onClick = click, modifier = Modifier.testTag("update-row"))
+                }
             }
         }
     }

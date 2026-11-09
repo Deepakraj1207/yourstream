@@ -4,6 +4,9 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -46,14 +48,22 @@ import dev.yourstream.ui.screens.settings.LanguagesRoute as LanguagesScreenRoute
 import dev.yourstream.ui.screens.settings.SettingsRoute as SettingsScreenRoute
 import dev.yourstream.ui.screens.settings.SourcesRoute as SourcesScreenRoute
 
-private const val NAV_SLIDE_MS = 280
-private const val NAV_FADE_MS = 150
+// Material motion: "fade through" between tabs, "shared axis X" for opening/closing pages.
+// The outgoing page fades out quickly; the incoming one fades in after it, so the two never
+// visibly overlap, and only a short distance is travelled (no full-screen slide to stutter).
+private const val MOTION_MS = 300
+private const val OUT_MS = 90
+private const val PLAYER_FADE_MS = 200
 
 private fun NavDestination.isTopLevel() = TopLevel.entries.any { hasRoute(it.route::class) }
-private fun NavDestination.isPlayer() = hasRoute(PlayerRoute::class)
+private fun NavDestination.isPlayer() = hasRoute(PlayerRoute::class) || hasRoute(StreamPlayerRoute::class)
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabs() = initialState.destination.isTopLevel() && targetState.destination.isTopLevel()
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.player() = initialState.destination.isPlayer() || targetState.destination.isPlayer()
-private val slide = tween<IntOffset>(NAV_SLIDE_MS, easing = FastOutSlowInEasing)
+
+private val motion = FastOutSlowInEasing
+private fun fadeInAfterOut() = fadeIn(tween(MOTION_MS - OUT_MS, delayMillis = OUT_MS, easing = LinearOutSlowInEasing))
+private fun quickFadeOut() = fadeOut(tween(OUT_MS, easing = FastOutLinearInEasing))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.axisOffset(full: Int) = (full * 0.08f).toInt()
 
 /** Every page draws its own opaque background, so pages never show through each other mid-transition. */
 private inline fun <reified T : Any> NavGraphBuilder.page(noinline content: @Composable (NavBackStackEntry) -> Unit) =
@@ -61,9 +71,8 @@ private inline fun <reified T : Any> NavGraphBuilder.page(noinline content: @Com
 
 /**
  * The whole graph. Each destination wires its screen's callbacks to the [AppNavigator].
- * Tabs switch instantly (like any bottom-bar app); opening a page slides it in from the right over
- * the current one, which moves a little to the left; back is the reverse. The player fades, since
- * it also leaves the navigation chrome.
+ * Tabs fade through; pages move along the horizontal axis (back reverses it); the player fades,
+ * since it also leaves the navigation chrome.
  */
 @Composable
 fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: String?, modifier: Modifier = Modifier) {
@@ -72,30 +81,30 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         nav, startDestination = HomeRoute, modifier = modifier,
         enterTransition = {
             when {
-                tabs() -> EnterTransition.None
-                player() -> fadeIn(tween(NAV_FADE_MS))
-                else -> slideInHorizontally(slide) { it }
+                player() -> fadeIn(tween(PLAYER_FADE_MS))
+                tabs() -> fadeInAfterOut() + scaleIn(tween(MOTION_MS - OUT_MS, delayMillis = OUT_MS, easing = motion), initialScale = 0.96f)
+                else -> fadeInAfterOut() + slideInHorizontally(tween(MOTION_MS, easing = motion)) { axisOffset(it) }
             }
         },
         exitTransition = {
             when {
-                tabs() -> ExitTransition.None
-                player() -> fadeOut(tween(NAV_FADE_MS))
-                else -> slideOutHorizontally(slide) { -it / 4 }
+                player() -> fadeOut(tween(PLAYER_FADE_MS))
+                tabs() -> quickFadeOut()
+                else -> quickFadeOut() + slideOutHorizontally(tween(MOTION_MS, easing = motion)) { -axisOffset(it) }
             }
         },
         popEnterTransition = {
             when {
-                tabs() -> EnterTransition.None
-                player() -> fadeIn(tween(NAV_FADE_MS))
-                else -> slideInHorizontally(slide) { -it / 4 }
+                player() -> fadeIn(tween(PLAYER_FADE_MS))
+                tabs() -> fadeInAfterOut() + scaleIn(tween(MOTION_MS - OUT_MS, delayMillis = OUT_MS, easing = motion), initialScale = 0.96f)
+                else -> fadeInAfterOut() + slideInHorizontally(tween(MOTION_MS, easing = motion)) { -axisOffset(it) }
             }
         },
         popExitTransition = {
             when {
-                tabs() -> ExitTransition.None
-                player() -> fadeOut(tween(NAV_FADE_MS))
-                else -> slideOutHorizontally(slide) { it }
+                player() -> fadeOut(tween(PLAYER_FADE_MS))
+                tabs() -> quickFadeOut()
+                else -> quickFadeOut() + slideOutHorizontally(tween(MOTION_MS, easing = motion)) { axisOffset(it) }
             }
         },
     ) {
@@ -139,6 +148,8 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<MatchReviewRoute> { MatchReviewDestination(back) }
         page<FixMatchRoute> { FixMatchDestination(back) }
         page<StatsRoute> { StatsDestination(back) }
+        page<CatalogTitleRoute> { dev.yourstream.ui.screens.addon.CatalogTitleDestination(navigator::open, back) }
+        page<StreamPlayerRoute> { dev.yourstream.ui.screens.addon.StreamPlayerDestination(back) }
         page<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
         page<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }

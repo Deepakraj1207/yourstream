@@ -87,7 +87,7 @@ class ScreenshotTest {
             Tile(MediaCardModel("fy:32", "Super Deluxe", "2019"), OpenTarget.Details(32), 32, caption = TileCaption.Reason("Tamil · ★ 8.3")),
             Tile(MediaCardModel("fy:33", "Soorarai Pottru", "2020"), OpenTarget.Details(33), 33, caption = TileCaption.Reason("Tamil · drama · ★ 8.7")),
         ))
-        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, r, s, none), {}, {}, {}, {}, {})
+        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s, none), {}, {}, {}, {}, {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -127,7 +127,7 @@ class ScreenshotTest {
         HomeScreen(
             HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
                 IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), catalogs = listOf(catalog)),
-            HomeRows(r, none, none, none), {}, {}, {}, {}, {},
+            HomeRows(r, none, none), {}, {}, {}, {}, {},
         )
     }
 
@@ -155,6 +155,27 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneLibraryEmpty() = shot("phone-library-empty", WindowLayout.COMPACT, TopLevel.LIBRARY) {
         BrowseScreen("Library", EmptyKind.MY_LIBRARY_EMPTY, BrowseUiState(count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneCatalogTitleSeries() = shot("phone-catalog-title", WindowLayout.COMPACT, TopLevel.HOME) {
+        val ref = dev.yourstream.catalog.api.CatalogItemRef(dev.yourstream.catalog.api.CatalogProviderId("cinemeta"), dev.yourstream.catalog.api.CatalogType.SERIES, "tt0903747")
+        val videos = (1..4).map { dev.yourstream.catalog.api.CatalogVideo("tt0903747:1:$it", 1, it, listOf("Pilot", "Cat's in the Bag", "And the Bag's in the River", "Cancer Man")[it - 1], "2008-01-2$it") }
+        val ep = videos[1]
+        dev.yourstream.ui.screens.addon.CatalogTitleScreen(
+            dev.yourstream.ui.screens.addon.CatalogTitleUiState(
+                "Breaking Bad", 2008, null, series = true,
+                meta = dev.yourstream.catalog.api.CatalogMetadata(ref, "Breaking Bad", 2008, "A chemistry teacher diagnosed with cancer turns to making methamphetamine.",
+                    genres = listOf("Crime", "Drama"), rating = 9.5, runtimeMinutes = 49, videos = videos),
+                loadingMeta = false, seasons = listOf(1, 2, 3), season = 1, episode = ep,
+                streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
+                    dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
+                    dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
+                    dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Torrent", null, null, "abc"),
+                ))),
+            ),
+            {}, {}, {}, {},
+        )
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -199,7 +220,7 @@ class ScreenshotTest {
         compose.setContent {
             YourStreamTheme(layout, darkTheme = true) {
                 val items = flowOf(PagingData.from(playerEpisodes, done)).collectAsLazyPagingItems()
-                dev.yourstream.ui.screens.player.PlayerScreen(state, {}, {}, {}, items, onRotate = if (layout == WindowLayout.TV) null else ({})) {
+                dev.yourstream.ui.screens.player.PlayerScreen(state, {}, {}, {}, items, onRotate = if (layout == WindowLayout.TV) null else ({}), onFit = {}) {
                     androidx.compose.foundation.layout.Box(
                         androidx.compose.ui.Modifier.fillMaxSize().background(
                             androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF1B3A4B), androidx.compose.ui.graphics.Color(0xFF3F2E56), androidx.compose.ui.graphics.Color(0xFF0B0D12))),

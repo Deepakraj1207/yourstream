@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- In-app updates: hands a downloaded release APK to the system installer (the user confirms). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Runs on Android TV too: no touchscreen required, leanback launcher supported. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -36,6 +38,17 @@
             </intent-filter>
         </activity>
 
+
+        <!-- Shares a downloaded update with the system installer. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
 
         <!-- WorkManager is initialised by YourStreamApp (Hilt worker factory), not by App Startup. -->
         <provider

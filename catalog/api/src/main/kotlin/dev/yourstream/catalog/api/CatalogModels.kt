@@ -101,6 +101,20 @@ data class CatalogMetadata(
     val releaseDate: String? = null,
     val originalLanguage: String? = null,
     val partial: Boolean = false,
+    /** Episodes of a series (Stremio "videos"), when the add-on lists them. */
+    val videos: List<CatalogVideo> = emptyList(),
+)
+
+/** One episode of a series as an add-on lists it; [id] is what stream add-ons are asked for ("tt0903747:1:2"). */
+@Serializable
+data class CatalogVideo(
+    val id: String,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val title: String? = null,
+    val released: String? = null,
+    val thumbnail: String? = null,
+    val overview: String? = null,
 )
 
 /** What a provider's manifest says it can do. Used for availability detection. */

@@ -158,7 +158,7 @@ class ViewModelTest {
             }
             override suspend fun suggest(prefix: String, limit: Int) = listOf("vikram")
         }
-        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant)
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, AddonSearch { emptyList() })
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
         assertNull(vm.state.value.results, "blank query: hint, no search")

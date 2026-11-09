@@ -25,9 +25,23 @@ fun interface HomeCatalogs {
     fun rows(): Flow<List<dev.yourstream.ui.screens.home.CatalogRow>>
 }
 
+/** Titles from the add-ons' search (Stremio "search" catalogs, then TMDB/Cinemeta). */
+fun interface AddonSearch {
+    suspend fun search(query: String): List<Tile>
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object ScreensModule {
+    @Provides
+    fun addonSearch(addons: dev.yourstream.catalog.sync.CatalogAddons): AddonSearch = AddonSearch { q ->
+        val manager = addons.manager()
+        val found = manager.search(q)
+        // Library-only answers are already in the search results.
+        if (found.source == dev.yourstream.catalog.api.CatalogSource.Local) emptyList()
+        else manager.withLibraryPresence(found.value.distinctBy { it.ref.id }.take(30)).map { (item, p) -> Presentation.tile(item, p) }
+    }
+
     private const val MAX_CATALOG_ROWS = 8
     private const val CATALOG_ROW_SIZE = 20
 

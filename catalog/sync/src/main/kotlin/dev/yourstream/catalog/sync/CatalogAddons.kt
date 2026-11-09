@@ -2,7 +2,13 @@ package dev.yourstream.catalog.sync
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.yourstream.catalog.api.CatalogItem
+import dev.yourstream.catalog.api.CatalogMetadata
 import dev.yourstream.catalog.api.CatalogProvider
+import dev.yourstream.catalog.api.CatalogProviderInfo
+import dev.yourstream.catalog.api.CatalogType
+import dev.yourstream.catalog.api.StreamProvider
+import dev.yourstream.catalog.core.toPartialMetadata
 import dev.yourstream.catalog.api.ExternalMetadataFallback
 import dev.yourstream.catalog.api.LibraryAvailability
 import dev.yourstream.catalog.api.LocalCatalogSource
@@ -88,8 +94,8 @@ class CatalogAddons @Inject constructor(
             is AppResult.Ok -> r.value
             is AppResult.Err -> return AppResult.Err(r.error)
         }
-        if (info.catalogs.isEmpty()) {
-            return AppResult.Err(AppError.InvalidInput("ADDON_NO_CATALOGS", "${info.name} has no catalogs. Only catalog add-ons are supported."))
+        if (info.catalogs.isEmpty() && "stream" !in info.resources && "meta" !in info.resources) {
+            return AppResult.Err(AppError.InvalidInput("ADDON_UNSUPPORTED", "${info.name} offers no catalogs, details or streams."))
         }
         val addon = CatalogAddon(probe.id.value, info.name.ifBlank { url }, url, builtIn = false, enabled = true)
         synchronized(this) {
@@ -98,6 +104,40 @@ class CatalogAddons @Inject constructor(
         }
         return AppResult.Ok(addon)
     }
+
+    /** What an add-on's manifest says it offers (null: not reachable right now). */
+    suspend fun describe(id: String): CatalogProviderInfo? {
+        val a = _addons.value.firstOrNull { it.id == id } ?: return null
+        return (synchronized(this) { provider(a) }?.describe() as? AppResult.Ok)?.value
+    }
+
+    /** Enabled add-ons that answer "how can I watch X?" (Stremio stream resource). */
+    suspend fun streamProviders(): List<StreamProvider> =
+        synchronized(this) { _addons.value.filter { it.enabled }.mapNotNull { provider(it) as? StreamProvider } }
+            .filter { runCatching { it.hasStreams() }.getOrDefault(false) }
+
+    /**
+     * Details for a catalog title, with its episode list for series. The manager asks the owning
+     * add-on (or TMDB/Cinemeta); when episodes are missing, the enabled add-ons with details are
+     * asked by IMDb id, then Cinemeta.
+     */
+    suspend fun metadata(item: CatalogItem): CatalogMetadata {
+        val base = runCatching { manager().metadata(item).value }.getOrNull()
+        if (base != null && (item.ref.type != CatalogType.SERIES || base.videos.isNotEmpty())) return base
+        val imdb = item.ref.imdbId ?: item.ref.id.takeIf { it.startsWith("tt") } ?: return base ?: item.toPartialMetadata()
+        val ref = item.ref.copy(id = imdb)
+        val candidates = synchronized(this) { _addons.value.filter { it.enabled }.mapNotNull { provider(it) } } + listOfNotNull(cinemeta)
+        for (p in candidates) {
+            val m = (runCatching { p.metadata(ref.copy(provider = p.id)) }.getOrNull() as? AppResult.Ok)?.value ?: continue
+            if (item.ref.type != CatalogType.SERIES || m.videos.isNotEmpty()) {
+                return (base ?: m).copy(videos = m.videos, description = base?.description ?: m.description, posterUrl = base?.posterUrl ?: m.posterUrl,
+                    backdropUrl = base?.backdropUrl ?: m.backdropUrl)
+            }
+        }
+        return base ?: item.toPartialMetadata()
+    }
+
+    private val cinemeta: CatalogProvider? by lazy { runCatching { factory.custom(CINEMETA, "Cinemeta") }.getOrNull() }
 
     @Synchronized
     fun setEnabled(id: String, enabled: Boolean) = update(_addons.value.map { if (it.id == id) it.copy(enabled = enabled) else it })
@@ -134,6 +174,7 @@ class CatalogAddons @Inject constructor(
         private const val KEY_DISABLED = "disabled_builtin"
         private const val KEY_CUSTOM = "custom"
         private const val SEP = "\t"
+        const val CINEMETA = "https://v3-cinemeta.strem.io/manifest.json"
 
         /** "stremio://host/x" or "https://host/x/" → "https://host/x/manifest.json"; null if not a web link (pure; tested). */
         fun normalize(input: String): String? {
