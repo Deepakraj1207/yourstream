@@ -52,7 +52,7 @@ class LiveIndexUpdater @Inject constructor(
     private suspend fun apply(event: TelegramMessageEvent, chat: dev.yourstream.media.indexer.store.ChatRecord) {
         when (event) {
             is TelegramMessageEvent.NewMediaMessage -> {
-                val item = normalizer.normalize(event.message, chat.title) ?: return
+                val item = normalizer.normalize(event.message, chat.title, albumCaptionFor(event.message)) ?: return
                 val result = store.upsert(listOf(item))
                 if (result.added > 0) logger.d(TAG, "live: new media in chat ${event.chatId}")
             }
@@ -63,7 +63,7 @@ class LiveIndexUpdater @Inject constructor(
             is TelegramMessageEvent.MessageChanged -> {
                 val lookup = messages.lookupMessages(event.chatId, listOf(event.messageId))
                 val found = (lookup as? AppResult.Ok)?.value?.firstOrNull() ?: return
-                val item = (found as? MessageLookup.Found)?.let { normalizer.normalize(it.message, chat.title) }
+                val item = (found as? MessageLookup.Found)?.let { normalizer.normalize(it.message, chat.title, albumCaptionFor(it.message)) }
                 if (item != null) store.upsert(listOf(item)) else store.markDeleted(event.chatId, listOf(event.messageId))
             }
         }
@@ -73,6 +73,10 @@ class LiveIndexUpdater @Inject constructor(
     suspend fun handleFile(file: TelegramFile) {
         if (file.isDownloadingCompleted || !file.isDownloadingActive) store.updateDownload(file)
     }
+
+    /** A new album file without a caption takes the caption another file of its album carries. */
+    private suspend fun albumCaptionFor(m: dev.yourstream.telegram.api.model.TelegramMediaMessage): String? =
+        if (m.albumId == 0L || m.caption.isNotBlank()) null else store.albumCaption(m.chatId, m.albumId)
 
     private companion object {
         const val TAG = "IndexLive"

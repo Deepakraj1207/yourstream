@@ -24,7 +24,7 @@ class ArtworkLookup(private val media: MediaRepository, private val now: () -> L
         synchronized(cache) {
             cache[itemId]?.let { e -> if (e.url != null || now() - e.at < missTtlMs) return e.url }
         }
-        val url = runCatching { media.getItem(itemId)?.summary?.posterUrl }.getOrNull()
+        val url = runCatching { media.getItem(itemId)?.summary?.let(Presentation::artwork) }.getOrNull()
         synchronized(cache) { cache[itemId] = Entry(url, now()) }
         return url
     }

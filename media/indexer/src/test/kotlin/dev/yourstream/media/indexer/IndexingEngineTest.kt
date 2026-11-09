@@ -44,6 +44,19 @@ class IndexingEngineTest {
     }
 
     @Test
+    fun filesOfAnAlbumShareItsCaption() = runTest {
+        env.enable(chat)
+        // Telegram stores an album's caption on one file only; the hashed names say nothing.
+        env.telegram.add(mediaMessage(chat, 10, "7744f81a5b3063b96a3f54785bd51330.mkv", caption = "Vikram (2022) Tamil 1080p").copy(albumId = 77))
+        env.telegram.add(mediaMessage(chat, 11, "74f2165fc2dbbe5d3747a4ccae8d27c4.mkv").copy(albumId = 77))
+        env.engine.run(chat, IndexMode.INCREMENTAL, 5.minutes)
+        listOf(10L, 11L).forEach { messageId ->
+            val media = env.repository.getMedia(env.db.mediaDao().findKey(chat, messageId)!!.id)
+            assertEquals("Vikram", media?.parsed?.title, "album file $messageId")
+        }
+    }
+
+    @Test
     fun parallelFiltersIndexTheSameFiles() = runTest {
         val parallel = IndexerTestEnv(parallelFilters = true)
         parallel.enable(chat)

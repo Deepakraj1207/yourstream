@@ -216,6 +216,7 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
     var tracks by remember { mutableStateOf(false) }
     var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
     var scrub by remember { mutableStateOf<Float?>(null) }
+    val inPip by dev.yourstream.ui.screens.player.inPictureInPicture()
     val fitLabel = fit.label()
     val first = remember { mutableStateOf(true) }
     LaunchedEffect(fit) { if (first.value) first.value = false else hint = PlayerHint(AppIcons.AspectRatio, fitLabel) }
@@ -230,6 +231,7 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("stream-player")) {
         PlayerSurface(vm.player, state.playing, fit)
+        if (inPip) return@Box
         Box(
             Modifier.fillMaxSize().playerGestures(
                 context,

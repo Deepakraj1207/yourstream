@@ -66,6 +66,8 @@ data class ScanCursorEntity(
         Index(value = ["canonical_media_id"]),
         Index(value = ["file_id"]),
         Index(value = ["media_type"]),
+        // Files of one album share the caption Telegram stores on only one of them.
+        Index(value = ["chat_id", "album_id"]),
     ],
     foreignKeys = [ForeignKey(IndexedChatEntity::class, ["chat_id"], ["chat_id"], onDelete = ForeignKey.CASCADE)],
 )

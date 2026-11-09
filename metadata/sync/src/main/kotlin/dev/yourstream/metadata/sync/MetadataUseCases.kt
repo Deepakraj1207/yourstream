@@ -15,7 +15,8 @@ class MatchLibraryMetadata @Inject constructor(private val service: LibraryMetad
         return total
     }
 
-    private companion object { const val MAX_BATCHES = 40 }
+    /** Up to 4,000 titles per run (newest first); the next index change continues. */
+    private companion object { const val MAX_BATCHES = 100 }
 }
 
 class SearchMetadataCandidates @Inject constructor(private val service: LibraryMetadataService) {

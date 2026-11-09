@@ -10,6 +10,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.core.inkPanel
+import dev.yourstream.ui.core.inkUnderline
 import dev.yourstream.ui.screens.player.label
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -121,8 +123,9 @@ fun SettingsRoute(
         updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
         onUpdate = {
             when (update) {
-                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.Ready -> updates.install()
-                is dev.yourstream.ui.screens.update.UpdateState.Downloading, dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
+                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.NeedsPermission -> updates.install()
+                is dev.yourstream.ui.screens.update.UpdateState.Downloading, is dev.yourstream.ui.screens.update.UpdateState.Installing,
+                dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
                 else -> updates.check()
             }
         },
@@ -207,13 +210,20 @@ fun SettingsScreen(
                         prefs.playerLandscape, "pref-landscape") { onPrefs(prefs.copy(playerLandscape = it)) }
                     Row(stringResource(R.string.settings_hold_speed), speedLabel(prefs.holdSpeed), dev.yourstream.ui.core.AppIcons.Speed,
                         tag = "pref-hold", onClick = { picker = Picker.HOLD })
+                    Toggle(stringResource(R.string.settings_pip), stringResource(R.string.settings_pip_detail), dev.yourstream.ui.core.AppIcons.Episodes,
+                        prefs.pictureInPicture, "pref-pip") { onPrefs(prefs.copy(pictureInPicture = it)) }
+                    Row(stringResource(R.string.settings_subtitle_size), subtitleSizeLabel(prefs.subtitleScale), dev.yourstream.ui.core.AppIcons.Subtitles,
+                        tag = "pref-subtitle-size", onClick = { picker = Picker.SUBTITLE })
+                    Toggle(stringResource(R.string.settings_subtitle_box), stringResource(R.string.settings_subtitle_box_detail), dev.yourstream.ui.core.AppIcons.Subtitles,
+                        prefs.subtitleBox, "pref-subtitle-box") { onPrefs(prefs.copy(subtitleBox = it)) }
                 }
             }
 
             item { Group(R.string.settings_group_appearance) }
             item {
                 Card {
-                    Row(stringResource(R.string.settings_theme), themeLabel(prefs.theme), Icons.Filled.Star, tag = "pref-theme", onClick = { picker = Picker.THEME })
+                    Row(stringResource(R.string.settings_style), styleLabel(prefs.style), Icons.Filled.Star, tag = "pref-style", onClick = { picker = Picker.STYLE })
+                    Row(stringResource(R.string.settings_theme), themeLabel(prefs.theme), Icons.Filled.Settings, tag = "pref-theme", onClick = { picker = Picker.THEME })
                 }
             }
 
@@ -249,15 +259,33 @@ fun SettingsScreen(
                 prefs.defaultFit, { onPrefs(prefs.copy(defaultFit = it)) }) { picker = null }
             Picker.HOLD -> Choose(stringResource(R.string.settings_hold_speed), AppSettings.HOLD_SPEEDS.map { it to speedLabel(it) }, prefs.holdSpeed,
                 { onPrefs(prefs.copy(holdSpeed = it)) }) { picker = null }
+            Picker.SUBTITLE -> Choose(stringResource(R.string.settings_subtitle_size), AppSettings.SUBTITLE_SCALES.map { it to subtitleSizeLabel(it) }, prefs.subtitleScale,
+                { onPrefs(prefs.copy(subtitleScale = it)) }) { picker = null }
+            Picker.STYLE -> Choose(stringResource(R.string.settings_style), UiStyle.entries.map { it to styleLabel(it) }, prefs.style,
+                { onPrefs(prefs.copy(style = it)) }) { picker = null }
             Picker.THEME -> Choose(stringResource(R.string.settings_theme), ThemeMode.entries.map { it to themeLabel(it) }, prefs.theme,
                 { onPrefs(prefs.copy(theme = it)) }) { picker = null }
         }
     }
 }
 
-private enum class Picker { SEEK, FIT, HOLD, THEME }
+private enum class Picker { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME }
 
 private fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
+
+@Composable
+private fun subtitleSizeLabel(scale: Float) = stringResource(
+    when {
+        scale < 0.9f -> R.string.settings_subtitle_small
+        scale < 1.1f -> R.string.settings_subtitle_normal
+        scale < 1.3f -> R.string.settings_subtitle_large
+        scale < 1.6f -> R.string.settings_subtitle_larger
+        else -> R.string.settings_subtitle_huge
+    },
+)
+
+@Composable
+private fun styleLabel(s: UiStyle) = stringResource(if (s == UiStyle.MANGA) R.string.settings_style_manga else R.string.settings_style_classic)
 
 @Composable
 private fun themeLabel(t: ThemeMode) = stringResource(
@@ -273,7 +301,7 @@ private fun themeLabel(t: ThemeMode) = stringResource(
 private fun Profile(state: SettingsUiState, onAccount: () -> Unit) {
     androidx.compose.material3.Surface(
         onClick = onAccount, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).focusHighlight(MaterialTheme.shapes.large).testTag("profile"),
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).inkPanel(MaterialTheme.shapes.large).focusHighlight(MaterialTheme.shapes.large).testTag("profile"),
     ) {
         androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(52.dp)) {
@@ -298,7 +326,8 @@ private fun Profile(state: SettingsUiState, onAccount: () -> Unit) {
 /** A rounded group of rows, like the cards in Stremio's and Nuvio's settings. */
 @Composable
 private fun Card(content: @Composable () -> Unit) {
-    androidx.compose.material3.Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+    androidx.compose.material3.Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(end = 4.dp, bottom = 4.dp).inkPanel(MaterialTheme.shapes.large)) {
         androidx.compose.foundation.layout.Column(Modifier.padding(vertical = 4.dp)) { content() }
     }
 }
@@ -340,6 +369,13 @@ private fun <T> Choose(title: String, options: List<Pair<T, String>>, selected: 
 
 @Composable
 private fun Group(title: Int) {
-    Text(stringResource(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).semantics { heading() })
+    if (dev.yourstream.ui.core.LocalMangaStyle.current) {
+        // Manga: chapter-style headings in comic lettering with an ink rule.
+        Text(stringResource(title), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).padding(bottom = 4.dp)
+                .inkUnderline(MaterialTheme.colorScheme.onSurface).semantics { heading() })
+    } else {
+        Text(stringResource(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).semantics { heading() })
+    }
 }

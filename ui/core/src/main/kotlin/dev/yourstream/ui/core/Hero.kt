@@ -62,24 +62,29 @@ fun HeroBanner(
 ) {
     val d = LocalDimens.current
     val compact = LocalWindowLayout.current == WindowLayout.COMPACT
-    Box(modifier.fillMaxWidth().height(d.heroHeight).padding(horizontal = d.gutter).clip(MaterialTheme.shapes.large).testTag("hero")) {
+    val manga = LocalMangaStyle.current
+    Box(modifier.fillMaxWidth().height(d.heroHeight).padding(horizontal = d.gutter).inkPanel(MaterialTheme.shapes.large).clip(MaterialTheme.shapes.large).testTag("hero")) {
         Artwork(model.posterUrl, model.title, Modifier.fillMaxSize(), showInitials = false)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.92f), 0.65f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.15f))))
+        // Manga: an action panel, speed lines rushing out behind the title.
+        if (manga) Box(Modifier.fillMaxSize().speedLines(Color.White.copy(alpha = if (model.posterUrl == null) 0.22f else 0.10f), seed = model.key.hashCode()))
         Row(Modifier.fillMaxSize().padding(if (compact) 16.dp else 32.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (!compact) {
                 Artwork(model.posterUrl, model.title, Modifier.fillMaxHeight(0.9f).aspectRatio(2f / 3f).clip(MaterialTheme.shapes.medium))
             }
             Column(Modifier.weight(1f).widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(model.eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(model.eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall,
+                    color = if (manga) MaterialTheme.colorScheme.tertiary else Color.White.copy(alpha = 0.85f))
                 Text(model.title, style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall,
                     color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
                 model.meta?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1) }
                 model.progress?.let { ProgressLine(it, Modifier.widthIn(max = 280.dp).fillMaxWidth()) }
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onPrimary, modifier = Modifier.then(if (primaryFocus != null) Modifier.focusRequester(primaryFocus) else Modifier).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("hero-primary")) {
+                    // Light on the dark banner in every theme (the paper theme's primary is ink).
+                    Button(onClick = onPrimary, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black), modifier = Modifier.then(if (primaryFocus != null) Modifier.focusRequester(primaryFocus) else Modifier).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("hero-primary")) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = null); Text(model.primaryLabel, Modifier.padding(start = 6.dp))
                     }
-                    FilledTonalButton(onClick = onSecondary, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("hero-secondary")) { Text(model.secondaryLabel) }
+                    FilledTonalButton(onClick = onSecondary, colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = Color.White.copy(alpha = 0.18f), contentColor = Color.White), modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("hero-secondary")) { Text(model.secondaryLabel) }
                 }
             }
         }

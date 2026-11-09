@@ -58,7 +58,7 @@ object Presentation {
                 progress = s.progress?.takeIf { !it.completed && it.positionMs > 0 }?.fraction
                     ?: if (s.kind == LibraryKind.SERIES && !seriesWatched && s.watchedEpisodeCount > 0) s.watchedEpisodeCount.toFloat() / s.episodeCount else null,
                 badge = resolution(s.maxResolution),
-                posterUrl = s.posterUrl,
+                posterUrl = artwork(s),
                 watched = watched,
             ),
             OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched, inLibrary = s.inLibrary,
@@ -149,6 +149,9 @@ object Presentation {
         itemId = presence?.itemId,
         caption = if (presence != null) TileCaption.InLibrary else null,
     )
+
+    /** The matched poster, else the title's own Telegram thumbnail. */
+    fun artwork(s: LibraryItemSummary): String? = s.posterUrl ?: s.thumbnailRef?.let(dev.yourstream.ui.core.TelegramThumbs::url)
 
     fun isSeries(h: SearchHit) = h.kind == ItemKind.SERIES
 

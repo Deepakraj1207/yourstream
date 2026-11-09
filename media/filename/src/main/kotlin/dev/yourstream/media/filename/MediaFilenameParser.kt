@@ -1,5 +1,7 @@
 package dev.yourstream.media.filename
 
+import dev.yourstream.media.filename.internal.RandomNames
+
 import dev.yourstream.media.filename.internal.Analysis
 import dev.yourstream.media.filename.internal.Analyzer
 import dev.yourstream.media.filename.internal.TitleNormalizer
@@ -25,7 +27,8 @@ import dev.yourstream.media.filename.internal.Vocabulary
 public object MediaFilenameParser {
 
     /** Bump when results change, so stored metadata can be recomputed. */
-    public const val VERSION: Int = 2
+    /** 3: random file names (hashes, UUIDs, Telegram ids) count as generic; their tokens never become titles. */
+    public const val VERSION: Int = 3
 
     private val GENERIC_NAME = Regex(
         "^(video|vid|file|movie|document|doc|telegram|tg|img|mov|clip|media|untitled|new|downloaded|download|v|output|record(ing)?|screen\\s?recording)?" +
@@ -39,6 +42,18 @@ public object MediaFilenameParser {
         failed(fileName, t)
     }
 
+    /**
+     * A name made by a machine ("7744f81a5b3063b9.mp4", "AgADBQADq7Ex.mkv", "VID_20230505.mp4"): it
+     * says nothing about the video, so it is never shown as a title.
+     */
+    public fun isMachineName(name: String): Boolean {
+        val base = name.trim().let { if (Regex("\\.[A-Za-z0-9]{2,4}$").containsMatchIn(it)) it.substringBeforeLast('.') else it }
+        val spaced = base.replace(Regex("[._\\-]+"), " ").trim()
+        if (spaced.isEmpty()) return true
+        if (GENERIC_NAME.matches(spaced)) return true
+        return RandomNames.isJunkTitle(spaced) || spaced.split(' ').all { RandomNames.isRandomToken(it) }
+    }
+
     /** Parses free text that is not a file name (a caption line, a search query). */
     public fun parseText(text: String): FilenameMetadata = try {
         build(text, Analyzer.analyze(text, isFileName = false, FieldSource.CAPTION), emptyList())
@@ -47,7 +62,7 @@ public object MediaFilenameParser {
     }
 
     private fun parseInternal(fileName: String, hints: ParseHints): FilenameMetadata {
-        val fromName = Analyzer.analyze(fileName, isFileName = true, FieldSource.FILE_NAME)
+        val fromName = stripRandomTokens(Analyzer.analyze(fileName, isFileName = true, FieldSource.FILE_NAME))
         val warnings = mutableListOf<String>()
         var result = fromName
 
@@ -75,7 +90,18 @@ public object MediaFilenameParser {
         val title = a.title?.value ?: return true
         if (GENERIC_NAME.matches(title)) return true
         if (title.count(Char::isLetter) < 2) return true
+        if (RandomNames.isJunkTitle(title)) return true
         return false
+    }
+
+    /** "Vikram a7F3k9Qz2LmP8xY1" → "Vikram": random tokens are dropped when real words remain. */
+    private fun stripRandomTokens(a: Analysis): Analysis {
+        val t = a.title ?: return a
+        val words = t.value.split(' ')
+        if (words.none(RandomNames::isRandomToken)) return a
+        val kept = words.filterNot(RandomNames::isRandomToken)
+        if (kept.joinToString("").count(Char::isLetter) < 2) return a // all junk: isGeneric handles it
+        return a.copy(title = t.copy(value = kept.joinToString(" ")))
     }
 
     private fun captionLine(caption: String?): String? = caption

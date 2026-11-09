@@ -138,6 +138,9 @@ class RoomIndexStore @Inject constructor(
         messageIds.chunked(SQL_CHUNK).forEach { media.touch(chatId, it, now) }
     }
 
+    override suspend fun albumCaption(chatId: Long, albumId: Long): String? =
+        if (albumId == 0L) null else media.albumCaption(chatId, albumId)
+
     override suspend fun liveMessageIdsAfter(chatId: Long, afterMessageId: Long, limit: Int): List<Long> =
         media.liveMessageIdsAfter(chatId, afterMessageId, limit)
 

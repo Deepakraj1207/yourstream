@@ -58,6 +58,8 @@ data class LibraryItemRow(
     val completed: Boolean,
     @ColumnInfo(name = "poster_url") val posterUrl: String?,
     @ColumnInfo(name = "metadata_title") val metadataTitle: String?,
+    /** "chatId:messageId" of the title's newest file: its Telegram thumbnail is the fallback artwork. */
+    @ColumnInfo(name = "thumb_ref") val thumbRef: String? = null,
 )
 
 data class EpisodeRow(

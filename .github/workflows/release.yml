@@ -67,6 +67,10 @@ jobs:
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          # Optional: a free TMDB key (themoviedb.org -> Settings -> API) gives better title
+          # matching and posters, especially for Indian titles. Without it Cinemeta is used.
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_READ_TOKEN: ${{ secrets.TMDB_READ_TOKEN }}
           VERSION_NAME: ${{ env.TAG }}
           VERSION_CODE: ${{ github.run_number }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
@@ -79,7 +83,8 @@ jobs:
           fi
           export VERSION_NAME="${VERSION_NAME#v}"
           # A release is built from scratch: no outputs reused from the shared build cache.
-          ./gradlew --no-daemon --no-build-cache assembleRelease
+          # Hilt/KSP occasionally misses a module on a cold build; one full retry fixes it.
+          ./gradlew --no-daemon --no-build-cache assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks assembleRelease
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt

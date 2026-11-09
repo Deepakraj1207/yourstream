@@ -21,8 +21,10 @@ import dev.yourstream.metadata.core.match.MatchInput
 import dev.yourstream.metadata.core.match.MatchOutcome
 import dev.yourstream.metadata.core.match.MetadataMatcher
 import dev.yourstream.metadata.core.match.ScoredCandidate
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -62,18 +64,19 @@ class LibraryMetadataService @Inject constructor(
     private val mutex = Mutex()
 
     /** Matches up to [limit] items that need it. Call repeatedly until processed == 0. */
-    suspend fun processPending(limit: Int = 25): MetadataRunResult = mutex.withLock {
+    suspend fun processPending(limit: Int = 40): MetadataRunResult = mutex.withLock {
         if (!settings.enabled || manager.searchProviders(null).isEmpty()) return MetadataRunResult(0, 0, 0, 0, 0)
         val work = dao.matchWork(clock.nowMillis(), limit)
-        var accepted = 0; var review = 0; var none = 0; var failed = 0
-        for (row in work) {
-            when (matchItem(row).decision) {
-                MatchDecision.ACCEPTED -> accepted++
-                MatchDecision.NEEDS_REVIEW -> review++
-                MatchDecision.NO_MATCH -> none++
-                MatchDecision.FAILED -> failed++
-            }
+        // Several titles at once: a big library is matched in minutes, not hours. Providers keep
+        // their own rate limits; this only overlaps the waiting.
+        val gate = kotlinx.coroutines.sync.Semaphore(PARALLEL_MATCHES)
+        val decisions = kotlinx.coroutines.coroutineScope {
+            work.map { row -> async { gate.withPermit { matchItem(row).decision } } }.map { it.await() }
         }
+        val accepted = decisions.count { it == MatchDecision.ACCEPTED }
+        val review = decisions.count { it == MatchDecision.NEEDS_REVIEW }
+        val none = decisions.count { it == MatchDecision.NO_MATCH }
+        val failed = decisions.count { it == MatchDecision.FAILED }
         val result = MetadataRunResult(work.size, accepted, review, none, failed)
         if (work.isNotEmpty()) logger.i(TAG, "metadata: $result")
         result
@@ -250,6 +253,8 @@ class LibraryMetadataService @Inject constructor(
 
     private companion object {
         const val TAG = "MetadataSync"
+        /** Titles matched at the same time. */
+        const val PARALLEL_MATCHES = 4
         const val MINUTE = 60_000L
         const val DAY = 24 * 60 * MINUTE
     }

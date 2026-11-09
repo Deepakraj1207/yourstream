@@ -79,12 +79,20 @@ interface MediaDao {
     )
     suspend fun updateDownload(fileId: Int, state: String, bytes: Long, path: String?): Int
 
+    @Query("SELECT caption FROM media WHERE chat_id = :chatId AND album_id = :albumId AND caption != '' LIMIT 1")
+    suspend fun albumCaption(chatId: Long, albumId: Long): String?
+
     @Query("SELECT COUNT(*) FROM media_parsed WHERE parser_version < :version")
     suspend fun countOutdatedParses(version: Int): Int
 
     /** Rows whose metadata came from an older parser, in id order (keyset paging). */
     @Query(
-        """SELECT m.id, m.file_name, m.caption, m.audio_title, m.audio_performer, c.title AS chat_title
+        """SELECT m.id, m.file_name,
+          -- A file without a caption in an album uses the album's caption (Telegram stores it once).
+          CASE WHEN m.caption = '' AND m.album_id != 0
+               THEN IFNULL((SELECT a.caption FROM media a WHERE a.chat_id = m.chat_id AND a.album_id = m.album_id AND a.caption != '' LIMIT 1), '')
+               ELSE m.caption END AS caption,
+          m.audio_title, m.audio_performer, c.title AS chat_title
         FROM media m JOIN media_parsed p ON p.media_id = m.id LEFT JOIN indexed_chat c ON c.chat_id = m.chat_id
         WHERE p.parser_version < :version AND m.id > :afterId ORDER BY m.id LIMIT :limit""",
     )

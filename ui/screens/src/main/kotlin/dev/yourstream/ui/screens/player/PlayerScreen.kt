@@ -166,9 +166,28 @@ internal fun ImmersiveMode() {
 
 @Composable
 internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = VideoFit.FIT) {
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    PipEligible(playing)
     AndroidView(
         factory = { ctx -> PlayerView(ctx).apply { useController = false; this.player = player } },
-        update = { it.keepScreenOn = playing; it.resizeMode = fit.resizeMode },
+        update = {
+            it.keepScreenOn = playing
+            it.resizeMode = fit.resizeMode
+            // Subtitle look from Settings: size, and outline or dark box.
+            it.subtitleView?.apply {
+                setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * settings.subtitleScale)
+                setApplyEmbeddedStyles(!settings.subtitleBox)
+                setStyle(
+                    androidx.media3.ui.CaptionStyleCompat(
+                        android.graphics.Color.WHITE,
+                        if (settings.subtitleBox) 0xB3000000.toInt() else android.graphics.Color.TRANSPARENT,
+                        android.graphics.Color.TRANSPARENT,
+                        if (settings.subtitleBox) androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE else androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                        android.graphics.Color.BLACK, null,
+                    ),
+                )
+            }
+        },
         modifier = Modifier.fillMaxSize(),
     )
 }
@@ -215,6 +234,7 @@ fun PlayerScreen(
     var upNextDismissed by remember(state.next) { mutableStateOf(false) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    val inPip by inPictureInPicture()
     var hint by remember { mutableStateOf<PlayerHint?>(null) }
     var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
     val fitLabel = fit.label()
@@ -284,6 +304,8 @@ fun PlayerScreen(
             .focusable(),
     ) {
         surface()
+        // Picture-in-picture: only the video; controls come back with the full screen.
+        if (inPip) return@Box
         // Gesture layer above the video (the video view itself does not take touches).
         val context = androidx.activity.compose.LocalActivity.current ?: androidx.compose.ui.platform.LocalContext.current
         val brightness = stringResource(R.string.player_brightness)

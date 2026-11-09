@@ -41,6 +41,7 @@ import dev.yourstream.ui.core.SkeletonHero
 import dev.yourstream.ui.core.SkeletonRow
 import dev.yourstream.ui.core.UiState
 import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.core.inkPanel
 import dev.yourstream.ui.screens.R
 import dev.yourstream.ui.screens.Tile
 import dev.yourstream.ui.screens.navigation.OpenTarget
@@ -204,7 +205,7 @@ private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
     androidx.compose.material3.Surface(
         color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = androidx.compose.material3.MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter, vertical = 8.dp).testTag("indexing-bar"),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter, vertical = 8.dp).inkPanel(androidx.compose.material3.MaterialTheme.shapes.large).testTag("indexing-bar"),
     ) {
         Column {
             androidx.compose.foundation.layout.Row(

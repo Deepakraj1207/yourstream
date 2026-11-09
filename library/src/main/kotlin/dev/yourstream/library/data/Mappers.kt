@@ -30,7 +30,7 @@ internal fun kindOf(name: String) = runCatching { LibraryKind.valueOf(name) }.ge
 internal fun LibraryItemRow.toModel() = LibraryItemSummary(
     id = id, kind = kindOf(kind), title = title, year = year, availableCount = availableCount, seasonCount = seasonCount,
     episodeCount = episodeCount, watchedEpisodeCount = watchedCount, maxResolution = maxResolution, totalSize = totalSize,
-    addedAt = addedAt, latestAddedAt = latestAddedAt, lastWatchedAt = lastWatchedAt, isFavorite = isFavorite, inLibrary = inLibrary,
+    addedAt = addedAt, latestAddedAt = latestAddedAt, lastWatchedAt = lastWatchedAt, isFavorite = isFavorite, inLibrary = inLibrary, thumbnailRef = thumbRef,
     progress = positionMs?.let { WatchProgress(it, durationMs ?: 0, completed, lastWatchedAt) },
     posterUrl = posterUrl,
     metadataTitle = metadataTitle,

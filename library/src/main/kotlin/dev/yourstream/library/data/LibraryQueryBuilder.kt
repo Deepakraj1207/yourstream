@@ -22,7 +22,9 @@ object LibraryQueryBuilder {
     private const val COLUMNS = """i.id, i.kind, i.title, i.year, i.available_count, i.season_count, i.episode_count, i.watched_count,
         i.max_resolution, i.total_size, i.added_at, i.latest_added_at, i.last_watched_at,
         (f.item_id IS NOT NULL) AS is_favorite, (ul.item_id IS NOT NULL) AS in_library, ws.position_ms, ws.duration_ms, COALESCE(ws.completed, 0) AS completed,
-        im.poster_url, im.title AS metadata_title"""
+        im.poster_url, im.title AS metadata_title,
+        (SELECT m.chat_id || ':' || m.message_id FROM media_link ml JOIN media m ON m.id = ml.media_id
+         WHERE ml.item_id = i.id AND m.is_deleted = 0 AND m.media_type = 'VIDEO' ORDER BY m.message_id DESC LIMIT 1) AS thumb_ref"""
 
     private const val SERIES_WATCHED = "(i.kind = 'SERIES' AND i.episode_count > 0 AND i.watched_count >= i.episode_count)"
     private const val ITEM_WATCHED = "(i.kind != 'SERIES' AND ws.completed = 1)"
