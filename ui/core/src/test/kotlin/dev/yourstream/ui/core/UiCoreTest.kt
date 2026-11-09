@@ -19,6 +19,10 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.percentOffset
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.platform.testTag
 import dev.yourstream.core.common.AppError
 import dev.yourstream.core.common.AppResult
 import org.junit.Rule
@@ -52,6 +56,39 @@ class UiModelsTest {
 @RunWith(RobolectricTestRunner::class)
 class UiComponentsTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun timelineScrubsByKeysOnceAndByTouch() {
+        var starts = 0
+        val ends = mutableListOf<Long>()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            YourStreamTheme(WindowLayout.TV) {
+                Timeline(60_000, 1_320_000, 300_000, { starts++ }, { ends += it }, { "${it / 1000}s" }, androidx.compose.ui.Modifier.testTag("timeline"))
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("timeline").requestFocus()
+        // Three presses are one scrub and one seek, after a short pause.
+        repeat(3) { compose.onNodeWithTag("timeline").performKeyInput { pressKey(Key.DirectionRight) } }
+        compose.onNodeWithTag("scrub-time", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("90s", useUnmergedTree = true).assertExists()
+        assertEquals(1, starts)
+        assertEquals(emptyList<Long>(), ends)
+        compose.mainClock.advanceTimeBy(1_000)
+        assertEquals(listOf(90_000L), ends)
+        // Centre commits at once; the position never goes below zero.
+        repeat(8) { compose.onNodeWithTag("timeline").performKeyInput { pressKey(Key.DirectionLeft) } }
+        compose.onNodeWithTag("timeline").performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(listOf(90_000L, 0L), ends)
+        // A tap at three quarters jumps there; screen readers can set the position too.
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithTag("timeline").performTouchInput { click(percentOffset(0.75f, 0.5f)) }
+        assertEquals(990_000.0, ends.last().toDouble(), 20_000.0)
+        compose.onNodeWithTag("timeline").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(600_000f) }
+        assertEquals(600_000L, ends.last())
+        assertEquals(4, starts)
+    }
 
     @Test
     fun stateContentRendersEveryState() {

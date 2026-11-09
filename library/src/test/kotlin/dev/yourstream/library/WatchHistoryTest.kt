@@ -93,7 +93,12 @@ class WatchHistoryTest {
             assertNull(media.getItem(show.id)!!.summary.lastWatchedAt)
 
             val e1 = episodes.episodes(show.id).all().first()
+            val all = episodes.episodes(show.id).all()
             assertEquals("S01E02", episodes.nextEpisode(e1.id)!!.label)
+            // Watch order across seasons, both ways; nothing before the first episode.
+            assertEquals("S01E02", episodes.previousEpisode(all[2].id)!!.label)
+            assertEquals("S01E01", episodes.previousEpisode(all[1].id)!!.label)
+            assertNull(episodes.previousEpisode(e1.id))
         }
     }
 

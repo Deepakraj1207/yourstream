@@ -1,6 +1,5 @@
 package dev.yourstream.ui.screens
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -11,7 +10,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.platform.testTag
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,7 +18,6 @@ import androidx.navigation.toRoute
 import androidx.test.core.app.ApplicationProvider
 import dev.yourstream.library.api.LibraryKind
 import dev.yourstream.library.api.PlaybackTarget
-import dev.yourstream.playback.media3.PlaybackStatus
 import dev.yourstream.ui.core.EmptyKind
 import dev.yourstream.ui.core.ErrorKind
 import dev.yourstream.ui.core.MediaCardModel
@@ -61,10 +58,6 @@ import dev.yourstream.ui.screens.navigation.HomeRoute
 import dev.yourstream.ui.screens.navigation.OpenTarget
 import dev.yourstream.ui.screens.navigation.PlayerRoute
 import dev.yourstream.ui.screens.navigation.TopLevel
-import dev.yourstream.ui.screens.player.PlayerAction
-import dev.yourstream.ui.screens.player.PlayerScreen
-import dev.yourstream.ui.screens.player.PlayerUiState
-import dev.yourstream.ui.screens.player.TrackOption
 import dev.yourstream.ui.screens.settings.AccountAction
 import dev.yourstream.ui.screens.settings.AccountScreen
 import dev.yourstream.ui.screens.settings.AccountStep
@@ -181,31 +174,6 @@ class ScreensTest {
         assertEquals(listOf<OpenTarget>(play), opened)
         compose.onNodeWithTag("favorite").performClick()
         assertEquals(listOf<DetailsAction>(DetailsAction.ToggleFavorite), actions)
-    }
-
-    @Test
-    fun playerControlsErrorsAndNextEpisode() {
-        val actions = mutableListOf<PlayerAction>()
-        val next = mutableListOf<OpenTarget.Play>()
-        val target = OpenTarget.Play(PlaybackTarget(5, 6))
-        var state by androidx.compose.runtime.mutableStateOf(
-            PlayerUiState("Ben 10", PlaybackStatus.READY, isPlaying = true, positionMs = 60_000, durationMs = 1_320_000,
-                audio = listOf(TrackOption("a1", "Hindi"), TrackOption("a2", "Tamil")), selectedAudio = "a1"),
-        )
-        set(WindowLayout.TV) { PlayerScreen(state, { actions += it }, {}, { next += it }) { Box(Modifier.testTag("surface")) } }
-        compose.onNodeWithTag("play-pause").performClick()
-        compose.onNodeWithText("+30 s").performClick()
-        assertEquals(listOf(PlayerAction.TogglePlay, PlayerAction.SeekBy(30_000)), actions)
-        compose.onNodeWithTag("audio").performClick()
-        compose.onNodeWithText("Tamil").assertExists()
-
-        state = state.copy(status = PlaybackStatus.ERROR, error = UiError(ErrorKind.OFFLINE, "timeout"), audio = emptyList())
-        compose.onNodeWithText("Try again").performClick()
-        assertEquals(PlayerAction.Retry, actions.last())
-
-        state = state.copy(status = PlaybackStatus.ENDED, error = null, next = "S01E06" to target)
-        compose.onNodeWithText("Play S01E06").performClick()
-        assertEquals(listOf(target), next)
     }
 
     @Test

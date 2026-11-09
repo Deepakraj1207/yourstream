@@ -215,6 +215,7 @@ class TelegramPlaybackController(
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) = publish()
+        override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) = publish()
 
         override fun onTracksChanged(tracks: androidx.media3.common.Tracks) = handleTracks(tracks)
     }
@@ -353,6 +354,12 @@ class TelegramPlaybackController(
     fun pause() { player.pause() }
     fun togglePlayPause() { if (player.playWhenReady) pause() else resume() }
 
+    /** Playback speed, e.g. 0.5–2. Kept across retries and version switches (same player). */
+    fun setSpeed(speed: Float) {
+        player.setPlaybackSpeed(speed.coerceIn(0.25f, 4f))
+        publish()
+    }
+
     /** User seek. With adaptive streaming, bursts are coalesced and background transfers make way (SeekManager). */
     fun seekTo(positionMs: Long) {
         seekManager?.seekTo(positionMs) ?: rawSeek(positionMs)
@@ -486,6 +493,21 @@ class TelegramPlaybackController(
             seeking = pendingSeekStartNanos != null,
             // Offline while the file still has to come from Telegram: say so instead of an unexplained spinner.
             recovery = recovery ?: "waiting for network".takeIf { networkUp == false && error == null && (status == PlaybackStatus.PREPARING || status == PlaybackStatus.BUFFERING) },
+            speed = player.playbackParameters.speed,
+            format = streamFormat(format, player.audioFormat),
+        )
+    }
+
+    private fun streamFormat(video: androidx.media3.common.Format?, audio: androidx.media3.common.Format?): StreamFormat? {
+        if (video == null && audio == null) return null
+        fun Int.known() = takeIf { it != androidx.media3.common.Format.NO_VALUE && it > 0 }
+        return StreamFormat(
+            videoMimeType = video?.sampleMimeType,
+            frameRate = video?.frameRate?.takeIf { it > 0f },
+            videoBitrate = video?.let { it.averageBitrate.known() ?: it.peakBitrate.known() },
+            audioMimeType = audio?.sampleMimeType,
+            audioChannels = audio?.channelCount?.known(),
+            audioSampleRate = audio?.sampleRate?.known(),
         )
     }
 

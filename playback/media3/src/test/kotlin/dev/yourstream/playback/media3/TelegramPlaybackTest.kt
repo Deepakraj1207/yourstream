@@ -164,10 +164,15 @@ class TelegramPlaybackTest {
         assertTrue(abs(ready.durationMs!! - 6_000) < 150, "duration ${ready.durationMs}")
         assertEquals(640, ready.videoWidth)
         assertEquals(360, ready.videoHeight)
+        // The decoded formats, for the player's quality info.
+        assertTrue(ready.format?.videoMimeType?.startsWith("video/") == true, "video format ${ready.format}")
+        assertEquals(1f, ready.speed)
         c.player.awaitState(Player.STATE_ENDED)
         val end = c.snapshot()
         assertEquals(PlaybackStatus.ENDED, end.status)
         assertTrue(end.positionMs >= 5_900)
+        c.setSpeed(1.5f)
+        assertEquals(1.5f, c.snapshot().speed, "speed is reported back in the state")
         c.sample()
         val m = c.metrics.value
         assertNotNull(m.startupMs)

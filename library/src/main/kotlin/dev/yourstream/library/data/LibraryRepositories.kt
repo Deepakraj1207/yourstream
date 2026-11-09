@@ -235,6 +235,13 @@ class RoomEpisodeRepository @Inject constructor(db: YourStreamDatabase) : Episod
         return episode(next.id)
     }
 
+    override suspend fun previousEpisode(episodeId: Long): Episode? {
+        val current = dao.episode(episodeId) ?: return null
+        val order = if (current.seasonNumber < 0) 1000 else current.seasonNumber
+        val previous = dao.previousEpisode(current.seriesId, order, current.number) ?: return null
+        return episode(previous.id)
+    }
+
     override suspend fun versions(episodeId: Long): List<MediaVersion> {
         val episode = dao.episode(episodeId) ?: return emptyList()
         return dao.versions(episode.seriesId, episodeId, includeUnavailable = false).map { it.toModel() }

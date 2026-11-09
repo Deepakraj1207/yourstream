@@ -115,11 +115,44 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Episodes | `EpisodesUiState(seasons, selectedSeasonId, nextUp)` + `items: Flow<PagingData<EpisodeItem>>` | `SelectSeason`, `SetWatched` | `SeriesRepository.seasons`, `EpisodeRepository.episodes`, `WatchIntelligence.nextEpisode`, `WatchHistoryRepository.markWatched` |
 | Search | `SearchUiState(query, results?, suggestions, interpretation)`. `results` = top result (when it clearly leads) + the rest + total; `null` = blank query (example chips) | `QueryChanged` (250 ms debounce), `PickSuggestion`, `Clear` | `LibrarySearch.search/suggest` |
 | Continue watching | `ContinueWatchingUiState(items)` | `Tile(action)` (incl. dismiss), `Retry` | `WatchIntelligence.continueWatching/dismiss` |
-| Player | `PlayerUiState(status, position, duration, error, recovery, audio/subtitle options + selection, next)` | `TogglePlay`, `Pause`, `SeekTo`, `SeekBy`, `SelectAudio`, `SelectSubtitle`, `Retry` | `TelegramPlaybackControllerFactory` (one controller per screen), `WatchHistoryRepository.progress`, `PlaybackSessionStore`, `WatchIntelligence.nextEpisode` |
+| Player | `PlayerUiState(title, subtitle, status, position, duration, buffered, speed, quality, error, recovery, audio/subtitle options + selection, previous, next, resumedFrom, episodes)` + `episodeItems: Flow<PagingData<EpisodeItem>>` | `TogglePlay`, `Pause`, `SeekTo`, `SeekBy`, `ScrubStart`, `ScrubEnd`, `SetSpeed`, `SelectAudio`, `SelectSubtitle`, `SelectSeason`, `StartOver`, `DismissResume`, `Retry` | `TelegramPlaybackControllerFactory` (one controller per screen), `WatchHistoryRepository.progress`, `PlaybackSessionStore`, `EpisodeRepository.episode/nextEpisode/previousEpisode/episodes`, `SeriesRepository.seasons` |
 | Settings | `SettingsUiState(signedInAs, enabledSources, languages)`, grouped Library / Playback / About / Advanced, with the app version | callbacks to sub-screens and developer tools | auth, user, index, `TrackPreferenceStore` |
 | Account | `AccountUiState(step, busy, error)`. `AccountStep` mirrors `AuthState` | `Submit(text)`, `Resend`, `UseQr`, `LogOut` | `TelegramAuthManager` |
 | Sources | `SourcesUiState(chats: UiState<List<SourceRow>>, hasMore, actionError)` | `Toggle`, `Rescan`, `LoadMore` | `TelegramChatRepository.chatList/loadMore`, `MediaIndexer.enableChat/disableChat/schedule`, `MediaIndexRepository.observeChats` |
 | Languages | `LanguagesUiState(prefs)` | `PreferAudio`, `PreferSubtitles`, `SetSubtitleMode` | `TrackPreferenceStore` |
+
+## Player
+
+The player UI (`:ui:screens` `player/`) is separate from the playback engine
+(`:playback:media3`): the ViewModel calls `TelegramPlaybackController` and maps its `PlaybackState`
+and `TrackState`; the screen is stateless over a `PlayerView` surface (`useController = false`).
+The Telegram data source is unchanged.
+
+**Engine additions** (additive, no behaviour change): `TelegramPlaybackController.setSpeed`, and
+`PlaybackState.speed` / `PlaybackState.format` (`StreamFormat`: video/audio MIME type, frame rate,
+bitrate, channels, sample rate). In the library, `EpisodeRepository.previousEpisode` mirrors
+`nextEpisode` (same watch order, files only).
+
+| Feature | Touch (phone, tablet) | Remote / keyboard (TV) |
+|---|---|---|
+| Play/pause | Large centre button | Play/Pause in the bottom bar (initial focus); centre with controls hidden; media keys, space |
+| Seek ±10 s | Centre buttons; double-tap left/right half (running total "+30 s") | Left/right with controls hidden; rewind/fast-forward buttons and media keys |
+| Timeline | Tap to jump, drag to scrub; time bubble; one exact seek on release (`beginScrub`/`endScrub`) | Focused: left/right scrub 10 s, faster when held; seeks on centre or after a pause |
+| Position / duration | "7:43" … "22:00" (with the speed when not 1×) | same |
+| Speed | 0.5–2× panel | same |
+| Audio / subtitles | Panels listing analysed tracks (language + label); "Off" for subtitles | same; the selected option takes focus |
+| Quality | Badge "1080p · HEVC" in the top bar opens the info panel (resolution, codec, frame rate, bitrate, audio, size, file) | Badge plus an info button |
+| Previous / next episode | Bar buttons | Bar buttons; media previous/next keys |
+| Episode list | Bottom sheet with season chips; opens at the playing episode ("Now playing") | Side sheet, same |
+| Up next | Card in the last 30 s; at the end it counts down 10 s and plays (Cancel stops it) | Same; "Play now" takes focus at the end |
+| Resume | Resumes from the saved session or history; "Resumed from 12:34 · Start over" for 10 s | same |
+| Buffering | Spinner in place of the play button; the engine's recovery text ("waiting for network") on top | Centre spinner; same text |
+| Errors | Full overlay with the engine's reason, Try again (when retryable), Play next episode instead, Back | Same; BACK leaves |
+| Controls | Tap toggles; hide after 4 s of playback (the accessibility timeout can extend it); stay while paused, buffering, ended, with a panel or an error | Any key shows them; BACK hides them while playing |
+| System bars | Hidden (immersive) while the player is shown | n/a |
+
+Codec names, resolution classes (cinemascope counts by width: 1920 × 800 is 1080p), bitrate and
+speed labels are pure functions in `PlayerViewModel` (tested).
 
 ## Loading, empty and error states
 
@@ -165,10 +198,9 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 * **Initial focus:**
   * Home: the hero's Resume/Play;
   * Details: the primary button;
-  * Player: Play/Pause.
-* **Player keys:** media play/pause/fast-forward/rewind and space work anywhere on the player
-  screen.
-* **Seeking:** the seek bar scrubs locally and seeks once on release.
+  * Player: Play/Pause; a panel's selected option; "Play now" when an episode ends.
+* **Player keys:** see [Player](#player).
+* **Seeking:** the timeline scrubs locally and seeks once (release, centre or a pause).
 * **Back:** the system or remote BACK key leaves screens. On TV the title bar has no back button,
   since the remote has one.
 * **Card menu:** long press (touch), Menu key (remote/keyboard) or screen-reader actions.
@@ -183,38 +215,47 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
   live regions: polite for empty, assertive for errors.
 * **Labelled controls:**
   * Play/Pause has a content description that changes with the state;
-  * the seek bar announces "1:02 / 22:00";
+  * the timeline is a progress bar announcing "1:02 / 22:00", with a set-progress action;
+  * player icons (seek, episodes, audio, subtitles, speed, quality) have labels; panel options are
+    radio buttons;
   * source switches say "Use Tamil Movies as a source";
   * icons in navigation are decorative, with the text label beside them.
 * **Text:** all text is in string resources (translatable). Nothing depends on colour alone.
 
-## Tests (35)
+## Tests (47)
 
-* **`:ui:core` (7):**
+* **`:ui:core` (8):**
   * breakpoints, error mapping, state helpers;
   * `StateContent` in every state;
   * card accessibility, Enter / D-pad-centre activation and D-pad focus movement;
   * chips;
   * card menu by long press, Menu key and screen-reader action;
-  * title-derived placeholder artwork.
+  * title-derived placeholder artwork;
+  * timeline: key scrubbing as one seek, centre to commit, tap, screen-reader set-progress.
 * **`:ui:screens`:**
-  * pure mappers (6): tiles and captions, details primary action, player state, account steps,
-    source rows, browse query;
+  * pure mappers (7): tiles and captions, details primary action, player state, player quality
+    labels, account steps, source rows, browse query;
   * ViewModels with fake domain interfaces (5): Home sign-in → sources → hero and rows; Search
     debounce, top result and error; Account routing and error; browse filters reaching the domain
     query plus card actions reaching the repositories; artwork cache hits and expiring misses;
-  * Compose screens (11): Home (blocking, hero, rows), browse count, skeleton and empty state,
-    Search top result and count, Settings groups and version, Details, Player (controls, error
-    retry, next episode), sign-in, sources, every layout's navigation, typed routes and "play
-    next" replacing the player;
-  * screenshots (6, Robolectric native graphics): phone home (dark), library (light), empty
-    favorites, tablet home, TV home, TV settings. They are written to
+  * Compose screens (10): Home (blocking, hero, rows), browse count, skeleton and empty state,
+    Search top result and count, Settings groups and version, Details, sign-in, sources, every
+    layout's navigation, typed routes and "play next" replacing the player;
+  * player (5): TV transport, panels and BACK; controls hiding while playing with remote seeks and
+    media keys; touch double-tap, resume/start over and episode list; error retry/skip and the
+    up-next countdown and cancel; up next near the end;
+  * screenshots (12, Robolectric native graphics): phone home (dark), library (light), empty
+    favorites, tablet home, TV home, TV settings, phone player, phone audio panel, phone player
+    error, TV player buffering, TV episode list, TV up next. They are written to
     `ui/screens/build/screenshots/` for review.
+* **Engine and library:** playback speed and stream format reported by the controller (Robolectric
+  playback test); previous episode across seasons (library test).
 
 ## Not done yet
 
 * **Visuals:** animated transitions between screens, backdrop (landscape) artwork, trailers.
-* **Player:** hiding system bars, auto-hiding controls, chapter/scrub thumbnails.
+* **Player:** scrub thumbnails, picture-in-picture, remembering the speed across episodes,
+  subtitle styling.
 * **Input:** search voice input, a TV on-screen keyboard tuned for D-pad.
 * **Discovery:** catalog screens (the catalog domain exists; no screen yet).
 * **Device testing:** all UI tests run on Robolectric; device and TV testing are still to do.

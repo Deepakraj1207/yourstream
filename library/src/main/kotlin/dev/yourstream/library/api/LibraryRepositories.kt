@@ -61,6 +61,8 @@ interface EpisodeRepository {
     suspend fun episode(episodeId: Long): Episode?
     /** The episode after [episodeId] in watch order that has a file, or null. */
     suspend fun nextEpisode(episodeId: Long): Episode?
+    /** The episode before [episodeId] in watch order that has a file, or null. */
+    suspend fun previousEpisode(episodeId: Long): Episode?
     suspend fun versions(episodeId: Long): List<MediaVersion>
 }
 

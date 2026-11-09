@@ -226,6 +226,15 @@ interface LibraryDao {
     )
     suspend fun nextEpisode(seriesId: Long, seasonOrder: Int, number: Int): EpisodeEntity?
 
+    /** Previous episode in watch order, or null at the start. */
+    @Query(
+        """SELECT * FROM episode WHERE series_id = :seriesId AND available_count > 0
+        AND (CASE WHEN season_number < 0 THEN 1000 ELSE season_number END < :seasonOrder
+             OR (CASE WHEN season_number < 0 THEN 1000 ELSE season_number END = :seasonOrder AND number < :number))
+        ORDER BY CASE WHEN season_number < 0 THEN 1000 ELSE season_number END DESC, number DESC LIMIT 1""",
+    )
+    suspend fun previousEpisode(seriesId: Long, seasonOrder: Int, number: Int): EpisodeEntity?
+
     @Query("SELECT id FROM episode WHERE series_id = :seriesId")
     suspend fun episodeIds(seriesId: Long): List<Long>
 

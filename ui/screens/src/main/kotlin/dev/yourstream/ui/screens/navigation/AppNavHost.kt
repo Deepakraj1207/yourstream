@@ -53,7 +53,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
         composable<SettingsRoute> { SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, onDeveloperTools) }
         composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back) }
         composable<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
-        composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlayNext = navigator::replacePlayer) }
+        composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlay = navigator::replacePlayer) }
         composable<AccountRoute> { AccountScreenRoute(back) }
         composable<SourcesRoute> { SourcesScreenRoute(back) }
         composable<LanguagesRoute> { LanguagesScreenRoute(back) }

@@ -4,6 +4,8 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -59,15 +61,24 @@ fun EmptyState(kind: EmptyKind, modifier: Modifier = Modifier, onAction: (() -> 
 }
 
 @Composable
-fun ErrorState(error: UiError, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
+fun ErrorState(
+    error: UiError,
+    modifier: Modifier = Modifier,
+    /** More ways out, shown under Retry (e.g. the player's "Play next episode instead"). */
+    extraActions: (@Composable RowScope.() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
+) {
     Message(
         StateTags.ERROR, if (error.kind == ErrorKind.OFFLINE) Icons.Filled.Refresh else Icons.Filled.Warning, stringResource(errorText(error.kind)), error.detail,
-        if (error.retryable && onRetry != null) stringResource(R.string.ui_retry) else null, onRetry, modifier, polite = false,
+        if (error.retryable && onRetry != null) stringResource(R.string.ui_retry) else null, onRetry, modifier, polite = false, extraActions,
     )
 }
 
 @Composable
-private fun Message(tag: String, icon: ImageVector, title: String, detail: String?, action: String?, onAction: (() -> Unit)?, modifier: Modifier, polite: Boolean = true) {
+private fun Message(
+    tag: String, icon: ImageVector, title: String, detail: String?, action: String?, onAction: (() -> Unit)?, modifier: Modifier,
+    polite: Boolean = true, extraActions: (@Composable RowScope.() -> Unit)? = null,
+) {
     Box(modifier.fillMaxSize().padding(LocalDimens.current.gutter).testTag(tag), contentAlignment = Alignment.Center) {
         Column(
             Modifier.widthIn(max = 520.dp).semantics { liveRegion = if (polite) LiveRegionMode.Polite else LiveRegionMode.Assertive },
@@ -78,6 +89,7 @@ private fun Message(tag: String, icon: ImageVector, title: String, detail: Strin
             Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
             if (!detail.isNullOrBlank()) Text(detail, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             if (action != null && onAction != null) Button(onClick = onAction, modifier = Modifier.padding(top = 8.dp).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("state-action")) { Text(action) }
+            extraActions?.let { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically, content = it) }
         }
     }
 }
@@ -98,7 +110,7 @@ fun <T> StateContent(
     when (state) {
         UiState.Loading -> loading()
         is UiState.Empty -> EmptyState(state.kind, modifier, onEmptyAction)
-        is UiState.Error -> ErrorState(state.error, modifier, onRetry)
+        is UiState.Error -> ErrorState(state.error, modifier, onRetry = onRetry)
         is UiState.Content -> Box(modifier) { content(state.value) }
     }
 }

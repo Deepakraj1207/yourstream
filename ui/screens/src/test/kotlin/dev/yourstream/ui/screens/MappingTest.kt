@@ -14,6 +14,8 @@ import dev.yourstream.playback.media3.PlaybackError
 import dev.yourstream.playback.media3.PlaybackErrorKind
 import dev.yourstream.playback.media3.PlaybackState
 import dev.yourstream.playback.media3.PlaybackStatus
+import dev.yourstream.playback.media3.PlayableMedia
+import dev.yourstream.playback.media3.StreamFormat
 import dev.yourstream.playback.media3.TrackState
 import dev.yourstream.search.core.ItemKind
 import dev.yourstream.search.core.SearchHit
@@ -26,11 +28,14 @@ import dev.yourstream.telegram.api.model.CodeInfo
 import dev.yourstream.telegram.api.model.TelegramChat
 import dev.yourstream.ui.core.EmptyKind
 import dev.yourstream.ui.core.ErrorKind
+import dev.yourstream.ui.core.UiError
 import dev.yourstream.ui.core.UiState
 import dev.yourstream.ui.screens.browse.BrowseFilters
 import dev.yourstream.ui.screens.details.DetailsViewModel
 import dev.yourstream.ui.screens.details.PrimaryAction
 import dev.yourstream.ui.screens.navigation.OpenTarget
+import dev.yourstream.ui.screens.player.EpisodeLink
+import dev.yourstream.ui.screens.player.PlayerExtras
 import dev.yourstream.ui.screens.player.PlayerViewModel
 import dev.yourstream.ui.screens.settings.AccountStep
 import dev.yourstream.ui.screens.settings.AccountViewModel
@@ -95,14 +100,48 @@ class MappingTest {
 
     @Test
     fun playerStateMapping() {
+        val none = PlayerExtras()
         val s = PlayerViewModel.map(
             PlaybackState(status = PlaybackStatus.ERROR, error = PlaybackError(PlaybackErrorKind.NETWORK, "timeout", retryable = true), recovery = "retry 1 in 2 s"),
-            TrackState(), null, null,
+            TrackState(), none, null,
         )
         assertEquals(ErrorKind.OFFLINE, s.error!!.kind)
         assertEquals("retry 1 in 2 s", s.recovery)
-        assertEquals(PlaybackStatus.BUFFERING, PlayerViewModel.map(PlaybackState(status = PlaybackStatus.BUFFERING), TrackState(), null, null).status)
-        assertEquals(true, PlayerViewModel.map(PlaybackState(status = PlaybackStatus.PREPARING), TrackState(), null, null).loading)
+        assertEquals(PlaybackStatus.BUFFERING, PlayerViewModel.map(PlaybackState(status = PlaybackStatus.BUFFERING), TrackState(), none, null).status)
+        assertEquals(true, PlayerViewModel.map(PlaybackState(status = PlaybackStatus.PREPARING), TrackState(), none, null).loading)
+
+        // Neighbours, resume point and speed pass through; an open error wins over the player's.
+        val next = EpisodeLink("S01E07", "Pilot", OpenTarget.Play(PlaybackTarget(5, 7)))
+        val x = PlayerExtras(subtitle = "S01E06 · Washington B.C.", next = next, resumedFromMs = 754_000, openError = UiError(ErrorKind.NOT_FOUND))
+        val m = PlayerViewModel.map(PlaybackState(status = PlaybackStatus.READY, speed = 1.5f), TrackState(), x, null)
+        assertEquals(next, m.next)
+        assertEquals(754_000L, m.resumedFromMs)
+        assertEquals(1.5f, m.speed)
+        assertEquals(ErrorKind.NOT_FOUND, m.error!!.kind)
+        assertEquals("S01E06 · Washington B.C.", m.subtitle)
+    }
+
+    @Test
+    fun playerQualityIsDisplayReady() {
+        val media = PlayableMedia("Vikram", "Vikram.2022.2160p.mkv", 1, "u", 4_500_000_000, null, "video/x-matroska", 3840, 1608, false)
+        val q = PlayerViewModel.quality(
+            PlaybackState(media = media, videoWidth = 3840, videoHeight = 1608,
+                format = StreamFormat("video/hevc", 23.976f, 18_400_000, "audio/eac3-joc", 6, 48_000)),
+        )!!
+        assertEquals("4K", q.resolution, "cinemascope 3840 × 1608 counts by width")
+        assertEquals("3840 × 1608", q.dimensions)
+        assertEquals("4K · HEVC", q.badge)
+        assertEquals("23.976 fps", q.frameRate)
+        assertEquals("18.4 Mbps", q.bitrate)
+        assertEquals("Dolby Atmos · 5.1", q.audio)
+        assertEquals(4_500_000_000, q.sizeBytes)
+        // Before the stream's format is known, the file's declared size still gives a resolution.
+        assertEquals("1080p", PlayerViewModel.quality(PlaybackState(media = media.copy(width = 1920, height = 800)))!!.badge)
+        assertNull(PlayerViewModel.quality(PlaybackState()))
+        assertEquals("480p", PlayerViewModel.resolution(854, 480))
+        assertEquals("1.25×", PlayerViewModel.speedLabel(1.25f))
+        assertEquals("2×", PlayerViewModel.speedLabel(2f))
+        assertEquals("Stereo", PlayerViewModel.channelsLabel(2))
     }
 
     @Test

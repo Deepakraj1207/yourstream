@@ -30,6 +30,23 @@ data class PlaybackState(
     val seeking: Boolean = false,
     /** Automatic recovery in progress ("retry 2 in 4 s", "switching to another version", "waiting for network"). */
     val recovery: String? = null,
+    /** Playback speed (1 = normal). */
+    val speed: Float = 1f,
+    /** What is being decoded, for the player's quality info. Null until the stream's format is known. */
+    val format: StreamFormat? = null,
+)
+
+/** Formats of the selected video and audio tracks, as Media3 reports them. */
+data class StreamFormat(
+    /** MIME type of the video stream ("video/hevc"). */
+    val videoMimeType: String? = null,
+    val frameRate: Float? = null,
+    /** Average or peak bitrate in bits per second, when the container declares it. */
+    val videoBitrate: Int? = null,
+    /** MIME type of the selected audio stream ("audio/eac3"). */
+    val audioMimeType: String? = null,
+    val audioChannels: Int? = null,
+    val audioSampleRate: Int? = null,
 )
 
 /** What the test player shows and the tests assert on. Times are wall-clock milliseconds. */

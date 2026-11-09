@@ -6,6 +6,10 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
 import androidx.paging.PagingData
@@ -101,4 +105,65 @@ class ScreenshotTest {
     fun tvSettings() = shot("tv-settings", WindowLayout.TV, TopLevel.SETTINGS) {
         SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "0.1.0", {}, {}, {}, {})
     }
+
+    // ---- Player (full screen: no shell). A gradient stands in for the video frame.
+
+    private val playerState = dev.yourstream.ui.screens.player.PlayerUiState(
+        "Ben 10", "S01E06 · Washington B.C.", dev.yourstream.playback.media3.PlaybackStatus.READY, isPlaying = false,
+        positionMs = 463_000, durationMs = 1_320_000, bufferedMs = 640_000,
+        quality = dev.yourstream.ui.screens.player.QualityInfo("1080p", "1920 × 1080", "HEVC", "23.976 fps", "4.2 Mbps", "AAC · Stereo", "Ben.10.S01E06.1080p.mkv", 690_000_000),
+        audio = listOf(dev.yourstream.ui.screens.player.TrackOption("a1", "Hindi"), dev.yourstream.ui.screens.player.TrackOption("a2", "Tamil"), dev.yourstream.ui.screens.player.TrackOption("a3", "English")),
+        selectedAudio = "a2",
+        subtitles = listOf(dev.yourstream.ui.screens.player.TrackOption("s1", "English")),
+        previous = dev.yourstream.ui.screens.player.EpisodeLink("S01E05", "Kevin 11", OpenTarget.Play(PlaybackTarget(20, 5))),
+        next = dev.yourstream.ui.screens.player.EpisodeLink("S01E07", "The Krakken", OpenTarget.Play(PlaybackTarget(20, 7))),
+        resumedFromMs = 455_000,
+        episodes = dev.yourstream.ui.screens.player.EpisodesPanel(
+            listOf(dev.yourstream.ui.screens.episodes.SeasonTab(1, "Season 1"), dev.yourstream.ui.screens.episodes.SeasonTab(2, "Season 2")), 1, 6,
+        ),
+    )
+    private val playerEpisodes = listOf("And Then There Were 10", "Washington B.C.", "The Krakken", "Permanent Retirement", "Hunted", "Tourist Trap", "Kevin 11", "The Alliance")
+        .mapIndexed { i, t ->
+            val n = i + 4L
+            dev.yourstream.ui.screens.episodes.EpisodeItem(n, "S01E%02d · %s".format(n, t), if (n == 6L) 0.35f else null, watched = n < 6, available = true, play = OpenTarget.Play(PlaybackTarget(20, n)))
+        }
+
+    private fun playerShot(name: String, layout: WindowLayout, state: dev.yourstream.ui.screens.player.PlayerUiState, open: String? = null) {
+        compose.setContent {
+            YourStreamTheme(layout, darkTheme = true) {
+                val items = flowOf(PagingData.from(playerEpisodes, done)).collectAsLazyPagingItems()
+                dev.yourstream.ui.screens.player.PlayerScreen(state, {}, {}, {}, items) {
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier.fillMaxSize().background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF1B3A4B), androidx.compose.ui.graphics.Color(0xFF3F2E56), androidx.compose.ui.graphics.Color(0xFF0B0D12))),
+                        ),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        open?.let { compose.onNodeWithTag(it).performClick(); compose.waitForIdle() }
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File("build/screenshots").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun phonePlayer() = playerShot("phone-player", WindowLayout.COMPACT, playerState)
+
+    @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun phonePlayerAudio() = playerShot("phone-player-audio", WindowLayout.COMPACT, playerState.copy(resumedFromMs = null), open = "audio")
+
+    @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
+    fun tvPlayer() = playerShot("tv-player", WindowLayout.TV, playerState.copy(resumedFromMs = null, status = dev.yourstream.playback.media3.PlaybackStatus.BUFFERING, recovery = "waiting for network"))
+
+    @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
+    fun tvPlayerEpisodes() = playerShot("tv-player-episodes", WindowLayout.TV, playerState.copy(resumedFromMs = null), open = "episodes")
+
+    @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
+    fun tvPlayerUpNext() = playerShot("tv-player-up-next", WindowLayout.TV, playerState.copy(resumedFromMs = null, status = dev.yourstream.playback.media3.PlaybackStatus.ENDED, positionMs = 1_320_000))
+
+    @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun phonePlayerError() = playerShot("phone-player-error", WindowLayout.COMPACT, playerState.copy(resumedFromMs = null, status = dev.yourstream.playback.media3.PlaybackStatus.ERROR,
+        error = dev.yourstream.ui.core.UiError(dev.yourstream.ui.core.ErrorKind.OFFLINE, "Telegram is not reachable")))
 }
