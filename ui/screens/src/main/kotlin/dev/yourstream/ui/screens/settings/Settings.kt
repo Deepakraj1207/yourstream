@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import kotlinx.coroutines.flow.map
 import androidx.compose.material.icons.filled.Refresh
@@ -107,6 +108,7 @@ data class SettingsLinks(
     val review: (() -> Unit)? = null,
     val stats: (() -> Unit)? = null,
     val sync: (() -> Unit)? = null,
+    val addons: (() -> Unit)? = null,
 )
 
 /** Grouped settings; content width is capped on large screens and TV for readability. */
@@ -140,6 +142,12 @@ fun SettingsScreen(
                 item {
                     ListRow(stringResource(R.string.settings_review), supporting = pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
                         leading = { Icon(Icons.Filled.Warning, contentDescription = null) }, onClick = open)
+                }
+            }
+            more.addons?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_addons), supporting = stringResource(R.string.settings_addons_detail),
+                        leading = { Icon(Icons.Filled.Add, contentDescription = null) }, onClick = open)
                 }
             }
             item { Group(R.string.settings_group_playback) }

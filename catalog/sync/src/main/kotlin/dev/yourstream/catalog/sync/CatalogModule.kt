@@ -15,12 +15,6 @@ import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
 import javax.inject.Singleton
 
-/**
- * The configured catalog providers, in fallback order. Provided by the app module from build
- * configuration (`catalog.providers`); empty is valid and leaves only the local library.
- */
-data class CatalogProviders(val list: List<CatalogProvider>)
-
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class CatalogModule {
@@ -31,15 +25,8 @@ abstract class CatalogModule {
     @Binds abstract fun external(impl: MetadataCatalogFallback): ExternalMetadataFallback
 
     companion object {
-        @Provides @Singleton
-        fun manager(
-            providers: CatalogProviders,
-            cache: CatalogCache,
-            clock: Clock,
-            logger: Logger,
-            external: ExternalMetadataFallback,
-            local: LocalCatalogSource,
-            library: LibraryAvailability,
-        ) = CatalogManager(providers.list, cache, clock, logger, external, local, library)
+        /** The manager for the user's enabled add-ons (rebuilt by [CatalogAddons] when they change). */
+        @Provides
+        fun manager(addons: CatalogAddons): CatalogManager = addons.manager()
     }
 }

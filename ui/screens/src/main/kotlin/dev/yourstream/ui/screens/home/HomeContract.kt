@@ -7,7 +7,10 @@ import dev.yourstream.ui.screens.TileAction
 import dev.yourstream.ui.screens.navigation.OpenTarget
 
 /** Something the user should do or know before the rows make sense. */
-enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, INDEXING, REVIEW }
+enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, REVIEW }
+
+/** One catalog from an add-on, as a Home row. */
+data class CatalogRow(val key: String, val title: String, val tiles: List<dev.yourstream.ui.screens.Tile>)
 
 /** Unwatched picks from the local watch profile; [basis] says what it is built from. */
 data class ForYou(val basis: String?, val tiles: List<dev.yourstream.ui.screens.Tile>)
@@ -37,6 +40,11 @@ data class HomeUiState(
     val forYou: UiState<ForYou> = UiState.Loading,
     /** Titles waiting for the user's match check. */
     val reviewCount: Int = 0,
+    /** Chats being indexed right now (the status bar at the top). */
+    val indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
+    /** Titles indexed since Home was last refreshed ("Load files" shows them). */
+    val newTitles: Int = 0,
+    val catalogs: List<CatalogRow> = emptyList(),
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?
@@ -52,5 +60,7 @@ enum class HomeSection { CONTINUE_WATCHING, RECENTLY_ADDED, MOVIES, SERIES, FAVO
 
 sealed interface HomeAction {
     data object Retry : HomeAction
+    /** Show what indexing has found so far. */
+    data object LoadFiles : HomeAction
     data class Tile(val action: TileAction) : HomeAction
 }

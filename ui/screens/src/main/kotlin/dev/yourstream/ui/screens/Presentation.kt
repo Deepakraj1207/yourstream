@@ -23,6 +23,8 @@ sealed interface TileCaption {
     /** A reason the domain gives as text ("Tamil · action · ★ 7.6"). */
     data class Reason(val text: String) : TileCaption
     data object Resume : TileCaption
+    /** A catalog title that is also in the user's Telegram library. */
+    data object InLibrary : TileCaption
 }
 
 /**
@@ -130,6 +132,17 @@ object Presentation {
             open, itemId = h.itemId,
         )
     }
+
+    /**
+     * A title from a catalog add-on. In the library: opens its details. Otherwise it searches the
+     * library for it (catalogs are information only; what plays is always the user's own media).
+     */
+    fun tile(item: dev.yourstream.catalog.api.CatalogItem, presence: dev.yourstream.catalog.api.LibraryPresence?): Tile = Tile(
+        MediaCardModel("cat:${item.ref.provider.value}:${item.ref.id}", item.title, item.year?.toString(), posterUrl = item.posterUrl),
+        presence?.let { OpenTarget.Details(it.itemId) } ?: OpenTarget.Search(item.title),
+        itemId = presence?.itemId,
+        caption = if (presence != null) TileCaption.InLibrary else null,
+    )
 
     fun isSeries(h: SearchHit) = h.kind == ItemKind.SERIES
 

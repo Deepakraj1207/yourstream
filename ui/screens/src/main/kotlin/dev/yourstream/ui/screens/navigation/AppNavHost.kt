@@ -73,7 +73,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         composable<SettingsRoute> {
             SettingsScreenRoute(
                 appVersion, navigator::account, navigator::sources, navigator::languages,
-                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync),
+                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons),
             )
         }
         composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
@@ -86,6 +86,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         composable<MatchReviewRoute> { MatchReviewDestination(back) }
         composable<FixMatchRoute> { FixMatchDestination(back) }
         composable<StatsRoute> { StatsDestination(back) }
+        composable<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
         composable<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }
 }

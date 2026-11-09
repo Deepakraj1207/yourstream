@@ -93,6 +93,8 @@ class ViewModelTest {
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
         assistant,
         ReviewQueue { review },
+        LibraryRefreshGate(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
+        HomeCatalogs { flowOf(emptyList()) },
     )
 
     private val review = MutableStateFlow(0)
@@ -218,7 +220,8 @@ class ViewModelTest {
                 else -> error(name)
             }
         }
-        val vm = LibraryViewModel(SavedStateHandle(), repo, TileActionHandler(repo, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }))
+        val vm = LibraryViewModel(SavedStateHandle(), repo, TileActionHandler(repo, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
+            LibraryRefreshGate(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") flowOf(emptyList<ChatIndexStatus>()) else error(name) }))
         backgroundScope.launch { vm.state.collect {} }
         backgroundScope.launch { vm.items.collect {} }
         advanceUntilIdle()

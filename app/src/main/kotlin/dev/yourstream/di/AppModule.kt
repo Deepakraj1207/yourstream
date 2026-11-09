@@ -11,7 +11,8 @@ import dev.yourstream.BuildConfig
 import dev.yourstream.catalog.indian.IndianCatalogs
 import dev.yourstream.catalog.stremio.StremioAddonDefinition
 import dev.yourstream.catalog.stremio.StremioCatalogProvider
-import dev.yourstream.catalog.sync.CatalogProviders
+import dev.yourstream.catalog.api.CatalogProvider
+import dev.yourstream.catalog.sync.CatalogProviderFactory
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
 import dev.yourstream.core.network.HttpClients
@@ -69,12 +70,17 @@ object AppModule {
      */
     @Provides
     @Singleton
-    fun catalogProviders(clock: Clock): CatalogProviders {
-        val ids = BuildConfig.CATALOG_PROVIDERS.split(',').map { it.trim() }.filter { it.isNotEmpty() && it != "none" }
-        val known = IndianCatalogs.create(ids, { HttpClients.create() }, clock)
-        val custom = BuildConfig.CATALOG_CUSTOM_MANIFESTS.split(',').map { it.trim() }.filter { it.startsWith("https://") || it.startsWith("stremio://") }
-            .map { StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(it), clock) }
-        return CatalogProviders(known + custom)
+    fun catalogProviders(clock: Clock): CatalogProviderFactory = object : CatalogProviderFactory {
+        override fun builtIns(): List<CatalogProvider> {
+            val ids = BuildConfig.CATALOG_PROVIDERS.split(',').map { it.trim() }.filter { it.isNotEmpty() && it != "none" }
+            val known = IndianCatalogs.create(ids, { HttpClients.create() }, clock)
+            val custom = BuildConfig.CATALOG_CUSTOM_MANIFESTS.split(',').map { it.trim() }.filter { it.startsWith("https://") || it.startsWith("stremio://") }
+                .map { StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(it), clock) }
+            return known + custom
+        }
+
+        override fun custom(manifestUrl: String, name: String): CatalogProvider =
+            StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(manifestUrl, name), clock)
     }
 
     @Provides

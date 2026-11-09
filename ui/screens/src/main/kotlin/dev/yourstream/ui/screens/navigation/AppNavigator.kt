@@ -21,6 +21,10 @@ class AppNavigator(private val nav: NavHostController) {
         is OpenTarget.Details -> nav.navigate(DetailsRoute(target.itemId))
         is OpenTarget.Episodes -> nav.navigate(EpisodesRoute(target.seriesId, target.seasonId))
         is OpenTarget.Play -> nav.navigate(PlayerRoute(target.target.itemId, target.target.episodeId, target.mediaId)) { launchSingleTop = true }
+        is OpenTarget.Search -> nav.navigate(SearchRoute(target.query)) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = false }
+            launchSingleTop = true
+        }
     }
 
     /** "Play next" from the player replaces the player instead of stacking another one. */
@@ -37,6 +41,7 @@ class AppNavigator(private val nav: NavHostController) {
     fun review() = nav.navigate(MatchReviewRoute) { launchSingleTop = true }
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
+    fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
     fun back(): Boolean = nav.popBackStack()
 }

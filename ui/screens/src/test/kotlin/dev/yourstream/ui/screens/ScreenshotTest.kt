@@ -120,6 +120,29 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeIndexing() = shot("phone-home-indexing", WindowLayout.COMPACT, TopLevel.HOME) {
+        val r = flowOf(PagingData.from(movies, done)).collectAsLazyPagingItems()
+        val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
+        val catalog = dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Tamil Movies", series.map { it.copy(caption = TileCaption.InLibrary) })
+        HomeScreen(
+            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
+                IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), newTitles = 12, catalogs = listOf(catalog)),
+            HomeRows(r, none, none, none), {}, {}, {}, {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(
+            dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indiastreams", "IndiaStreams", null, true, true), 9, true),
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false)),
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:x", "Cinemeta Catalogs", "https://v3-cinemeta.strem.io/manifest.json", false, true), 6, true),
+            ), added = "Cinemeta Catalogs"), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.FAVORITES) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }
