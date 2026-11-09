@@ -123,8 +123,9 @@ fun SettingsRoute(
         updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
         onUpdate = {
             when (update) {
-                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.Ready -> updates.install()
-                is dev.yourstream.ui.screens.update.UpdateState.Downloading, dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
+                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.NeedsPermission -> updates.install()
+                is dev.yourstream.ui.screens.update.UpdateState.Downloading, is dev.yourstream.ui.screens.update.UpdateState.Installing,
+                dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
                 else -> updates.check()
             }
         },
@@ -209,6 +210,12 @@ fun SettingsScreen(
                         prefs.playerLandscape, "pref-landscape") { onPrefs(prefs.copy(playerLandscape = it)) }
                     Row(stringResource(R.string.settings_hold_speed), speedLabel(prefs.holdSpeed), dev.yourstream.ui.core.AppIcons.Speed,
                         tag = "pref-hold", onClick = { picker = Picker.HOLD })
+                    Toggle(stringResource(R.string.settings_pip), stringResource(R.string.settings_pip_detail), dev.yourstream.ui.core.AppIcons.Episodes,
+                        prefs.pictureInPicture, "pref-pip") { onPrefs(prefs.copy(pictureInPicture = it)) }
+                    Row(stringResource(R.string.settings_subtitle_size), subtitleSizeLabel(prefs.subtitleScale), dev.yourstream.ui.core.AppIcons.Subtitles,
+                        tag = "pref-subtitle-size", onClick = { picker = Picker.SUBTITLE })
+                    Toggle(stringResource(R.string.settings_subtitle_box), stringResource(R.string.settings_subtitle_box_detail), dev.yourstream.ui.core.AppIcons.Subtitles,
+                        prefs.subtitleBox, "pref-subtitle-box") { onPrefs(prefs.copy(subtitleBox = it)) }
                 }
             }
 
@@ -252,6 +259,8 @@ fun SettingsScreen(
                 prefs.defaultFit, { onPrefs(prefs.copy(defaultFit = it)) }) { picker = null }
             Picker.HOLD -> Choose(stringResource(R.string.settings_hold_speed), AppSettings.HOLD_SPEEDS.map { it to speedLabel(it) }, prefs.holdSpeed,
                 { onPrefs(prefs.copy(holdSpeed = it)) }) { picker = null }
+            Picker.SUBTITLE -> Choose(stringResource(R.string.settings_subtitle_size), AppSettings.SUBTITLE_SCALES.map { it to subtitleSizeLabel(it) }, prefs.subtitleScale,
+                { onPrefs(prefs.copy(subtitleScale = it)) }) { picker = null }
             Picker.STYLE -> Choose(stringResource(R.string.settings_style), UiStyle.entries.map { it to styleLabel(it) }, prefs.style,
                 { onPrefs(prefs.copy(style = it)) }) { picker = null }
             Picker.THEME -> Choose(stringResource(R.string.settings_theme), ThemeMode.entries.map { it to themeLabel(it) }, prefs.theme,
@@ -260,9 +269,20 @@ fun SettingsScreen(
     }
 }
 
-private enum class Picker { SEEK, FIT, HOLD, STYLE, THEME }
+private enum class Picker { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME }
 
 private fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
+
+@Composable
+private fun subtitleSizeLabel(scale: Float) = stringResource(
+    when {
+        scale < 0.9f -> R.string.settings_subtitle_small
+        scale < 1.1f -> R.string.settings_subtitle_normal
+        scale < 1.3f -> R.string.settings_subtitle_large
+        scale < 1.6f -> R.string.settings_subtitle_larger
+        else -> R.string.settings_subtitle_huge
+    },
+)
 
 @Composable
 private fun styleLabel(s: UiStyle) = stringResource(if (s == UiStyle.MANGA) R.string.settings_style_manga else R.string.settings_style_classic)

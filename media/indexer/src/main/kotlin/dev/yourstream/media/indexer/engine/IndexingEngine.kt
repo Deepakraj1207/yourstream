@@ -175,7 +175,7 @@ class IndexingEngine @Inject constructor(
                 val page = fetchPage(run, filter, from)
                 val fresh = page.messages.filter { it.messageId > boundary }
                 maxSeen = maxOf(maxSeen, page.messages.maxOfOrNull { it.messageId } ?: 0)
-                write(run, page, fresh.mapNotNull { normalizer.normalize(it, run.chatTitle) }, cursor = null)
+                write(run, page, normalize(page.messages, fresh, run.chatTitle), cursor = null)
                 // Stop as soon as the page reaches already indexed territory.
                 if (page.messages.isEmpty() || page.nextFromMessageId == 0L || page.nextFromMessageId <= boundary || fresh.size < page.messages.size) break
                 from = page.nextFromMessageId
@@ -209,7 +209,7 @@ class IndexingEngine @Inject constructor(
                     backfillComplete = done,
                     estimatedTotal = page.totalCount,
                 )
-                write(run, page, page.messages.mapNotNull { normalizer.normalize(it, run.chatTitle) }, cursor)
+                write(run, page, normalize(page.messages, page.messages, run.chatTitle), cursor)
                 if (done) break
                 from = page.nextFromMessageId
             }
@@ -235,6 +235,12 @@ class IndexingEngine @Inject constructor(
         if (notify) listeners.forEach { it.onIndexChanged() }
     }
 
+    /** Normalises [which] of a page; files of an album without a caption get the album's caption. */
+    private fun normalize(page: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>, which: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>, chatTitle: String?) =
+        page.filter { it.albumId != 0L && it.caption.isNotBlank() }.associate { it.albumId to it.caption }.let { albums ->
+            which.mapNotNull { normalizer.normalize(it, chatTitle, albums[it.albumId]) }
+        }
+
     private suspend fun fetchPage(run: Run, filter: MediaSearchFilter, from: Long): MediaMessagePage =
         withRetry("searchMedia") { messages.searchMedia(run.chatId, filter, from, config.pageSize) }
 
@@ -257,7 +263,13 @@ class IndexingEngine @Inject constructor(
             val gone = lookups.filter { it is MessageLookup.Missing || it is MessageLookup.NoMedia }.map { it.messageId }
             val alive = lookups.filterIsInstance<MessageLookup.Found>()
             // Re-upsert the living: catches replaced files and refreshes session file ids.
-            val normalized = alive.associate { it.messageId to normalizer.normalize(it.message, run.chatTitle) }
+            // Album files keep the album's caption (from this batch, else from the index).
+            val albums = alive.filter { it.message.albumId != 0L && it.message.caption.isNotBlank() }.associate { it.message.albumId to it.message.caption }.toMutableMap()
+            for (f in alive) {
+                val a = f.message.albumId
+                if (a != 0L && f.message.caption.isBlank() && a !in albums) store.albumCaption(run.chatId, a)?.let { albums[a] = it }
+            }
+            val normalized = alive.associate { it.messageId to normalizer.normalize(it.message, run.chatTitle, albums[it.message.albumId]) }
             val written = store.upsert(normalized.values.filterNotNull())
             val removedByPolicy = normalized.filterValues { it == null }.keys.toList()
             val removed = store.markDeleted(run.chatId, gone + removedByPolicy)

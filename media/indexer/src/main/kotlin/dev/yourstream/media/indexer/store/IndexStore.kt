@@ -38,6 +38,9 @@ data class WriteResult(val added: Int = 0, val updated: Int = 0, val unchanged: 
  */
 interface IndexStore {
     suspend fun chat(chatId: Long): ChatRecord?
+
+    /** The caption one file of an album carries (Telegram stores it once per album), if any. */
+    suspend fun albumCaption(chatId: Long, albumId: Long): String? = null
     suspend fun cursor(chatId: Long, filter: MediaSearchFilter): ScanCursor
     suspend fun saveCursor(cursor: ScanCursor)
     suspend fun resetCursors(chatId: Long)

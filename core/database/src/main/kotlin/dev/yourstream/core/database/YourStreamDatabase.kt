@@ -61,7 +61,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
  *
  * v1 index · v2 parsed metadata · v3 library (items, seasons, episodes, links, tracks) and user
  * data (favorites, watch state/history, track preferences) · v4 external metadata ·
- * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index · v8 Continue Watching dismissals · v9 title-order index · v10 My library picks.
+ * v5 catalog provider cache · v6 language settings and remembered track choices · v7 search index · v8 Continue Watching dismissals · v9 title-order index · v10 My library picks · v11 album index.
  */
 @Database(
     entities = [
@@ -99,7 +99,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         WatchDismissalEntity::class,
         UserLibraryEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -121,6 +121,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 8, to = 9),
         // v10: "My library" picks (user data). Adds one table only; starts empty.
         AutoMigration(from = 9, to = 10),
+        // v11: index for album captions (media chat_id + album_id). Adds an index only.
+        AutoMigration(from = 10, to = 11),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {

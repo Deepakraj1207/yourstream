@@ -112,7 +112,7 @@ class DetailsViewModel @Inject constructor(
                 if (position > 0) PrimaryAction.Resume(OpenTarget.Play(PlaybackTarget(s.id)), position) else PrimaryAction.Play(OpenTarget.Play(PlaybackTarget(s.id)))
             } else null
             return DetailsContent(
-                itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year, posterUrl = s.posterUrl,
+                itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year, posterUrl = dev.yourstream.ui.screens.Presentation.artwork(s),
                 languages = d.languages.map(LanguageCatalog::displayName), isFavorite = s.isFavorite, inLibrary = s.inLibrary, percent = w?.percent ?: 0,
                 primary = primary,
                 versions = d.versions.filter { !it.isDeleted && !it.isExcluded }.map { v ->

@@ -1,5 +1,7 @@
 package dev.yourstream.library.data
 
+import dev.yourstream.media.filename.MediaFilenameParser
+
 import androidx.room.withTransaction
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
@@ -133,7 +135,10 @@ class LibrarySynchronizer @Inject constructor(
         val key = (row.normalizedTitle ?: title?.let(LibraryQueryBuilder::normalize))?.takeIf { it.isNotBlank() }
         val titleConfidence = fieldConfidence(row.fieldConfidence, "title") ?: row.confidence ?: 0f
         if (title == null || key == null || titleConfidence < MIN_TITLE_CONFIDENCE) {
-            val name = title ?: row.fileName.ifBlank { "Video ${row.messageId}" }
+            // Never show a machine-made name (hash, Telegram id) as a title.
+            val name = title?.takeUnless(MediaFilenameParser::isMachineName)
+                ?: row.fileName.takeUnless { it.isBlank() || MediaFilenameParser.isMachineName(it) }
+                ?: UNTITLED
             return ensureItem(LibraryKind.VIDEO, "video:${row.mediaId}", name, key ?: LibraryQueryBuilder.normalize(name), null, titleConfidence, batch) to null
         }
 
@@ -295,6 +300,8 @@ class LibrarySynchronizer @Inject constructor(
     companion object {
         private const val TAG = "LibrarySync"
         const val BATCH = 500
+        /** Shown for files nothing names (no usable file name, caption or chat title). */
+        const val UNTITLED = "Untitled video"
         const val METHOD_AUTO = "AUTO"
         const val METHOD_MANUAL = "MANUAL"
         const val METHOD_EXCLUDED = "EXCLUDED"

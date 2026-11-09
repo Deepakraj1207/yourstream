@@ -42,6 +42,18 @@ public object MediaFilenameParser {
         failed(fileName, t)
     }
 
+    /**
+     * A name made by a machine ("7744f81a5b3063b9.mp4", "AgADBQADq7Ex.mkv", "VID_20230505.mp4"): it
+     * says nothing about the video, so it is never shown as a title.
+     */
+    public fun isMachineName(name: String): Boolean {
+        val base = name.trim().let { if (Regex("\\.[A-Za-z0-9]{2,4}$").containsMatchIn(it)) it.substringBeforeLast('.') else it }
+        val spaced = base.replace(Regex("[._\\-]+"), " ").trim()
+        if (spaced.isEmpty()) return true
+        if (GENERIC_NAME.matches(spaced)) return true
+        return RandomNames.isJunkTitle(spaced) || spaced.split(' ').all { RandomNames.isRandomToken(it) }
+    }
+
     /** Parses free text that is not a file name (a caption line, a search query). */
     public fun parseText(text: String): FilenameMetadata = try {
         build(text, Analyzer.analyze(text, isFileName = false, FieldSource.CAPTION), emptyList())

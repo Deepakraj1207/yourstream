@@ -39,24 +39,29 @@ sealed interface UpdateState {
     /** A newer release with an APK exists. */
     data class Available(val version: String, val notes: String, val sizeBytes: Long) : UpdateState
     data class Downloading(val version: String, val fraction: Float?) : UpdateState
-    /** Downloaded; the system installer was (or can be) opened. */
-    data class Ready(val version: String) : UpdateState
+    /** Android needs "Install unknown apps" allowed for YourStream; continues on return. */
+    data class NeedsPermission(val version: String) : UpdateState
+    /** Handed to Android's installer; its confirmation is on screen. */
+    data class Installing(val version: String) : UpdateState
     data class Failed(val message: String) : UpdateState
 }
 
 /**
- * New versions of the app from its GitHub Releases. Implemented by the app module (it knows the
- * repository, the installed version and how to hand an APK to the system installer).
+ * New versions of the app from its GitHub Releases, installed inside the app. Implemented by the
+ * app module (it knows the repository, the installed version and the package installer).
  */
 interface AppUpdates {
     val installedVersion: String
     val state: StateFlow<UpdateState>
 
-    /** Asks GitHub for the latest release ([quiet]: on app start, at most every few hours). */
+    /** Asks GitHub for the latest release ([quiet]: on app start; failures stay silent). */
     suspend fun check(quiet: Boolean = false)
 
-    /** Downloads the available APK, then opens the installer. */
+    /** Downloads the available APK (with progress), then hands it to Android's installer. */
     suspend fun downloadAndInstall()
+
+    /** The app is in front again (e.g. back from allowing installs): continue a waiting install. */
+    suspend fun onAppResumed() {}
 }
 
 @HiltViewModel
@@ -70,11 +75,11 @@ class UpdateViewModel @Inject constructor(private val updates: AppUpdates) : Vie
 
     fun checkOnStart() = viewModelScope.launch { updates.check(quiet = true) }
     fun check() = viewModelScope.launch { updates.check(quiet = false) }
-    fun install() = viewModelScope.launch { updates.downloadAndInstall() }
+    fun install() = viewModelScope.launch { _dismissed.value = null; updates.downloadAndInstall() }
     fun later(version: String) { _dismissed.value = version }
 }
 
-/** Checks once when the app starts and offers a newer version in a dialog. */
+/** Checks once when the app opens and offers a newer version right away (like Nuvio). */
 @Composable
 fun UpdatePrompt(vm: UpdateViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -83,39 +88,67 @@ fun UpdatePrompt(vm: UpdateViewModel = hiltViewModel()) {
     val version = when (val s = state) {
         is UpdateState.Available -> s.version
         is UpdateState.Downloading -> s.version
+        is UpdateState.NeedsPermission -> s.version
+        is UpdateState.Installing -> s.version
+        is UpdateState.Failed -> "failed"
         else -> null
     }
     if (version == null || version == dismissed) return
-    UpdateDialog(state, onUpdate = vm::install, onLater = { vm.later(version) })
+    UpdateDialog(state, vm.installedVersion, onUpdate = vm::install, onLater = { vm.later(version) })
 }
 
 @Composable
-fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onLater: () -> Unit) {
-    val downloading = state as? UpdateState.Downloading
-    val available = state as? UpdateState.Available
+fun UpdateDialog(state: UpdateState, installed: String, onUpdate: () -> Unit, onLater: () -> Unit) {
+    val busy = state is UpdateState.Downloading || state is UpdateState.Installing
     AlertDialog(
-        onDismissRequest = { if (downloading == null) onLater() },
+        onDismissRequest = { if (!busy) onLater() },
         modifier = Modifier.testTag("update-dialog"),
-        title = { Text(stringResource(R.string.update_title, available?.version ?: downloading?.version.orEmpty())) },
+        title = {
+            Text(
+                when (state) {
+                    is UpdateState.Available -> stringResource(R.string.update_title, state.version)
+                    is UpdateState.Downloading -> stringResource(R.string.update_title, state.version)
+                    is UpdateState.NeedsPermission -> stringResource(R.string.update_permission_title)
+                    is UpdateState.Installing -> stringResource(R.string.update_installing_title)
+                    is UpdateState.Failed -> stringResource(R.string.update_failed_title)
+                    else -> ""
+                },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (downloading != null) {
-                    Text(stringResource(R.string.update_downloading))
-                    downloading.fraction?.let { f -> LinearProgressIndicator(progress = { f }, modifier = Modifier.fillMaxWidth()) } ?: LinearProgressIndicator(Modifier.fillMaxWidth())
-                } else {
-                    Text(stringResource(R.string.update_message), style = MaterialTheme.typography.bodyMedium)
-                    available?.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                        Text(notes.take(1500), style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()))
+                when (state) {
+                    is UpdateState.Available -> {
+                        Text(stringResource(R.string.update_message, installed), style = MaterialTheme.typography.bodyMedium)
+                        if (state.sizeBytes > 0) Text(stringResource(R.string.update_size, state.sizeBytes / (1024 * 1024)), style = MaterialTheme.typography.bodySmall)
+                        state.notes.takeIf { it.isNotBlank() }?.let { notes ->
+                            Text(notes.take(2000), style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()))
+                        }
                     }
+                    is UpdateState.Downloading -> {
+                        val f = state.fraction
+                        Text(if (f != null) stringResource(R.string.update_downloading_percent, (f * 100).toInt()) else stringResource(R.string.update_downloading))
+                        if (f != null) LinearProgressIndicator(progress = { f }, modifier = Modifier.fillMaxWidth().testTag("update-progress"))
+                        else LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                    is UpdateState.NeedsPermission -> Text(stringResource(R.string.update_permission_message))
+                    is UpdateState.Installing -> Text(stringResource(R.string.update_installing_message))
+                    is UpdateState.Failed -> Text(state.message)
+                    else -> Unit
                 }
             }
         },
         confirmButton = {
-            if (downloading == null) Button(onClick = onUpdate, modifier = Modifier.testTag("update-now")) { Text(stringResource(R.string.update_now)) }
+            when (state) {
+                is UpdateState.Available -> Button(onClick = onUpdate, modifier = Modifier.testTag("update-now")) { Text(stringResource(R.string.update_now)) }
+                is UpdateState.NeedsPermission -> Button(onClick = onUpdate) { Text(stringResource(R.string.update_allow)) }
+                is UpdateState.Failed -> Button(onClick = onUpdate) { Text(stringResource(R.string.update_retry)) }
+                else -> Unit
+            }
         },
         dismissButton = {
-            if (downloading == null) TextButton(onClick = onLater) { Text(stringResource(R.string.update_later)) }
+            if (!busy) TextButton(onClick = onLater) { Text(stringResource(R.string.update_later)) }
         },
     )
 }
@@ -123,11 +156,12 @@ fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onLater: () -> Unit) 
 /** One line for Settings: "Version 0.4.0 · Up to date" / "Update to 0.5.0" / "Downloading 40 %". */
 @Composable
 fun updateSummary(installed: String, state: UpdateState): String = when (state) {
-    UpdateState.Idle -> stringResource(R.string.settings_version, installed)
+    UpdateState.Idle -> stringResource(R.string.update_tap_to_check, installed)
     UpdateState.Checking -> stringResource(R.string.update_checking)
     is UpdateState.UpToDate -> stringResource(R.string.update_up_to_date, installed)
     is UpdateState.Available -> stringResource(R.string.update_available, state.version)
     is UpdateState.Downloading -> stringResource(R.string.update_downloading_percent, ((state.fraction ?: 0f) * 100).toInt())
-    is UpdateState.Ready -> stringResource(R.string.update_ready, state.version)
+    is UpdateState.NeedsPermission -> stringResource(R.string.update_permission_title)
+    is UpdateState.Installing -> stringResource(R.string.update_installing_title)
     is UpdateState.Failed -> stringResource(R.string.update_failed, state.message)
 }

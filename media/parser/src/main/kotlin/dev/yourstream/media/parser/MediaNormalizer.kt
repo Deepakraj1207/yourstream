@@ -65,8 +65,10 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
      * [chatTitle] is a last-resort hint for the title when both file name and caption are
      * generic. The Telegram file name is stored exactly as received, even when empty.
      */
-    fun normalize(message: TelegramMediaMessage, chatTitle: String? = null): NormalizedMedia? {
+    fun normalize(message: TelegramMediaMessage, chatTitle: String? = null, albumCaption: String? = null): NormalizedMedia? {
         val media = message.media
+        // Telegram stores an album's caption on one of its files: the others use it too.
+        val caption = message.caption.ifBlank { albumCaption.orEmpty() }
         val file = media.file
         val originalName = media.fileName
         val nameForAnalysis = originalName.ifBlank { fallbackName(message) }
@@ -74,7 +76,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
         if (!policy.accepts(type)) return null
 
         val parts = MediaClassifier.splitName(originalName)
-        val parsed = ParsedMediaMapper.parse(originalName, message.caption, chatTitle)
+        val parsed = ParsedMediaMapper.parse(originalName, caption, chatTitle)
         val size = if (file.size > 0) file.size else file.expectedSize
 
         return NormalizedMedia(
@@ -102,7 +104,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
                 TelegramMediaContentType.DOCUMENT -> SourceContentType.DOCUMENT
                 TelegramMediaContentType.AUDIO -> SourceContentType.AUDIO
             },
-            caption = message.caption,
+            caption = caption,
             audioTitle = media.title,
             audioPerformer = media.performer,
             downloadState = when {

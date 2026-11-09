@@ -309,7 +309,7 @@
     <string name="player_speed_hold">Fast forward</string>
     <string name="update_row">App updates</string>
     <string name="update_title">Update to %1$s</string>
-    <string name="update_message">A new version of YourStream is available. Your library, progress and settings stay.</string>
+    <string name="update_message">You have %1$s. The update installs right here; your library, progress and settings stay.</string>
     <string name="update_now">Update</string>
     <string name="update_later">Later</string>
     <string name="update_downloading">Downloading the update…</string>
@@ -317,7 +317,6 @@
     <string name="update_up_to_date">Version %1$s · up to date</string>
     <string name="update_available">Version %1$s is available: tap to update</string>
     <string name="update_downloading_percent">Downloading… %1$d%%</string>
-    <string name="update_ready">Version %1$s downloaded: tap to install</string>
     <string name="update_failed">Could not check: %1$s. Tap to try again</string>
     <string name="addon_streams">Streams</string>
     <string name="addon_season">Season %1$d</string>
@@ -361,4 +360,23 @@
     <string name="settings_style">Style</string>
     <string name="settings_style_manga">Manga</string>
     <string name="settings_style_classic">Classic</string>
+    <string name="update_size">Download: %1$d MB</string>
+    <string name="update_permission_title">Allow updates</string>
+    <string name="update_permission_message">Android asks you once to allow YourStream to install its updates. Turn on \"Allow from this source\", then come back: the update continues by itself.</string>
+    <string name="update_allow">Open settings</string>
+    <string name="update_installing_title">Installing the update</string>
+    <string name="update_installing_message">Confirm \"Update\" in Android\'s dialog. YourStream restarts with the new version.</string>
+    <string name="update_failed_title">Update not installed</string>
+    <string name="update_retry">Try again</string>
+    <string name="update_tap_to_check">Version %1$s · tap to check for updates</string>
+    <string name="settings_pip">Picture-in-picture</string>
+    <string name="settings_pip_detail">Keep playing in a small window when you leave the app</string>
+    <string name="settings_subtitle_size">Subtitle size</string>
+    <string name="settings_subtitle_small">Small</string>
+    <string name="settings_subtitle_normal">Normal</string>
+    <string name="settings_subtitle_large">Large</string>
+    <string name="settings_subtitle_larger">Larger</string>
+    <string name="settings_subtitle_huge">Huge</string>
+    <string name="settings_subtitle_box">Subtitle background</string>
+    <string name="settings_subtitle_box_detail">A dark box behind subtitles (off: outlined text)</string>
 </resources>

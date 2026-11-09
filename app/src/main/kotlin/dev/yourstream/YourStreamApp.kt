@@ -42,7 +42,10 @@ class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImag
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     /** Posters: see [dev.yourstream.ui.core.appImageLoader]. */
-    override fun newImageLoader(context: coil3.PlatformContext): coil3.ImageLoader = dev.yourstream.ui.core.appImageLoader(this)
+    override fun newImageLoader(context: coil3.PlatformContext): coil3.ImageLoader = dev.yourstream.ui.core.appImageLoader(this, thumbnails)
+
+    /** Telegram video thumbnails as artwork for titles without a poster. */
+    @Inject lateinit var thumbnails: dev.yourstream.di.TelegramThumbnails
 
     override fun onCreate() {
         // Before Hilt: a crash while building the object graph is still recorded.

@@ -72,6 +72,8 @@ data class LibraryItemSummary(
     val metadataTitle: String? = null,
     /** The user added it to "My library". */
     val inLibrary: Boolean = false,
+    /** "chatId:messageId" of a file of this title, for its Telegram thumbnail (when there is no poster). */
+    val thumbnailRef: String? = null,
 ) {
     val isAvailable: Boolean get() = availableCount > 0
     val unwatchedEpisodeCount: Int get() = (episodeCount - watchedEpisodeCount).coerceAtLeast(0)

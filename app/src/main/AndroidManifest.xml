@@ -31,6 +31,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -41,7 +42,10 @@
         </activity>
 
 
-        <!-- Shares a downloaded update with the system installer. -->
+        <!-- The package installer's answer for an in-app update (confirm / done / failed). -->
+        <receiver android:name=".update.UpdateInstallReceiver" android:exported="false" />
+
+        <!-- Shares a downloaded update with the system installer (fallback path). -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"

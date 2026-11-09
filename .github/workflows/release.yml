@@ -83,7 +83,8 @@ jobs:
           fi
           export VERSION_NAME="${VERSION_NAME#v}"
           # A release is built from scratch: no outputs reused from the shared build cache.
-          ./gradlew --no-daemon --no-build-cache assembleRelease
+          # Hilt/KSP occasionally misses a module on a cold build; one full retry fixes it.
+          ./gradlew --no-daemon --no-build-cache assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks assembleRelease
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt

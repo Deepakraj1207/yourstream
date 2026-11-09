@@ -30,3 +30,15 @@ class RandomNamesTest {
         assertEquals("Leo", MediaFilenameParser.parse("Leo a7F3k9Qz2LmP8xY1.mkv").title?.value)
     }
 }
+
+class MachineNameTest {
+    @Test
+    fun machineNamesAreRecognised() {
+        listOf(
+            "7744f81a5b3063b96a3f54785bd51330.mp4", "74f2165fc2dbbe5d3747a4ccae8d27c4", "AgADBQADq7ExGwbKjVQ.mkv",
+            "VID_20230505_WA0003.mp4", "video_123.mp4", "3f2a8c1e-4b5d-4e6f-8a9b-0c1d2e3f4a5b.mp4", "",
+        ).forEach { kotlin.test.assertTrue(MediaFilenameParser.isMachineName(it), it) }
+        listOf("Vikram (2022) Tamil HDRip.mkv", "Ben.10.S01E06.mkv", "M3GAN.2022.1080p.mkv", "Kaithi2019.mkv", "The Frog", "Lupin")
+            .forEach { kotlin.test.assertFalse(MediaFilenameParser.isMachineName(it), it) }
+    }
+}

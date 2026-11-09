@@ -29,6 +29,7 @@ dependencies {
     api(projects.media.api)
     api(libs.androidx.paging.common)
     implementation(projects.core.database)
+    implementation(projects.media.filename)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
