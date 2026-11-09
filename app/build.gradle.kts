@@ -111,6 +111,7 @@ dependencies {
     implementation(projects.search.engine)
     implementation(projects.assistant.engine)
     implementation(projects.watch.engine)
+    implementation(projects.ui.screens)
     implementation(projects.core.diagnostics)
     implementation(projects.core.database)
     implementation(libs.androidx.media3.ui)

@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Runs on Android TV too: no touchscreen required, leanback launcher supported. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+
     <!--
       allowBackup=false: the TDLib database holds the Telegram session (auth keys). It must
       never leave the device through cloud or adb backups.
@@ -14,19 +18,30 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
-        android:label="YourStream (debug)"
+        android:label="YourStream"
+        android:banner="@drawable/tv_banner"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- The app. Handles size changes itself (foldables, multi-window, rotation) with adaptive layouts. -->
         <activity
-            android:name=".debug.DebugActivity"
+            android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Stage-1 debug screens (Settings → Developer tools). -->
+        <activity
+            android:name=".debug.DebugActivity"
+            android:exported="false"
+            android:label="YourStream debug"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Stage-1 test player. Handles rotation itself so playback is not interrupted. -->
         <activity

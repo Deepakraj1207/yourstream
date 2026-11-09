@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_loading">Loading</string>
+    <string name="ui_retry">Try again</string>
+
+    <string name="empty_not_signed_in_title">Connect Telegram</string>
+    <string name="empty_not_signed_in_message">Sign in to Telegram to see the videos in your chats.</string>
+    <string name="empty_not_signed_in_action">Sign in</string>
+    <string name="empty_no_sources_title">Choose your sources</string>
+    <string name="empty_no_sources_message">Pick the Telegram chats and channels whose videos should appear in your library.</string>
+    <string name="empty_no_sources_action">Choose chats</string>
+    <string name="empty_library_title">Nothing here yet</string>
+    <string name="empty_library_message">Your chats are being indexed. Videos appear as soon as they are found.</string>
+    <string name="empty_no_results_title">No results</string>
+    <string name="empty_no_results_message">Try a different spelling, fewer words, or another filter.</string>
+    <string name="empty_in_progress_title">Nothing in progress</string>
+    <string name="empty_in_progress_message">Movies and episodes you start appear here.</string>
+    <string name="empty_favorites_title">No favorites yet</string>
+    <string name="empty_favorites_message">Mark movies and series as favorites to find them here.</string>
+    <string name="empty_episodes_title">No episodes</string>
+    <string name="empty_episodes_message">No playable episodes were found for this season.</string>
+    <string name="empty_chats_title">No chats</string>
+    <string name="empty_chats_message">No Telegram chats were found for this account.</string>
+    <string name="empty_generic_title">Nothing to show</string>
+    <string name="empty_generic_message"> </string>
+
+    <string name="error_offline">You are offline. Your library still works; new videos and streaming need a connection.</string>
+    <string name="error_telegram">Telegram is not available right now.</string>
+    <string name="error_signed_out">You are signed out of Telegram.</string>
+    <string name="error_not_found">This is no longer available.</string>
+    <string name="error_service">The service is not responding. Try again in a moment.</string>
+    <string name="error_input">That was not accepted. Check it and try again.</string>
+    <string name="error_unknown">Something went wrong.</string>
+
+    <string name="cd_progress">%1$d percent watched</string>
+    <string name="ui_see_all">See all</string>
+    <string name="ui_back">Back</string>
+</resources>

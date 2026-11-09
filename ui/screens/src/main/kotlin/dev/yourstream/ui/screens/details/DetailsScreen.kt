@@ -1,0 +1,84 @@
+package dev.yourstream.ui.screens.details
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.yourstream.ui.core.ListRow
+import dev.yourstream.ui.core.LocalWindowLayout
+import dev.yourstream.ui.core.ScreenScaffold
+import dev.yourstream.ui.core.SectionHeader
+import dev.yourstream.ui.core.StateContent
+import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.screens.R
+import dev.yourstream.ui.screens.navigation.OpenTarget
+import dev.yourstream.ui.screens.timeLabel
+
+@Composable
+fun DetailsRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm: DetailsViewModel = hiltViewModel()) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    DetailsScreen(state, vm::onAction, onOpen, onBack)
+}
+
+@Composable
+fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOpen: (OpenTarget) -> Unit, onBack: () -> Unit) {
+    val title = (state.content as? dev.yourstream.ui.core.UiState.Content)?.value?.title.orEmpty()
+    ScreenScaffold(title, onBack = onBack) {
+        StateContent(state.content, Modifier.fillMaxSize(), onRetry = { onAction(DetailsAction.Retry) }) { c ->
+            val gutter = LocalWindowLayout.current.gutter
+            val primaryFocus = remember { FocusRequester() }
+            LazyColumn(Modifier.fillMaxSize().testTag("details")) {
+                item {
+                    Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = gutter))
+                }
+                item {
+                    Row(Modifier.padding(gutter), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        c.primary?.let { p ->
+                            Button(onClick = { onOpen(p.target) }, modifier = Modifier.focusRequester(primaryFocus).focusHighlight().testTag("primary")) {
+                                Text(when (p) {
+                                    is PrimaryAction.Play -> stringResource(R.string.action_play)
+                                    is PrimaryAction.Resume -> stringResource(R.string.action_resume_at, timeLabel(p.positionMs))
+                                    is PrimaryAction.Episode -> stringResource(if (p.resume) R.string.action_resume_episode else R.string.action_play_episode, p.label)
+                                })
+                            }
+                        }
+                        OutlinedButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight().testTag("favorite")) {
+                            Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))
+                        }
+                    }
+                }
+                if (c.seasons.isNotEmpty()) {
+                    item { SectionHeader(stringResource(R.string.details_seasons)) }
+                    items(c.seasons, key = { "s${it.seasonId}" }) { s ->
+                        ListRow(s.name, supporting = stringResource(R.string.details_episode_count, s.episodes), onClick = { onOpen(OpenTarget.Episodes(c.itemId, s.seasonId)) })
+                    }
+                }
+                if (c.versions.size > 1 || (c.versions.isNotEmpty() && c.seasons.isEmpty())) {
+                    item { SectionHeader(stringResource(R.string.details_versions)) }
+                    items(c.versions, key = { "v${it.mediaId}" }) { v -> ListRow(v.name, supporting = v.detail, onClick = { onOpen(v.target) }) }
+                }
+            }
+            // Remote users land on the main action.
+            LaunchedEffect(c.itemId) { if (c.primary != null) runCatching { primaryFocus.requestFocus() } }
+        }
+    }
+}
