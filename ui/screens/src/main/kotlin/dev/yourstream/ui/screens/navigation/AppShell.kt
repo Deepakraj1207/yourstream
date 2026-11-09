@@ -40,7 +40,7 @@ import dev.yourstream.ui.core.rememberWindowLayout
  * never recreates screens.
  */
 @Composable
-fun YourStreamUi(onDeveloperTools: (() -> Unit)? = null, layout: WindowLayout = rememberWindowLayout()) {
+fun YourStreamUi(onDeveloperTools: (() -> Unit)? = null, appVersion: String? = null, layout: WindowLayout = rememberWindowLayout()) {
     YourStreamTheme(layout) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
@@ -49,7 +49,7 @@ fun YourStreamUi(onDeveloperTools: (() -> Unit)? = null, layout: WindowLayout = 
             val destination = entry?.destination
             val current = TopLevel.entries.firstOrNull { t -> destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true }
             val fullScreen = destination?.hasRoute(PlayerRoute::class) == true
-            val graph = remember(nav) { movableContentOf { m: Modifier -> AppNavHost(nav, navigator, onDeveloperTools, m) } }
+            val graph = remember(nav) { movableContentOf { m: Modifier -> AppNavHost(nav, navigator, onDeveloperTools, appVersion, m) } }
             if (fullScreen) graph(Modifier.fillMaxSize())
             else AdaptiveShell(layout, current, navigator::top) { graph(it) }
         }

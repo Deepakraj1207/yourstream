@@ -43,6 +43,7 @@ data class DetailsContent(
     val kind: LibraryKind,
     val title: String,
     val year: Int?,
+    val posterUrl: String?,
     val languages: List<String>,
     val isFavorite: Boolean,
     /** 0..100, from the domain's watch summary. */
@@ -104,7 +105,7 @@ class DetailsViewModel @Inject constructor(
                 if (position > 0) PrimaryAction.Resume(OpenTarget.Play(PlaybackTarget(s.id)), position) else PrimaryAction.Play(OpenTarget.Play(PlaybackTarget(s.id)))
             } else null
             return DetailsContent(
-                itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year,
+                itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year, posterUrl = s.posterUrl,
                 languages = d.languages.map(LanguageCatalog::displayName), isFavorite = s.isFavorite, percent = w?.percent ?: 0,
                 primary = primary,
                 versions = d.versions.filter { !it.isDeleted && !it.isExcluded }.map { v ->

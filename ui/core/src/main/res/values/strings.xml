@@ -35,4 +35,6 @@
     <string name="cd_progress">%1$d percent watched</string>
     <string name="ui_see_all">See all</string>
     <string name="ui_back">Back</string>
+    <string name="ui_close">Close</string>
+    <string name="cd_watched">watched</string>
 </resources>

@@ -21,8 +21,18 @@ import dev.yourstream.telegram.api.model.TelegramConnectionState
 import dev.yourstream.ui.core.EmptyKind
 import dev.yourstream.ui.core.ErrorKind
 import dev.yourstream.ui.core.UiState
-import dev.yourstream.ui.screens.favorites.FavoritesAction
-import dev.yourstream.ui.screens.favorites.FavoritesViewModel
+import androidx.paging.PagingData
+import dev.yourstream.library.api.LibraryItemSummary
+import dev.yourstream.library.api.LibraryQuery
+import dev.yourstream.library.api.LibrarySort
+import dev.yourstream.library.api.MovieRepository
+import dev.yourstream.library.api.PlaybackTarget
+import dev.yourstream.library.api.SeriesRepository
+import dev.yourstream.library.api.WatchFilter
+import dev.yourstream.ui.screens.browse.BrowseAction
+import dev.yourstream.ui.screens.browse.LibraryViewModel
+import dev.yourstream.ui.screens.home.HeroItem
+import dev.yourstream.ui.screens.navigation.OpenTarget
 import dev.yourstream.ui.screens.home.HomeBanner
 import dev.yourstream.ui.screens.home.HomeViewModel
 import dev.yourstream.ui.screens.search.SearchAction
@@ -58,19 +68,32 @@ class ViewModelTest {
 
     private val auth = MutableStateFlow<AuthState>(AuthState.WaitPhoneNumber)
     private val chats = MutableStateFlow<List<ChatIndexStatus>>(emptyList())
+    private val count = MutableStateFlow(0)
     private val added = MutableStateFlow<List<AddedEntry>>(emptyList())
 
+    private val media = stub<MediaRepository> { name, _ ->
+        when (name) {
+            "recentlyAdded", "favorites" -> flowOf(PagingData.empty<LibraryItemSummary>())
+            "count" -> count
+            "getItem" -> null
+            else -> error(name)
+        }
+    }
+
     private fun home() = HomeViewModel(
-        stub<WatchIntelligence> { name, _ ->
-            when (name) { "continueWatching" -> flowOf(emptyList<Any>()); "recentlyAdded" -> added; "favorites" -> flowOf(emptyList<Any>()); else -> error(name) }
-        },
+        stub<WatchIntelligence> { name, _ -> when (name) { "continueWatching" -> flowOf(emptyList<Any>()); "recentlyAdded" -> added; else -> error(name) } },
+        media,
+        stub<MovieRepository> { _, _ -> flowOf(PagingData.empty<LibraryItemSummary>()) },
+        stub<SeriesRepository> { _, _ -> flowOf(PagingData.empty<LibraryItemSummary>()) },
         stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) },
         stub<TelegramAuthManager> { name, _ -> if (name == "getState") auth else error(name) },
         stub<TelegramManager> { name, _ -> if (name == "getConnectionState") MutableStateFlow(TelegramConnectionState.READY) else error(name) },
+        ArtworkLookup(media),
+        TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
     )
 
     @Test
-    fun homeGuidesThroughSignInAndSourcesThenShowsRows() = runTest(dispatcher) {
+    fun homeGuidesThroughSignInAndSourcesThenShowsTheLibrary() = runTest(dispatcher) {
         val vm = home()
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
@@ -82,11 +105,17 @@ class ViewModelTest {
         assertEquals(EmptyKind.NO_SOURCES, vm.state.value.blocking)
 
         chats.value = listOf(ChatIndexStatus(1, "Movies", true, IndexState.IDLE, 0, 0, false, null, null, null, null))
+        advanceUntilIdle()
+        assertEquals(EmptyKind.LIBRARY_EMPTY, vm.state.value.blocking, "sources chosen, nothing indexed yet")
+
+        count.value = 1
         added.value = listOf(AddedEntry(7, LibraryKind.MOVIE, "Vikram", 2022, 1, WatchStatus.UNWATCHED, 0, false))
         advanceUntilIdle()
         assertNull(vm.state.value.banner)
         assertNull(vm.state.value.blocking)
-        assertEquals(listOf("Vikram"), (vm.state.value.recentlyAdded as UiState.Content).value.map { it.card.title })
+        val hero = (vm.state.value.hero as UiState.Content).value
+        assertEquals("Vikram" to HeroItem.Kind.NEW, hero.title to hero.kind)
+        assertEquals(OpenTarget.Play(PlaybackTarget(7)), hero.primary, "a movie plays straight from the hero")
     }
 
     @Test
@@ -101,14 +130,16 @@ class ViewModelTest {
             }
             override suspend fun suggest(prefix: String, limit: Int) = listOf("vikram")
         }
-        val vm = SearchViewModel(SavedStateHandle(), search)
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media))
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
         assertNull(vm.state.value.results, "blank query: hint, no search")
         for (c in listOf("v", "vi", "vik", "vikram")) { vm.onAction(SearchAction.QueryChanged(c)); advanceTimeBy(50) }
         advanceUntilIdle()
         assertEquals(listOf("vikram"), asked, "typing is debounced into one search")
-        assertEquals(listOf("Vikram"), (vm.state.value.results as UiState.Content).value.map { it.card.title })
+        val r = (vm.state.value.results as UiState.Content).value
+        assertEquals("Vikram", r.top!!.card.title, "a single hit is the top result")
+        assertEquals(emptyList(), r.rest)
         assertEquals(listOf("read as vikram"), vm.state.value.interpretation)
         vm.onAction(SearchAction.QueryChanged("zzz")); advanceUntilIdle()
         assertEquals(UiState.Empty(EmptyKind.NO_RESULTS), vm.state.value.results)
@@ -144,16 +175,44 @@ class ViewModelTest {
     }
 
     @Test
-    fun favoritesRemoveGoesToTheRepository() = runTest(dispatcher) {
-        val removed = mutableListOf<Pair<Long, Boolean>>()
-        val vm = FavoritesViewModel(
-            stub<WatchIntelligence> { name, _ -> if (name == "favorites") flowOf(emptyList<Any>()) else error(name) },
-            stub<MediaRepository> { name, args -> if (name == "setFavorite") { removed += (args[0] as Long) to (args[1] as Boolean); Unit } else error(name) },
-        )
+    fun browseFiltersReachTheDomainQueryAndActionsTheRepositories() = runTest(dispatcher) {
+        val queries = mutableListOf<LibraryQuery>()
+        val favorites = mutableListOf<Pair<Long, Boolean>>()
+        val repo = stub<MediaRepository> { name, args ->
+            when (name) {
+                "search" -> { queries += args[0] as LibraryQuery; flowOf(PagingData.empty<LibraryItemSummary>()) }
+                "count" -> flowOf(42)
+                "setFavorite" -> { favorites += (args[0] as Long) to (args[1] as Boolean); Unit }
+                else -> error(name)
+            }
+        }
+        val vm = LibraryViewModel(SavedStateHandle(), repo, TileActionHandler(repo, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }))
         backgroundScope.launch { vm.state.collect {} }
+        backgroundScope.launch { vm.items.collect {} }
         advanceUntilIdle()
-        assertEquals(UiState.Empty(EmptyKind.NO_FAVORITES), vm.state.value.items)
-        vm.onAction(FavoritesAction.Remove(4)); advanceUntilIdle()
-        assertEquals(listOf(4L to false), removed)
+        assertEquals(42, vm.state.value.count)
+        vm.onAction(BrowseAction.SetKind(LibraryKind.SERIES)); vm.onAction(BrowseAction.SetWatch(WatchFilter.UNWATCHED)); advanceUntilIdle()
+        assertEquals(LibraryQuery(kinds = setOf(LibraryKind.SERIES), sort = LibrarySort.TITLE, watch = WatchFilter.UNWATCHED), queries.last())
+        vm.onAction(BrowseAction.Tile(TileAction.SetFavorite(4, true))); advanceUntilIdle()
+        assertEquals(listOf(4L to true), favorites)
+    }
+
+    @Test
+    fun artworkLookupCachesHitsAndRetriesMisses() = runTest(dispatcher) {
+        var now = 0L
+        var poster: String? = null
+        var lookups = 0
+        val repo = stub<MediaRepository> { name, _ ->
+            if (name != "getItem") error(name)
+            lookups++
+            dev.yourstream.library.api.LibraryItemDetails(summary(1).copy(posterUrl = poster), "", false, false, emptyList(), emptyList(), emptyList())
+        }
+        val art = ArtworkLookup(repo, { now }, missTtlMs = 1_000)
+        assertNull(art.poster(1)); assertNull(art.poster(1))
+        assertEquals(1, lookups, "a miss is cached for a while")
+        poster = "https://img/x.jpg"; now = 2_000
+        assertEquals("https://img/x.jpg", art.poster(1), "metadata matched later: retried after the TTL")
+        assertEquals("https://img/x.jpg", art.poster(1))
+        assertEquals(2, lookups)
     }
 }

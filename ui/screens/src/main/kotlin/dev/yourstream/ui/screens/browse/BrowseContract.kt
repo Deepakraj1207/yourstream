@@ -4,10 +4,11 @@ import dev.yourstream.library.api.LibraryKind
 import dev.yourstream.library.api.LibraryQuery
 import dev.yourstream.library.api.LibrarySort
 import dev.yourstream.library.api.WatchFilter
+import dev.yourstream.ui.screens.TileAction
 
 /** Filters of a library list; maps 1:1 to the domain's [LibraryQuery]. */
 data class BrowseFilters(
-    /** Null = all kinds (Library only; Movies/Series are fixed). */
+    /** Null = all kinds (Library / Recently added only; Movies/Series are fixed). */
     val kind: LibraryKind? = null,
     val sort: LibrarySort = LibrarySort.RECENTLY_ADDED,
     val watch: WatchFilter = WatchFilter.ANY,
@@ -18,14 +19,19 @@ data class BrowseFilters(
     val isFiltered: Boolean get() = kind != null || watch != WatchFilter.ANY
 }
 
+/** Which controls a browse screen shows. */
+data class BrowseControls(val kind: Boolean, val sort: Boolean, val watch: Boolean)
+
 data class BrowseUiState(
     val filters: BrowseFilters = BrowseFilters(),
-    /** Library shows the kind chips; Movies/Series do not. */
-    val showKindFilter: Boolean = true,
+    val controls: BrowseControls = BrowseControls(kind = true, sort = true, watch = true),
+    /** Titles matching the filters (null while counting). */
+    val count: Int? = null,
 )
 
 sealed interface BrowseAction {
     data class SetKind(val kind: LibraryKind?) : BrowseAction
     data class SetSort(val sort: LibrarySort) : BrowseAction
     data class SetWatch(val watch: WatchFilter) : BrowseAction
+    data class Tile(val action: TileAction) : BrowseAction
 }

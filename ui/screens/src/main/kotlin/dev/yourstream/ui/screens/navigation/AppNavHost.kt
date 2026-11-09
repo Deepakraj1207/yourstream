@@ -11,7 +11,8 @@ import dev.yourstream.ui.screens.browse.SeriesRoute as SeriesScreenRoute
 import dev.yourstream.ui.screens.continuewatching.ContinueWatchingRoute as ContinueWatchingScreenRoute
 import dev.yourstream.ui.screens.details.DetailsRoute as DetailsScreenRoute
 import dev.yourstream.ui.screens.episodes.EpisodesRoute as EpisodesScreenRoute
-import dev.yourstream.ui.screens.favorites.FavoritesRoute as FavoritesScreenRoute
+import dev.yourstream.ui.screens.browse.FavoritesRoute as FavoritesScreenRoute
+import dev.yourstream.ui.screens.browse.RecentlyAddedRoute as RecentlyAddedScreenRoute
 import dev.yourstream.ui.screens.home.HomeRoute as HomeScreenRoute
 import dev.yourstream.ui.screens.home.HomeSection
 import dev.yourstream.ui.screens.player.PlayerRoute as PlayerScreenRoute
@@ -23,14 +24,20 @@ import dev.yourstream.ui.screens.settings.SourcesRoute as SourcesScreenRoute
 
 /** The whole graph. Each destination wires its screen's callbacks to the [AppNavigator]. */
 @Composable
-fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools: (() -> Unit)?, appVersion: String?, modifier: Modifier = Modifier) {
     val back: () -> Unit = { navigator.back() }
     NavHost(nav, startDestination = HomeRoute, modifier = modifier) {
         composable<HomeRoute> {
             HomeScreenRoute(
                 onOpen = navigator::open,
                 onSeeAll = { s ->
-                    navigator.top(when (s) { HomeSection.CONTINUE_WATCHING -> TopLevel.CONTINUE; HomeSection.RECENTLY_ADDED -> TopLevel.LIBRARY; HomeSection.FAVORITES -> TopLevel.FAVORITES })
+                    navigator.top(when (s) {
+                        HomeSection.CONTINUE_WATCHING -> TopLevel.CONTINUE
+                        HomeSection.RECENTLY_ADDED -> TopLevel.RECENT
+                        HomeSection.MOVIES -> TopLevel.MOVIES
+                        HomeSection.SERIES -> TopLevel.SERIES
+                        HomeSection.FAVORITES -> TopLevel.FAVORITES
+                    })
                 },
                 onSignIn = navigator::account,
                 onChooseSources = navigator::sources,
@@ -40,9 +47,10 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
         composable<MoviesRoute> { MoviesScreenRoute(navigator::open) }
         composable<SeriesRoute> { SeriesScreenRoute(navigator::open) }
         composable<SearchRoute> { SearchScreenRoute(navigator::open) }
-        composable<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open, onBack = null) }
+        composable<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
+        composable<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
         composable<FavoritesRoute> { FavoritesScreenRoute(navigator::open) }
-        composable<SettingsRoute> { SettingsScreenRoute(navigator::account, navigator::sources, navigator::languages, onDeveloperTools) }
+        composable<SettingsRoute> { SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, onDeveloperTools) }
         composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back) }
         composable<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
         composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlayNext = navigator::replacePlayer) }

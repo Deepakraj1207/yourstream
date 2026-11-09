@@ -1,13 +1,18 @@
-# UI skeleton (Stage 2, step 1)
+# UI (Stage 2)
 
-A functional, unpolished UI on top of the frozen domain layer. It uses:
+The main application UI on top of the frozen domain layer. Step 1 built the skeleton (navigation,
+contracts, states); step 2 turned it into a polished media library. Every screen shows real data
+from the existing repositories and use cases. There is no demo data: fixture titles appear only in
+tests. It uses:
 
 * Jetpack Compose and Material 3;
 * Compose for TV for the TV navigation drawer;
 * Navigation Compose with type-safe routes;
-* Hilt view models.
+* Hilt view models;
+* Paging 3 for every long list;
+* Coil 3 for posters from matched metadata.
 
-No backend code was changed for it.
+No Telegram, indexing or playback code was changed for it.
 
 ```
 MainActivity ─ YourStreamUi (theme + window layout)
@@ -24,8 +29,8 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 | Module | Contents | Depends on |
 |---|---|---|
-| `:ui:core` | `UiState` / `UiError` / `EmptyKind`; state views; media components; `WindowLayout`; theme; focus highlight | `core:common` only (for `AppError` → `UiError`) |
-| `:ui:screens` | Routes, `AppNavigator`, `AdaptiveShell`, `AppNavHost`; one package per screen (contract + ViewModel + screen); `Presentation` mappers | `:ui:core` and the domain API modules |
+| `:ui:core` | Design system (brand theme, `Dimens`, typography, shapes); `UiState` / `UiError` / `EmptyKind`; state views and skeletons; artwork; poster/wide cards, rows, grids, hero; card menus; controls; `WindowLayout`; focus highlight | `core:common` only (for `AppError` → `UiError`) |
+| `:ui:screens` | Routes, `AppNavigator`, `AdaptiveShell`, `AppNavHost`; one package per screen (contract + ViewModel + screen); `Presentation` mappers; `TileActionHandler`; `ArtworkLookup` | `:ui:core` and the domain API modules |
 | `:app` | `MainActivity` (launcher + TV leanback launcher); the Stage-1 debug activity (Settings → Developer tools) | everything |
 
 ## Rules
@@ -50,16 +55,48 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 6. **Saved state.** Filters (browse) and the search query live in `SavedStateHandle` and survive
    process death. Login codes and passwords are deliberately never saved.
 
+## Design system
+
+* **Brand:** amber primary on deep ink, teal secondary. Dark and light schemes; TV is always dark.
+* **`Dimens` per layout** (`LocalDimens`): gutter, poster width, wide-card width, hero height, row
+  and card gaps, focus scale.
+
+  | Layout | Gutter | Poster | Wide card | Hero | Focus scale |
+  |---|---|---|---|---|---|
+  | COMPACT | 16 | 116 | 248 | 280 | 1.0 |
+  | MEDIUM | 24 | 140 | 300 | 340 | 1.0 |
+  | EXPANDED | 32 | 160 | 336 | 400 | 1.03 |
+  | TV | 48 | 168 | 320 | 360 | 1.08 |
+* **Type:** heavier titles; TV text is scaled ×1.15 for ten-foot viewing.
+* **Artwork:** `Artwork(url, title)` shows the matched poster via Coil. While it loads, when it
+  fails and when there is no match, `TitleArt` shows a gradient picked from a hash of the title
+  plus its initials. Initials are hidden where the title is already drawn over the art (wide
+  cards, hero background).
+* **Cards:**
+  * `PosterCard` (2:3): badge (4K / 1080p / "New episode"), watched check, progress line.
+  * `WideCard` (16:9): title, episode and "14 min left" over a scrim. Used by Continue watching.
+* **Progress:** `ProgressLine` is one continuous 4 dp bar with no gap or stop dot.
+* **Card actions:** long press, the Menu key or a screen reader's custom actions open the card
+  menu: Details, add/remove favorite, mark watched/unwatched, remove from Continue watching. Touch
+  uses a bottom sheet and TV a focusable dialog. `TileActionHandler` runs each action through
+  `MediaRepository`, `WatchHistoryRepository` or `WatchIntelligence`; Room flows refresh the lists.
+* **Hero:** `HeroBanner` shows the top Continue watching entry (or else the newest addition) with
+  Resume/Play and More info/Episodes. It has a side poster on wider layouts.
+* **Posters for non-paged sources:** Continue watching, the hero and search hits carry item IDs
+  only. `ArtworkLookup` reads the poster with `MediaRepository.getItem`, using a 300-entry LRU
+  cache in which misses expire after 5 minutes.
+
 ## Navigation
 
 | Destination | Route | Reached from |
 |---|---|---|
 | Home | `HomeRoute` (start) | top level |
-| Library | `LibraryRoute` | top level; Home → "See all" (recently added) |
-| Movies / Series | `MoviesRoute` / `SeriesRoute` | top level (rail/drawer/TV); Library kind chips on phones |
+| Library | `LibraryRoute` | top level |
+| Movies / Series | `MoviesRoute` / `SeriesRoute` | top level (rail/drawer/TV); Library kind filter on phones; Home → "See all" |
 | Search | `SearchRoute` | top level |
 | Continue watching | `ContinueWatchingRoute` | top level (rail/drawer/TV); Home → "See all" |
-| Favorites | `FavoritesRoute` | top level |
+| Recently added | `RecentlyAddedRoute` | top level (rail/drawer/TV); Home → "See all" |
+| Favorites | `FavoritesRoute` | top level; Home → "See all" |
 | Settings | `SettingsRoute` | top level |
 | Details | `DetailsRoute(itemId)` | any card |
 | Episodes | `EpisodesRoute(seriesId, seasonId?)` | Details → season |
@@ -72,23 +109,23 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 | Screen | UiState | Actions | Domain sources |
 |---|---|---|---|
-| Home | `HomeUiState(banner, continueWatching, recentlyAdded, favorites)`. Each row is a `UiState`; `blocking` = full-screen empty state when nothing exists | `Retry`; callbacks open / see all / sign in / choose sources | `WatchIntelligence.continueWatching/recentlyAdded/favorites`, `TelegramAuthManager.state`, `MediaIndexRepository.observeChats`, `TelegramManager.connectionState` |
-| Library, Movies, Series | `BrowseUiState(filters, showKindFilter)` + `items: Flow<PagingData<Tile>>` | `SetKind`, `SetSort`, `SetWatch` | `MediaRepository.search`, `MovieRepository.movies`, `SeriesRepository.series` (`LibraryQuery`) |
+| Home | `HomeUiState(banner, hero, continueWatching, libraryCount)` + paged rows (recently added, unwatched movies, series, favorites). `blocking` = full-screen sign-in / choose-chats / empty-library state, only when the library has no titles | `Retry`, `Tile(action)`; callbacks open / see all / sign in / choose sources | `WatchIntelligence.continueWatching/recentlyAdded`, `MediaRepository.recentlyAdded/favorites/count`, `MovieRepository.movies`, `SeriesRepository.series`, `TelegramAuthManager.state`, `MediaIndexRepository.observeChats`, `TelegramManager.connectionState` |
+| Library, Movies, Series, Recently added, Favorites | `BrowseUiState(filters, controls, count)` + `items: Flow<PagingData<Tile>>`. `controls` says which filters a screen offers | `SetKind`, `SetSort`, `SetWatch`, `Tile(action)` | `MediaRepository.search/recentlyAdded/favorites/count`, `MovieRepository.movies`, `SeriesRepository.series` (`LibraryQuery`) |
 | Details | `DetailsUiState(content: UiState<DetailsContent>)`. `primary`: Play / Resume(position) / Episode(label, resume) | `ToggleFavorite`, `Retry` | `MediaRepository.getItem/setFavorite`, `WatchIntelligence.summary` (incl. next-episode decision) |
 | Episodes | `EpisodesUiState(seasons, selectedSeasonId, nextUp)` + `items: Flow<PagingData<EpisodeItem>>` | `SelectSeason`, `SetWatched` | `SeriesRepository.seasons`, `EpisodeRepository.episodes`, `WatchIntelligence.nextEpisode`, `WatchHistoryRepository.markWatched` |
-| Search | `SearchUiState(query, results?, suggestions, interpretation)`. `results == null` = blank query (hint) | `QueryChanged` (250 ms debounce), `PickSuggestion`, `Clear` | `LibrarySearch.search/suggest` |
-| Continue watching | `ContinueWatchingUiState(items)` | `Remove` (dismiss), `Retry` | `WatchIntelligence.continueWatching/dismiss` |
-| Favorites | `FavoritesUiState(items)` | `Remove`, `Retry` | `WatchIntelligence.favorites`, `MediaRepository.setFavorite` |
+| Search | `SearchUiState(query, results?, suggestions, interpretation)`. `results` = top result (when it clearly leads) + the rest + total; `null` = blank query (example chips) | `QueryChanged` (250 ms debounce), `PickSuggestion`, `Clear` | `LibrarySearch.search/suggest` |
+| Continue watching | `ContinueWatchingUiState(items)` | `Tile(action)` (incl. dismiss), `Retry` | `WatchIntelligence.continueWatching/dismiss` |
 | Player | `PlayerUiState(status, position, duration, error, recovery, audio/subtitle options + selection, next)` | `TogglePlay`, `Pause`, `SeekTo`, `SeekBy`, `SelectAudio`, `SelectSubtitle`, `Retry` | `TelegramPlaybackControllerFactory` (one controller per screen), `WatchHistoryRepository.progress`, `PlaybackSessionStore`, `WatchIntelligence.nextEpisode` |
-| Settings | `SettingsUiState(signedInAs, enabledSources, languages)` | callbacks to sub-screens and developer tools | auth, user, index, `TrackPreferenceStore` |
+| Settings | `SettingsUiState(signedInAs, enabledSources, languages)`, grouped Library / Playback / About / Advanced, with the app version | callbacks to sub-screens and developer tools | auth, user, index, `TrackPreferenceStore` |
 | Account | `AccountUiState(step, busy, error)`. `AccountStep` mirrors `AuthState` | `Submit(text)`, `Resend`, `UseQr`, `LogOut` | `TelegramAuthManager` |
 | Sources | `SourcesUiState(chats: UiState<List<SourceRow>>, hasMore, actionError)` | `Toggle`, `Rescan`, `LoadMore` | `TelegramChatRepository.chatList/loadMore`, `MediaIndexer.enableChat/disableChat/schedule`, `MediaIndexRepository.observeChats` |
 | Languages | `LanguagesUiState(prefs)` | `PreferAudio`, `PreferSubtitles`, `SetSubtitleMode` | `TrackPreferenceStore` |
 
 ## Loading, empty and error states
 
-* **Loading:** a centred progress indicator, announced as "Loading". Paged lists show it only
-  on the first load.
+* **Loading:** skeletons shaped like the content (hero, rows, poster or wide grids) with a soft
+  pulse that follows the system animation scale. They are announced as "Loading". Paged grids
+  append skeleton cards while the next page loads.
 * **Empty:** `EmptyKind` decides the title, the message and the call to action.
   * `NOT_SIGNED_IN` → Sign in;
   * `NO_SOURCES` → Choose chats;
@@ -97,6 +134,8 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 * **Error:** `ErrorKind` decides the message: OFFLINE ("your library still works"), TELEGRAM,
   SIGNED_OUT, NOT_FOUND, SERVICE, INPUT, UNKNOWN. The domain's safe detail is shown below it.
   Retry appears only when `retryable`.
+* **Counts:** browse screens show "240 titles" (plurals) from `MediaRepository.count`. An
+  unfiltered, empty list shows only its empty state, with no count and no filters.
 * **Partial failure:** a failed Home row shows its error in place and the others still render.
   The player overlays errors on the video, and its recovery text ("waiting for network",
   "switching to another version") comes from the playback layer.
@@ -107,10 +146,10 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 | Layout | When | Navigation | Cards |
 |---|---|---|---|
-| COMPACT | < 600 dp | bottom bar (Home, Library, Search, Favorites, Settings) | 112 dp min, 16 dp gutter |
-| MEDIUM | 600–839 dp | navigation rail (all 8) | 136 dp |
-| EXPANDED | ≥ 840 dp | permanent drawer | 160 dp |
-| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus) | 196 dp, 48 dp overscan gutter, always dark |
+| COMPACT | < 600 dp | bottom bar (Home, Library, Search, Favorites, Settings) | see `Dimens` |
+| MEDIUM | 600–839 dp | navigation rail (all 9) | see `Dimens` |
+| EXPANDED | ≥ 840 dp | permanent drawer | see `Dimens` |
+| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus) | 48 dp overscan gutter, always dark |
 
 * **Rotation and size changes:** `MainActivity` handles them in place, so the player keeps
   playing.
@@ -118,10 +157,13 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 ## Keyboard, remote and touch
 
-* **Focus:** every clickable has a visible focus border (`focusHighlight`). Cards, chips, rows,
+* **Focus:** every clickable has a visible focus border plus a slight scale on large screens and
+  TV (`focusHighlight`). Rows and grids use `focusRestorer`, so moving back into a row lands on the
+  card you left. Cards, chips, rows,
   buttons, rail and drawer items are all reachable with D-pad / Tab and activated with
   Enter / centre (tested).
 * **Initial focus:**
+  * Home: the hero's Resume/Play;
   * Details: the primary button;
   * Player: Play/Pause.
 * **Player keys:** media play/pause/fast-forward/rewind and space work anywhere on the player
@@ -129,12 +171,14 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 * **Seeking:** the seek bar scrubs locally and seeks once on release.
 * **Back:** the system or remote BACK key leaves screens. On TV the title bar has no back button,
   since the remote has one.
+* **Card menu:** long press (touch), Menu key (remote/keyboard) or screen-reader actions.
 * **Touch:** standard Material targets, with no hover-only or focus-only controls.
 
 ## Accessibility
 
 * **Cards:** each card is one merged node with a full description, e.g. "Vikram, 2022, 40 percent
-  watched".
+  watched". The card menu's entries are also exposed as custom accessibility actions.
+* **Artwork** is decorative; badges, the watched check and progress are in the description.
 * **Headings and announcements:** section headers are headings. Empty and error messages are
   live regions: polite for empty, assertive for errors.
 * **Labelled controls:**
@@ -144,29 +188,33 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
   * icons in navigation are decorative, with the text label beside them.
 * **Text:** all text is in string resources (translatable). Nothing depends on colour alone.
 
-## Tests (22)
+## Tests (35)
 
-* **`:ui:core`:**
+* **`:ui:core` (7):**
   * breakpoints, error mapping, state helpers;
   * `StateContent` in every state;
   * card accessibility, Enter / D-pad-centre activation and D-pad focus movement;
-  * chips.
+  * chips;
+  * card menu by long press, Menu key and screen-reader action;
+  * title-derived placeholder artwork.
 * **`:ui:screens`:**
-  * pure mappers (tiles, details primary action, player state, account steps, source rows,
-    browse query);
-  * ViewModels with fake domain interfaces: Home sign-in → sources → rows, Search debounce and
-    error, Account routing and error, Favorites;
-  * Compose screens: Home, Details, Player (controls, error retry, next episode), sign-in,
-    sources;
-  * every layout's navigation;
-  * typed routes with arguments, and "play next" replacing the player.
+  * pure mappers (6): tiles and captions, details primary action, player state, account steps,
+    source rows, browse query;
+  * ViewModels with fake domain interfaces (5): Home sign-in → sources → hero and rows; Search
+    debounce, top result and error; Account routing and error; browse filters reaching the domain
+    query plus card actions reaching the repositories; artwork cache hits and expiring misses;
+  * Compose screens (11): Home (blocking, hero, rows), browse count, skeleton and empty state,
+    Search top result and count, Settings groups and version, Details, Player (controls, error
+    retry, next episode), sign-in, sources, every layout's navigation, typed routes and "play
+    next" replacing the player;
+  * screenshots (6, Robolectric native graphics): phone home (dark), library (light), empty
+    favorites, tablet home, TV home, TV settings. They are written to
+    `ui/screens/build/screenshots/` for review.
 
-## Not done yet (by design: visual polish comes later)
+## Not done yet
 
-* **Visuals:** artwork and posters (placeholders only), brand colours and typography,
-  animations and transitions, a TV-style hero/featured row.
+* **Visuals:** animated transitions between screens, backdrop (landscape) artwork, trailers.
 * **Player:** hiding system bars, auto-hiding controls, chapter/scrub thumbnails.
-* **Focus:** restoring focus to the card you came from after BACK on TV.
 * **Input:** search voice input, a TV on-screen keyboard tuned for D-pad.
 * **Discovery:** catalog screens (the catalog domain exists; no screen yet).
 * **Device testing:** all UI tests run on Robolectric; device and TV testing are still to do.

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="titles_count">
+        <item quantity="one">%1$d title</item>
+        <item quantity="other">%1$d titles</item>
+    </plurals>
+    <plurals name="results_count">
+        <item quantity="one">%1$d result</item>
+        <item quantity="other">%1$d results</item>
+    </plurals>
+    <plurals name="settings_sources_count">
+        <item quantity="one">%1$d chat selected</item>
+        <item quantity="other">%1$d chats selected</item>
+    </plurals>
+</resources>

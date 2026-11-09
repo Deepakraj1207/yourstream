@@ -18,6 +18,22 @@ import dev.yourstream.telegram.api.TelegramAuthManager
 import dev.yourstream.telegram.api.TelegramUserRepository
 import dev.yourstream.telegram.api.model.AuthState
 import dev.yourstream.ui.core.ListRow
+import dev.yourstream.ui.core.LocalDimens
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.yourstream.ui.core.ScreenScaffold
 import dev.yourstream.ui.screens.R
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,24 +79,53 @@ class SettingsViewModel @Inject constructor(
 }
 
 @Composable
-fun SettingsRoute(onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
-    SettingsScreen(state, onAccount, onSources, onLanguages, onDeveloperTools)
+    SettingsScreen(state, appVersion, onAccount, onSources, onLanguages, onDeveloperTools)
 }
 
+/** Grouped settings; content width is capped on large screens and TV for readability. */
 @Composable
-fun SettingsScreen(state: SettingsUiState, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?) {
+fun SettingsScreen(state: SettingsUiState, appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?) {
     ScreenScaffold(stringResource(R.string.nav_settings)) {
-        LazyColumn(Modifier.testTag("settings")) {
+        LazyColumn(
+            Modifier.testTag("settings").widthIn(max = 760.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = LocalDimens.current.gutter - 16.dp, vertical = 8.dp),
+        ) {
+            item { Group(R.string.settings_group_library) }
             item {
                 ListRow(stringResource(R.string.settings_account),
                     supporting = if (state.signedIn) stringResource(R.string.settings_signed_in_as, state.signedInAs.orEmpty()) else stringResource(R.string.settings_not_signed_in),
-                    onClick = onAccount)
+                    leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null) }, onClick = onAccount)
             }
-            item { ListRow(stringResource(R.string.settings_sources), supporting = stringResource(R.string.settings_sources_count, state.enabledSources), onClick = onSources) }
-            item { ListRow(stringResource(R.string.settings_languages), supporting = state.languages.ifEmpty { null }, onClick = onLanguages) }
-            onDeveloperTools?.let { item { ListRow(stringResource(R.string.settings_developer), supporting = stringResource(R.string.settings_developer_detail), onClick = it) } }
+            item {
+                ListRow(stringResource(R.string.settings_sources), supporting = pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
+                    leading = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) }, onClick = onSources)
+            }
+            item { Group(R.string.settings_group_playback) }
+            item {
+                ListRow(stringResource(R.string.settings_languages), supporting = state.languages.ifEmpty { null },
+                    leading = { Icon(Icons.Filled.Settings, contentDescription = null) }, onClick = onLanguages)
+            }
+            item { Group(R.string.settings_group_about) }
+            item {
+                ListRow(stringResource(R.string.app_name), supporting = appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(R.string.settings_about_line),
+                    leading = { Icon(Icons.Filled.Info, contentDescription = null) })
+            }
+            onDeveloperTools?.let {
+                item { Group(R.string.settings_group_advanced) }
+                item {
+                    ListRow(stringResource(R.string.settings_developer), supporting = stringResource(R.string.settings_developer_detail),
+                        leading = { Icon(Icons.Filled.Build, contentDescription = null) }, onClick = it)
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun Group(title: Int) {
+    Text(stringResource(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 4.dp).semantics { heading() })
 }

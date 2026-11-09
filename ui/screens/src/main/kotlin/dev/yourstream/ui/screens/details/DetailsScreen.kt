@@ -8,7 +8,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import dev.yourstream.ui.core.Artwork
+import dev.yourstream.ui.core.ProgressLine
+import dev.yourstream.ui.core.LocalDimens
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,29 +51,33 @@ fun DetailsRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm: DetailsVi
 
 @Composable
 fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOpen: (OpenTarget) -> Unit, onBack: () -> Unit) {
-    val title = (state.content as? dev.yourstream.ui.core.UiState.Content)?.value?.title.orEmpty()
-    ScreenScaffold(title, onBack = onBack) {
+    ScreenScaffold("", onBack = onBack) {
         StateContent(state.content, Modifier.fillMaxSize(), onRetry = { onAction(DetailsAction.Retry) }) { c ->
             val gutter = LocalWindowLayout.current.gutter
             val primaryFocus = remember { FocusRequester() }
             LazyColumn(Modifier.fillMaxSize().testTag("details")) {
                 item {
-                    Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = gutter))
-                }
-                item {
-                    Row(Modifier.padding(gutter), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        c.primary?.let { p ->
-                            Button(onClick = { onOpen(p.target) }, modifier = Modifier.focusRequester(primaryFocus).focusHighlight().testTag("primary")) {
-                                Text(when (p) {
-                                    is PrimaryAction.Play -> stringResource(R.string.action_play)
-                                    is PrimaryAction.Resume -> stringResource(R.string.action_resume_at, timeLabel(p.positionMs))
-                                    is PrimaryAction.Episode -> stringResource(if (p.resume) R.string.action_resume_episode else R.string.action_play_episode, p.label)
-                                })
+                    Row(Modifier.padding(horizontal = gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Artwork(c.posterUrl, c.title, Modifier.width(LocalDimens.current.posterWidth).aspectRatio(2f / 3f).clip(MaterialTheme.shapes.medium))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(c.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+                            Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (c.percent in 1..99) ProgressLine(c.percent / 100f, Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.surfaceVariant)
+                            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                c.primary?.let { p ->
+                                    Button(onClick = { onOpen(p.target) }, modifier = Modifier.focusRequester(primaryFocus).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("primary")) {
+                                        Text(when (p) {
+                                            is PrimaryAction.Play -> stringResource(R.string.action_play)
+                                            is PrimaryAction.Resume -> stringResource(R.string.action_resume_at, timeLabel(p.positionMs))
+                                            is PrimaryAction.Episode -> stringResource(if (p.resume) R.string.action_resume_episode else R.string.action_play_episode, p.label)
+                                        })
+                                    }
+                                }
+                                FilledTonalButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("favorite")) {
+                                    Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))
+                                }
                             }
-                        }
-                        OutlinedButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight().testTag("favorite")) {
-                            Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))
                         }
                     }
                 }

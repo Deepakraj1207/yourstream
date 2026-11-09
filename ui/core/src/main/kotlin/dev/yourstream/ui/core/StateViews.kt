@@ -7,7 +7,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,28 +55,29 @@ fun LoadingState(modifier: Modifier = Modifier) {
 @Composable
 fun EmptyState(kind: EmptyKind, modifier: Modifier = Modifier, onAction: (() -> Unit)? = null) {
     val (title, message, action) = emptyTexts(kind)
-    Message(StateTags.EMPTY, stringResource(title), message?.let { stringResource(it) }, action?.takeIf { onAction != null }?.let { stringResource(it) }, onAction, modifier)
+    Message(StateTags.EMPTY, emptyIcon(kind), stringResource(title), message?.let { stringResource(it) }, action?.takeIf { onAction != null }?.let { stringResource(it) }, onAction, modifier)
 }
 
 @Composable
 fun ErrorState(error: UiError, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     Message(
-        StateTags.ERROR, stringResource(errorText(error.kind)), error.detail,
+        StateTags.ERROR, if (error.kind == ErrorKind.OFFLINE) Icons.Filled.Refresh else Icons.Filled.Warning, stringResource(errorText(error.kind)), error.detail,
         if (error.retryable && onRetry != null) stringResource(R.string.ui_retry) else null, onRetry, modifier, polite = false,
     )
 }
 
 @Composable
-private fun Message(tag: String, title: String, detail: String?, action: String?, onAction: (() -> Unit)?, modifier: Modifier, polite: Boolean = true) {
-    Box(modifier.fillMaxSize().padding(LocalWindowLayout.current.gutter).testTag(tag), contentAlignment = Alignment.Center) {
+private fun Message(tag: String, icon: ImageVector, title: String, detail: String?, action: String?, onAction: (() -> Unit)?, modifier: Modifier, polite: Boolean = true) {
+    Box(modifier.fillMaxSize().padding(LocalDimens.current.gutter).testTag(tag), contentAlignment = Alignment.Center) {
         Column(
-            Modifier.widthIn(max = 480.dp).semantics { liveRegion = if (polite) LiveRegionMode.Polite else LiveRegionMode.Assertive },
+            Modifier.widthIn(max = 520.dp).semantics { liveRegion = if (polite) LiveRegionMode.Polite else LiveRegionMode.Assertive },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-            if (!detail.isNullOrBlank()) Text(detail, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-            if (action != null && onAction != null) Button(onClick = onAction, modifier = Modifier.focusHighlight()) { Text(action) }
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+            if (!detail.isNullOrBlank()) Text(detail, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            if (action != null && onAction != null) Button(onClick = onAction, modifier = Modifier.padding(top = 8.dp).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("state-action")) { Text(action) }
         }
     }
 }
@@ -79,10 +92,11 @@ fun <T> StateContent(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
     onEmptyAction: (() -> Unit)? = null,
+    loading: @Composable () -> Unit = { LoadingState(modifier) },
     content: @Composable (T) -> Unit,
 ) {
     when (state) {
-        UiState.Loading -> LoadingState(modifier)
+        UiState.Loading -> loading()
         is UiState.Empty -> EmptyState(state.kind, modifier, onEmptyAction)
         is UiState.Error -> ErrorState(state.error, modifier, onRetry)
         is UiState.Content -> Box(modifier) { content(state.value) }
@@ -97,11 +111,12 @@ fun <T : Any> PagedContent(
     modifier: Modifier = Modifier,
     onEmptyAction: (() -> Unit)? = null,
     errorOf: (Throwable) -> UiError = { it.toUiError() },
+    loading: @Composable () -> Unit = { SkeletonGrid(modifier = modifier) },
     content: @Composable (LazyPagingItems<T>) -> Unit,
 ) {
     val refresh = items.loadState.refresh
     when {
-        refresh is LoadState.Loading && items.itemCount == 0 -> LoadingState(modifier)
+        refresh is LoadState.Loading && items.itemCount == 0 -> loading()
         refresh is LoadState.Error && items.itemCount == 0 -> ErrorState(errorOf(refresh.error), modifier) { items.retry() }
         refresh is LoadState.NotLoading && items.itemCount == 0 -> EmptyState(empty, modifier, onEmptyAction)
         else -> Box(modifier) { content(items) }
@@ -131,4 +146,13 @@ private fun errorText(kind: ErrorKind): Int = when (kind) {
     ErrorKind.SERVICE -> R.string.error_service
     ErrorKind.INPUT -> R.string.error_input
     ErrorKind.UNKNOWN -> R.string.error_unknown
+}
+
+private fun emptyIcon(kind: EmptyKind): ImageVector = when (kind) {
+    EmptyKind.NOT_SIGNED_IN -> Icons.Filled.AccountCircle
+    EmptyKind.NO_SOURCES, EmptyKind.NO_CHATS, EmptyKind.LIBRARY_EMPTY, EmptyKind.NO_EPISODES -> Icons.Filled.List
+    EmptyKind.NO_RESULTS -> Icons.Filled.Search
+    EmptyKind.NOTHING_IN_PROGRESS -> Icons.Filled.PlayArrow
+    EmptyKind.NO_FAVORITES -> Icons.Filled.Favorite
+    EmptyKind.GENERIC -> Icons.Filled.Info
 }

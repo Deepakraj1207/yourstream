@@ -3,13 +3,13 @@ package dev.yourstream.ui.screens.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ThumbUp
+import dev.yourstream.ui.core.AppIcons
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.yourstream.library.api.PlaybackTarget
 import dev.yourstream.ui.screens.R
@@ -24,6 +24,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object SeriesRoute : Route
 @Serializable data object SearchRoute : Route
 @Serializable data object ContinueWatchingRoute : Route
+@Serializable data object RecentlyAddedRoute : Route
 @Serializable data object FavoritesRoute : Route
 @Serializable data object SettingsRoute : Route
 
@@ -45,10 +46,11 @@ import kotlinx.serialization.Serializable
 enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector, val compact: Boolean) {
     HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home, true),
     LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List, true),
-    MOVIES(MoviesRoute, R.string.nav_movies, Icons.Filled.Star, false),
-    SERIES(SeriesRoute, R.string.nav_series, Icons.Filled.ThumbUp, false),
+    MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie, false),
+    SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv, false),
     SEARCH(SearchRoute, R.string.nav_search, Icons.Filled.Search, true),
     CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
+    RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
     FAVORITES(FavoritesRoute, R.string.nav_favorites, Icons.Filled.Favorite, true),
     SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings, true),
 }

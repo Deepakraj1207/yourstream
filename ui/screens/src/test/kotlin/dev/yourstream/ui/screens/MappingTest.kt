@@ -63,7 +63,11 @@ class MappingTest {
         val movie = Presentation.tile(summary(2, progress = WatchProgress(600, 1000, false, 1)))
         assertEquals(0.6f, movie.card.progress)
         assertEquals("1080p", movie.card.badge)
-        assertNull(Presentation.tile(summary(3, progress = WatchProgress(0, 1000, true, 1))).card.progress, "finished: no bar")
+        val done = Presentation.tile(summary(3, progress = WatchProgress(0, 1000, true, 1)))
+        assertNull(done.card.progress, "finished: no bar")
+        assertEquals(true, done.card.watched)
+        assertEquals(true, done.watched, "offers \"mark unwatched\"")
+        assertEquals(false, series.isFavorite)
 
         val episodeHit = Presentation.tile(SearchHit(5, ItemKind.SERIES, "Ben 10", null, 1.0, emptyList(), emptyList(), season = 2, episodeId = 55, episodeNumber = 5))
         assertEquals(OpenTarget.Play(PlaybackTarget(5, 55)), episodeHit.open, "s2e5 opens the episode")

@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            YourStreamUi(onDeveloperTools = { startActivity(Intent(this, DebugActivity::class.java)) })
+            YourStreamUi(onDeveloperTools = { startActivity(Intent(this, DebugActivity::class.java)) }, appVersion = BuildConfig.VERSION_NAME)
         }
     }
 }

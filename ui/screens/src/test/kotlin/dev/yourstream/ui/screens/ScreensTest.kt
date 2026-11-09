@@ -35,6 +35,24 @@ import dev.yourstream.ui.screens.details.DetailsUiState
 import dev.yourstream.ui.screens.details.PrimaryAction
 import dev.yourstream.ui.screens.home.HomeBanner
 import dev.yourstream.ui.screens.home.HomeScreen
+import dev.yourstream.ui.screens.home.HomeRows
+import dev.yourstream.ui.screens.home.HeroItem
+import dev.yourstream.ui.screens.browse.BrowseScreen
+import dev.yourstream.ui.screens.browse.BrowseUiState
+import dev.yourstream.ui.screens.search.SearchResults
+import dev.yourstream.ui.screens.search.SearchScreen
+import dev.yourstream.ui.screens.search.SearchUiState
+import dev.yourstream.ui.screens.settings.SettingsScreen
+import dev.yourstream.ui.screens.settings.SettingsUiState
+import dev.yourstream.ui.core.StateTags
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
+import androidx.paging.PagingData
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import dev.yourstream.ui.screens.home.HomeUiState
 import dev.yourstream.ui.screens.navigation.AdaptiveShell
 import dev.yourstream.ui.screens.navigation.AppNavigator
@@ -68,25 +86,84 @@ class ScreensTest {
     private fun set(layout: WindowLayout = WindowLayout.COMPACT, content: @androidx.compose.runtime.Composable () -> Unit) =
         compose.setContent { YourStreamTheme(layout) { content() } }
 
+    @androidx.compose.runtime.Composable
+    private fun rows(vararg recent: Tile): HomeRows {
+        val r = kotlinx.coroutines.flow.flowOf(PagingData.from(recent.toList())).collectAsLazyPagingItems()
+        val none = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>())).collectAsLazyPagingItems()
+        return HomeRows(r, none, none, none)
+    }
+
     @Test
-    fun homeBlocksOnSignInAndOpensTiles() {
+    fun homeBlocksOnSignInThenShowsHeroAndRows() {
         var signIn = 0
         val opened = mutableListOf<OpenTarget>()
-        var state by androidx.compose.runtime.mutableStateOf(
-            HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NO_FAVORITES)),
-        )
-        set { HomeScreen(state, {}, { opened += it }, {}, { signIn++ }, {}) }
+        var state by androidx.compose.runtime.mutableStateOf(HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), libraryCount = 0))
+        val tile = Tile(MediaCardModel("item:7", "Vikram", "2022"), OpenTarget.Details(7), itemId = 7, isFavorite = false, watched = false)
+        set { HomeScreen(state, rows(tile), {}, { opened += it }, {}, { signIn++ }, {}) }
         compose.onNodeWithText("Connect Telegram").assertIsDisplayed()
-        compose.onNodeWithText("Sign in").performClick()
+        compose.onNodeWithTag("state-action").performClick()
         assertEquals(1, signIn)
 
-        val tile = Tile(MediaCardModel("item:7", "Vikram", "2022"), OpenTarget.Details(7))
-        state = HomeUiState(null, UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), UiState.Content(listOf(tile)), UiState.Error(UiError(ErrorKind.OFFLINE)))
-        compose.onNodeWithTag("row:Recently added").assertExists()
-        compose.onNodeWithTag("row:Continue watching").assertDoesNotExist()
+        val hero = HeroItem(HeroItem.Kind.CONTINUE, "hero:5", "Ben 10", "2005", null, 0.35f, OpenTarget.Play(PlaybackTarget(5, 6)), OpenTarget.Details(5), "S01E06")
+        state = HomeUiState(null, UiState.Content(hero), UiState.Error(UiError(ErrorKind.OFFLINE)), libraryCount = 12)
+        compose.onNodeWithTag("hero").assertExists()
+        compose.onNodeWithText("Resume S01E06").performClick()
+        assertEquals(OpenTarget.Play(PlaybackTarget(5, 6)), opened.last())
         compose.onNodeWithText("Try again").assertExists() // the failed row shows its error in place
+        compose.onNodeWithTag("home").performScrollToNode(hasTestTag("card:item:7"))
         compose.onNodeWithTag("card:item:7").performClick()
-        assertEquals(listOf<OpenTarget>(OpenTarget.Details(7)), opened)
+        assertEquals(OpenTarget.Details(7), opened.last())
+    }
+
+    @Test
+    fun browseShowsCountAndSkeletonWhileLoading() {
+        set {
+            val loading = androidx.compose.runtime.remember {
+                kotlinx.coroutines.flow.flowOf(PagingData.empty<Tile>(LoadStates(LoadState.Loading, LoadState.NotLoading(false), LoadState.NotLoading(false))))
+            }
+            BrowseScreen("Library", EmptyKind.LIBRARY_EMPTY, BrowseUiState(count = 1240), loading.collectAsLazyPagingItems(), {}, {})
+        }
+        compose.onNodeWithTag("count").assertTextEquals("1240 titles")
+        compose.onNodeWithTag(StateTags.LOADING).assertExists() // skeleton, not a spinner
+    }
+
+    @Test
+    fun browseShowsItsEmptyState() {
+        set {
+            // As Room's paging source reports it: refresh finished, end of pagination reached, no items.
+            val done = LoadStates(LoadState.NotLoading(true), LoadState.NotLoading(true), LoadState.NotLoading(true))
+            val empty = androidx.compose.runtime.remember { kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>(), done)) }
+            BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(count = 0), empty.collectAsLazyPagingItems(), {}, {})
+        }
+        compose.onNodeWithText("No favorites yet").assertExists()
+        // Nothing to filter or count yet.
+        compose.onNodeWithTag("count").assertDoesNotExist()
+        compose.onNodeWithTag("sort").assertDoesNotExist()
+    }
+
+    @Test
+    fun searchShowsTopResultAndCount() {
+        val top = Tile(MediaCardModel("hit:1:0", "Doraemon"), OpenTarget.Details(1))
+        val rest = listOf(Tile(MediaCardModel("hit:2:0", "Doraemon: Nobita"), OpenTarget.Details(2)))
+        val opened = mutableListOf<OpenTarget>()
+        set { SearchScreen(SearchUiState("doremon", UiState.Content(SearchResults(top, rest, 2)), interpretation = listOf("doremon → doraemon")), {}, { opened += it }) }
+        compose.onNodeWithTag("results-count").assertTextEquals("2 results")
+        compose.onNodeWithText("doremon → doraemon").assertExists()
+        compose.onNodeWithTag("top-result").performClick()
+        assertEquals(listOf<OpenTarget>(OpenTarget.Details(1)), opened)
+    }
+
+    @Test
+    fun settingsGroupsAndVersion() {
+        var sources = 0
+        set { SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", {}, { sources++ }, {}, {}) }
+        compose.onNodeWithText("Signed in as Asha").assertExists()
+        compose.onNodeWithText("3 chats selected").performClick()
+        assertEquals(1, sources)
+        compose.onNodeWithTag("settings").performScrollToNode(hasText("Version 1.2.0"))
+        compose.onNodeWithText("Version 1.2.0").assertExists()
+        compose.onNodeWithTag("settings").performScrollToNode(hasText("Developer tools"))
+        compose.onNodeWithText("Developer tools").assertExists()
     }
 
     @Test
@@ -96,7 +173,7 @@ class ScreensTest {
         val play = OpenTarget.Play(PlaybackTarget(1))
         set {
             DetailsScreen(
-                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, listOf("Tamil"), false, 40, PrimaryAction.Resume(play, 3_723_000), emptyList(), emptyList()))),
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, listOf("Tamil"), false, 40, PrimaryAction.Resume(play, 3_723_000), emptyList(), emptyList()))),
                 { actions += it }, { opened += it }, {},
             )
         }

@@ -17,6 +17,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import dev.yourstream.core.common.AppError
 import dev.yourstream.core.common.AppResult
 import org.junit.Rule
@@ -108,5 +110,44 @@ class UiComponentsTest {
         }
         compose.onNodeWithText("Y").performClick()
         assertEquals("y", selected)
+    }
+
+    @Test
+    fun cardMenuOpensByLongPressMenuKeyAndScreenReader() {
+        val done = mutableListOf<String>()
+        var layout by androidx.compose.runtime.mutableStateOf(WindowLayout.COMPACT)
+        compose.setContent {
+            YourStreamTheme(layout) {
+                PosterCard(MediaCardModel("a", "Vikram"), {}, actions = listOf(CardAction("Add to favorites") { done += "fav" }, CardAction("Mark watched") { done += "watched" }))
+            }
+        }
+        // Touch: long press → bottom sheet.
+        compose.onNodeWithTag("card:a").performTouchInput { longClick() }
+        compose.onNodeWithTag("card-menu").assertExists()
+        compose.onNodeWithText("Mark watched").performClick()
+        assertEquals(listOf("watched"), done)
+        compose.waitForIdle()
+
+        // Screen readers: the same actions as custom accessibility actions.
+        val custom = compose.onNodeWithTag("card:a").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
+        assertEquals(listOf("Add to favorites", "Mark watched"), custom.map { it.label })
+        compose.runOnIdle { custom.first().action() }
+        assertEquals(listOf("watched", "fav"), done)
+
+        // Remote: the Menu key → a focusable dialog on TV.
+        layout = WindowLayout.TV
+        compose.onNodeWithTag("card:a").requestFocus()
+        compose.onNodeWithTag("card:a").performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("card-menu").assertExists()
+        compose.onNodeWithText("Add to favorites").performClick()
+        assertEquals(listOf("watched", "fav", "fav"), done)
+    }
+
+    @Test
+    fun titleArtworkIsDerivedFromTheTitle() {
+        assertEquals("DK", initials("The Dark Knight"))
+        assertEquals("BI", initials("Bheem Island"))
+        assertEquals(TitleColors.of("Vikram"), TitleColors.of("vikram"), "stable per title")
+        assertEquals("1", initials("10"))
     }
 }

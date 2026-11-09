@@ -112,10 +112,8 @@ fun PlayerScreen(
     ) {
         surface()
         if (state.loading && state.error == null) CircularProgressIndicator(Modifier.align(Alignment.Center).testTag("player-loading"))
-        state.error?.let { e ->
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f))) { ErrorState(e) { onAction(PlayerAction.Retry) } }
-        }
-        Column(
+        // Transport controls are hidden while an error is shown: the error (and its retry) is on top.
+        if (state.error == null) Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -147,6 +145,9 @@ fun PlayerScreen(
                     Button(onClick = { onPlayNext(target) }, modifier = Modifier.focusHighlight().testTag("play-next")) { Text(stringResource(R.string.action_play_episode, label)) }
                 }
             }
+        }
+        state.error?.let { e ->
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).testTag("player-error")) { ErrorState(e) { onAction(PlayerAction.Retry) } }
         }
     }
     LaunchedEffect(Unit) { runCatching { playFocus.requestFocus() } }
