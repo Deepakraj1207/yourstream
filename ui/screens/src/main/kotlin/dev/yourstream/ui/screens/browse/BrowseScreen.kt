@@ -43,7 +43,7 @@ import dev.yourstream.ui.screens.tileActions
 import dev.yourstream.ui.screens.tileCard
 
 @Composable
-fun LibraryRoute(onOpen: (OpenTarget) -> Unit, vm: LibraryViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_library, EmptyKind.LIBRARY_EMPTY, vm, onOpen)
+fun LibraryRoute(onOpen: (OpenTarget) -> Unit, vm: LibraryViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_library, EmptyKind.MY_LIBRARY_EMPTY, vm, onOpen)
 
 @Composable
 fun MoviesRoute(onOpen: (OpenTarget) -> Unit, vm: MoviesViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_movies, EmptyKind.LIBRARY_EMPTY, vm, onOpen)

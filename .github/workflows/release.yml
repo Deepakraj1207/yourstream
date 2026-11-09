@@ -78,7 +78,8 @@ jobs:
             exit 1
           fi
           export VERSION_NAME="${VERSION_NAME#v}"
-          ./gradlew --no-daemon assembleRelease
+          # A release is built from scratch: no outputs reused from the shared build cache.
+          ./gradlew --no-daemon --no-build-cache assembleRelease
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt

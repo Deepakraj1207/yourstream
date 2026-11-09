@@ -120,6 +120,44 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeIndexing() = shot("phone-home-indexing", WindowLayout.COMPACT, TopLevel.HOME) {
+        val r = flowOf(PagingData.from(movies, done)).collectAsLazyPagingItems()
+        val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
+        val catalog = dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Tamil Movies", series.map { it.copy(caption = TileCaption.InLibrary) })
+        HomeScreen(
+            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
+                IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), catalogs = listOf(catalog)),
+            HomeRows(r, none, none, none), {}, {}, {}, {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(
+            dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indiastreams", "IndiaStreams", null, true, true), 9, true),
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false)),
+                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:x", "Cinemeta Catalogs", "https://v3-cinemeta.strem.io/manifest.json", false, true), 6, true),
+            ), added = "Cinemeta Catalogs"), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneDetails() = shot("phone-details", WindowLayout.COMPACT, TopLevel.LIBRARY) {
+        dev.yourstream.ui.screens.details.DetailsScreen(
+            dev.yourstream.ui.screens.details.DetailsUiState(UiState.Content(dev.yourstream.ui.screens.details.DetailsContent(
+                1, dev.yourstream.library.api.LibraryKind.MOVIE, "Vikram", 2022, null, listOf("Tamil"), false, 40,
+                dev.yourstream.ui.screens.details.PrimaryAction.Resume(OpenTarget.Play(PlaybackTarget(1)), 3_723_000), emptyList(), emptyList()))),
+            {}, {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryEmpty() = shot("phone-library-empty", WindowLayout.COMPACT, TopLevel.LIBRARY) {
+        BrowseScreen("Library", EmptyKind.MY_LIBRARY_EMPTY, BrowseUiState(count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneFavoritesEmpty() = shot("phone-favorites-empty", WindowLayout.COMPACT, TopLevel.FAVORITES) {
         BrowseScreen("Favorites", EmptyKind.NO_FAVORITES, BrowseUiState(controls = BrowseControls(kind = true, sort = false, watch = false), count = 0), flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems(), {}, {})
     }
@@ -161,7 +199,7 @@ class ScreenshotTest {
         compose.setContent {
             YourStreamTheme(layout, darkTheme = true) {
                 val items = flowOf(PagingData.from(playerEpisodes, done)).collectAsLazyPagingItems()
-                dev.yourstream.ui.screens.player.PlayerScreen(state, {}, {}, {}, items) {
+                dev.yourstream.ui.screens.player.PlayerScreen(state, {}, {}, {}, items, onRotate = if (layout == WindowLayout.TV) null else ({})) {
                     androidx.compose.foundation.layout.Box(
                         androidx.compose.ui.Modifier.fillMaxSize().background(
                             androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF1B3A4B), androidx.compose.ui.graphics.Color(0xFF3F2E56), androidx.compose.ui.graphics.Color(0xFF0B0D12))),

@@ -21,7 +21,6 @@
     <string name="home_banner_signed_out">Sign in to Telegram to update your library</string>
     <string name="home_banner_no_sources">Choose the chats your videos come from</string>
     <string name="home_banner_offline">Offline: showing your library; streaming needs a connection</string>
-    <string name="home_banner_indexing">Looking for new videos in your chats…</string>
 
     <string name="filter_all">All</string>
     <string name="filter_videos">Videos</string>
@@ -273,4 +272,33 @@
     <string name="sync_problem_failed">Sync did not work this time. It will try again later.</string>
 
     <!-- Telegram API credentials -->
+    <plurals name="home_indexing_chats">
+        <item quantity="one">Indexing %1$d chat</item>
+        <item quantity="other">Indexing %1$d chats</item>
+    </plurals>
+    <plurals name="home_indexing_found">
+        <item quantity="one">%1$d file found</item>
+        <item quantity="other">%1$d files found</item>
+    </plurals>
+    <string name="caption_in_library">In your library</string>
+    <string name="settings_addons">Add-ons</string>
+    <string name="settings_addons_detail">Catalog add-ons: add, switch on or off</string>
+    <string name="addons_intro">Catalog add-ons add title lists (trending, new releases, by language) to Home. They are information only: what you play is always your own Telegram media.</string>
+    <string name="addons_add_label">Add-on link</string>
+    <string name="addons_add_hint">https://…/manifest.json or stremio://…</string>
+    <string name="addons_add">Add</string>
+    <string name="addons_added">%1$s added</string>
+    <string name="addons_installed">Installed</string>
+    <string name="addons_built_in">Built in</string>
+    <string name="addons_remove">Remove %1$s</string>
+    <string name="addons_checking">Checking…</string>
+    <string name="addons_unavailable">Not reachable right now</string>
+    <plurals name="addons_catalogs">
+        <item quantity="one">%1$d catalog</item>
+        <item quantity="other">%1$d catalogs</item>
+    </plurals>
+    <string name="addons_only_catalogs">Only catalog add-ons are supported (no stream add-ons).</string>
+    <string name="action_add_to_library">Add to library</string>
+    <string name="action_remove_from_library">Remove from library</string>
+    <string name="player_rotate">Rotate screen</string>
 </resources>

@@ -173,7 +173,7 @@ class ScreensTest {
         }
         compose.onNodeWithText("Resume from 1:02:03").performClick()
         assertEquals(listOf<OpenTarget>(play), opened)
-        compose.onNodeWithTag("favorite").performClick()
+        compose.onNodeWithTag("favorite").performScrollTo().performClick()
         assertEquals(listOf<DetailsAction>(DetailsAction.ToggleFavorite), actions)
     }
 

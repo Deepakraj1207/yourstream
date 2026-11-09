@@ -44,6 +44,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dev.yourstream.ui.screens.IndexingStatus
+import dev.yourstream.ui.screens.IndexingMonitor
+import kotlinx.coroutines.flow.debounce
+import dev.yourstream.ui.screens.HomeCatalogs
 import javax.inject.Inject
 
 /**
@@ -51,7 +55,7 @@ import javax.inject.Inject
  * the poster rows from the library repositories (paged, with artwork), the library size from
  * [MediaRepository.count], and the status banner from Telegram/indexing state.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val watch: WatchIntelligence,
@@ -65,9 +69,12 @@ class HomeViewModel @Inject constructor(
     private val actions: TileActionHandler,
     private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
     private val reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
+    private val indexingMonitor: IndexingMonitor,
+    private val homeCatalogs: HomeCatalogs,
 ) : ViewModel() {
     private val retry = MutableStateFlow(0)
 
+    // Live: new files appear in the rows while chats are indexed.
     private fun paged(source: () -> Flow<PagingData<dev.yourstream.library.api.LibraryItemSummary>>): Flow<PagingData<Tile>> =
         source().map { p -> p.map(Presentation::tile) }.cachedIn(viewModelScope)
 
@@ -100,18 +107,23 @@ class HomeViewModel @Inject constructor(
             a !is AuthState.Ready && a !is AuthState.Unknown && a !is AuthState.WaitParameters -> HomeBanner.NOT_SIGNED_IN
             chats.none { it.enabled } -> HomeBanner.NO_SOURCES
             conn == TelegramConnectionState.WAITING_FOR_NETWORK -> HomeBanner.OFFLINE
-            chats.any { it.enabled && it.progress != null } -> HomeBanner.INDEXING
             else -> null
         }
     }.catch { emit(null) }
 
     private val count: Flow<Int?> = media.count(LibraryQuery()).map<Int, Int?> { it }.catch { emit(null) }
 
+    /** Indexing progress for the status bar. */
+    private val indexing: Flow<IndexingStatus> = indexingMonitor.status
+
+    /** Rows from the user's catalog add-ons (Settings → Add-ons); reloaded when they change. */
+    private val catalogs: Flow<List<CatalogRow>> = homeCatalogs.rows().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
+
     /**
      * Recommendations from the local watch profile (nothing leaves the device), recomputed when the
      * viewing history or the library changes.
      */
-    private val forYou: Flow<UiState<ForYou>> = combine(watch.recentlyWatched(1), count) { recent, n -> recent.firstOrNull()?.lastWatchedAt to n }
+    private val forYou: Flow<UiState<ForYou>> = combine(watch.recentlyWatched(1), count.debounce(RECOMMEND_DEBOUNCE_MS)) { recent, n -> recent.firstOrNull()?.lastWatchedAt to n }
         .distinctUntilChanged()
         .mapLatest {
             val r = assistant.recommendations(FOR_YOU)
@@ -123,11 +135,13 @@ class HomeViewModel @Inject constructor(
 
     private val review: Flow<Int> = reviewQueue.count()
 
-    private val extras = combine(forYou, review) { f, r -> f to r }
+    private val extras = combine(forYou, review, indexing, catalogs) { f, r, i, c -> Extras(f, r, i, c) }
 
-    val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, (f, r) ->
+    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val indexing: IndexingStatus, val catalogs: List<CatalogRow>)
+
+    val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
         // Lowest-priority banner: only when nothing more urgent is shown.
-        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { r > 0 }, h, cw, n, f, r)
+        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, e.indexing, e.catalogs)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -140,6 +154,8 @@ class HomeViewModel @Inject constructor(
 
     companion object {
         const val FOR_YOU = 20
+        /** While indexing adds titles every moment, recommendations are recomputed at most this often. */
+        const val RECOMMEND_DEBOUNCE_MS = 5_000L
 
         fun heroOf(e: ContinueEntry, poster: String?) = HeroItem(
             HeroItem.Kind.CONTINUE, "hero:${e.target.itemId}:${e.target.episodeKey}", e.title,

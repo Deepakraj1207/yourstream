@@ -190,6 +190,17 @@ data class FavoriteEntity(
     @ColumnInfo(name = "added_at") val addedAt: Long,
 )
 
+/** Titles the user added to "My library" (the Library tab is only these). User data. */
+@Entity(
+    tableName = "user_library",
+    foreignKeys = [ForeignKey(LibraryItemEntity::class, ["id"], ["item_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["added_at"])],
+)
+data class UserLibraryEntity(
+    @PrimaryKey @ColumnInfo(name = "item_id") val itemId: Long,
+    @ColumnInfo(name = "added_at") val addedAt: Long,
+)
+
 /**
  * Resume point and completion per playable unit: a movie/video (episode_key = 0) or one episode
  * (episode_key = episode id). episode_key is not a foreign key on purpose: an episode row may be

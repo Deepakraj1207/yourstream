@@ -88,7 +88,10 @@ private val FIXED_KIND = BrowseControls(kind = false, sort = true, watch = true)
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
-    BrowseViewModel(saved, null, ALL, LibrarySort.TITLE, media, actions, { media.search(it) })
+    BrowseViewModel(saved, null, ALL, LibrarySort.TITLE, media, actions, { media.search(it) }) {
+    /** "My library": only what the user added (empty until they add a movie or series). */
+    override fun query(f: BrowseFilters) = f.toQuery(null).copy(myLibraryOnly = true)
+}
 
 @HiltViewModel
 class MoviesViewModel @Inject constructor(saved: SavedStateHandle, movies: MovieRepository, media: MediaRepository, actions: TileActionHandler) :

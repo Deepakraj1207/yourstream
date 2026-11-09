@@ -22,7 +22,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object LibraryRoute : Route
 @Serializable data object MoviesRoute : Route
 @Serializable data object SeriesRoute : Route
-@Serializable data object SearchRoute : Route
+/** [query]: start with this text (a catalog title to look for in the library). */
+@Serializable data class SearchRoute(val query: String = "") : Route
 @Serializable data object ContinueWatchingRoute : Route
 @Serializable data object RecentlyAddedRoute : Route
 @Serializable data object FavoritesRoute : Route
@@ -45,6 +46,8 @@ import kotlinx.serialization.Serializable
 /** Choose the right metadata for one title (from Details). */
 @Serializable data class FixMatchRoute(val itemId: Long) : Route
 @Serializable data object StatsRoute : Route
+/** Catalog add-ons: built-in ones and those added by link. */
+@Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
 @Serializable data object ProgressSyncRoute : Route
 
@@ -57,7 +60,7 @@ enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: Image
     LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List, true),
     MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie, false),
     SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv, false),
-    SEARCH(SearchRoute, R.string.nav_search, Icons.Filled.Search, true),
+    SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search, true),
     CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
     RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
     FAVORITES(FavoritesRoute, R.string.nav_favorites, Icons.Filled.Favorite, true),
@@ -69,4 +72,6 @@ sealed interface OpenTarget {
     data class Details(val itemId: Long) : OpenTarget
     data class Episodes(val seriesId: Long, val seasonId: Long? = null) : OpenTarget
     data class Play(val target: PlaybackTarget, val mediaId: Long? = null) : OpenTarget
+    /** Look for a title in the library (catalog titles that are not in it). */
+    data class Search(val query: String) : OpenTarget
 }

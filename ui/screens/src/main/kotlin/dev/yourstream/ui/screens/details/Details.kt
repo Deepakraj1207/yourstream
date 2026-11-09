@@ -51,12 +51,15 @@ data class DetailsContent(
     val primary: PrimaryAction?,
     val versions: List<VersionRow>,
     val seasons: List<SeasonRow>,
+    /** In "My library" (the Library tab). */
+    val inLibrary: Boolean = false,
 )
 
 data class DetailsUiState(val content: UiState<DetailsContent> = UiState.Loading)
 
 sealed interface DetailsAction {
     data object ToggleFavorite : DetailsAction
+    data object ToggleLibrary : DetailsAction
     data object Retry : DetailsAction
 }
 
@@ -78,6 +81,10 @@ class DetailsViewModel @Inject constructor(
             DetailsAction.ToggleFavorite -> {
                 val c = (state.value.content as? UiState.Content)?.value ?: return
                 viewModelScope.launch { media.setFavorite(itemId, !c.isFavorite); load(showLoading = false) }
+            }
+            DetailsAction.ToggleLibrary -> {
+                val c = (state.value.content as? UiState.Content)?.value ?: return
+                viewModelScope.launch { media.setInLibrary(itemId, !c.inLibrary); load(showLoading = false) }
             }
         }
     }
@@ -106,7 +113,7 @@ class DetailsViewModel @Inject constructor(
             } else null
             return DetailsContent(
                 itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year, posterUrl = s.posterUrl,
-                languages = d.languages.map(LanguageCatalog::displayName), isFavorite = s.isFavorite, percent = w?.percent ?: 0,
+                languages = d.languages.map(LanguageCatalog::displayName), isFavorite = s.isFavorite, inLibrary = s.inLibrary, percent = w?.percent ?: 0,
                 primary = primary,
                 versions = d.versions.filter { !it.isDeleted && !it.isExcluded }.map { v ->
                     VersionRow(v.mediaId, v.fileName,

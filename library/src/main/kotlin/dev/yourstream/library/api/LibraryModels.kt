@@ -22,6 +22,8 @@ data class LibraryQuery(
     /** Empty = all kinds. */
     val kinds: Set<LibraryKind> = emptySet(),
     val favoritesOnly: Boolean = false,
+    /** Only titles the user added to "My library" (the Library tab). */
+    val myLibraryOnly: Boolean = false,
     val watch: WatchFilter = WatchFilter.ANY,
     val yearFrom: Int? = null,
     val yearTo: Int? = null,
@@ -68,6 +70,8 @@ data class LibraryItemSummary(
     val posterUrl: String? = null,
     /** Official title from external metadata, when matched (title stays the library's own). */
     val metadataTitle: String? = null,
+    /** The user added it to "My library". */
+    val inLibrary: Boolean = false,
 ) {
     val isAvailable: Boolean get() = availableCount > 0
     val unwatchedEpisodeCount: Int get() = (episodeCount - watchedEpisodeCount).coerceAtLeast(0)

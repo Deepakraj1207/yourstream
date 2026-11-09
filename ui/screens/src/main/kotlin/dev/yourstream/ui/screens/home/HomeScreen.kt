@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
@@ -72,6 +74,24 @@ fun HomeScreen(
     onChooseSources: () -> Unit,
     onReview: () -> Unit = {},
 ) {
+    Column(Modifier.fillMaxSize()) {
+        // Pinned above the rows: what indexing is doing (the rows below update live).
+        if (state.indexing.active) IndexingBar(state.indexing)
+        HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
+    }
+}
+
+@Composable
+private fun HomeContent(
+    state: HomeUiState,
+    rows: HomeRows,
+    onAction: (HomeAction) -> Unit,
+    onOpen: (OpenTarget) -> Unit,
+    onSeeAll: (HomeSection) -> Unit,
+    onSignIn: () -> Unit,
+    onChooseSources: () -> Unit,
+    onReview: () -> Unit,
+) {
     val blocking = state.blocking
     if (blocking != null) {
         EmptyState(blocking, Modifier.testTag("home"), onAction = when (blocking) {
@@ -114,6 +134,10 @@ fun HomeScreen(
         paged("movies", R.string.home_unwatched_movies, rows.movies, HomeSection.MOVIES, card, actions, onOpen, onSeeAll)
         paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
         paged("favorites", R.string.home_favorites, rows.favorites, HomeSection.FAVORITES, card, actions, onOpen, onSeeAll)
+        // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
+        state.catalogs.forEach { c ->
+            item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
+        }
     }
     // Remote users start on the hero's main button.
     LaunchedEffect(state.hero is UiState.Content) { if (state.hero is UiState.Content) runCatching { heroFocus.requestFocus() } }
@@ -163,7 +187,6 @@ private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, o
         HomeBanner.NOT_SIGNED_IN -> stringResource(R.string.home_banner_signed_out) to onSignIn
         HomeBanner.NO_SOURCES -> stringResource(R.string.home_banner_no_sources) to onChooseSources
         HomeBanner.OFFLINE -> stringResource(R.string.home_banner_offline) to null
-        HomeBanner.INDEXING -> stringResource(R.string.home_banner_indexing) to null
         HomeBanner.REVIEW -> androidx.compose.ui.res.pluralStringResource(R.plurals.home_banner_review, reviewCount, reviewCount) to onReview
     }
     val m = Modifier.padding(horizontal = LocalDimens.current.gutter).testTag("banner")
@@ -174,6 +197,45 @@ private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, o
         androidx.compose.foundation.layout.Row(m, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Icon(Icons.Filled.Info, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
             Text(text, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+/** "Indexing 2 chats · 134 files found" with progress. Status only. */
+@Composable
+private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
+    val d = LocalDimens.current
+    androidx.compose.material3.Surface(
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = androidx.compose.material3.MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter, vertical = 8.dp).testTag("indexing-bar"),
+    ) {
+        Column {
+            androidx.compose.foundation.layout.Row(
+                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    val chats = status.chats + status.queued
+                    Text(
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_chats, chats, chats),
+                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1,
+                    )
+                    Text(
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_found, status.found, status.found),
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                        modifier = Modifier.testTag("indexing-detail"),
+                    )
+                }
+            }
+            val fraction = status.fraction
+            if (fraction != null) {
+                androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(3.dp), drawStopIndicator = {}, gapSize = 0.dp)
+            } else {
+                androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp))
+            }
         }
     }
 }

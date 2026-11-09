@@ -18,6 +18,9 @@ interface MediaRepository {
 
     suspend fun setFavorite(itemId: Long, favorite: Boolean)
 
+    /** Adds a title to / removes it from "My library" (the Library tab). Its files are untouched. */
+    suspend fun setInLibrary(itemId: Long, inLibrary: Boolean)
+
     /** Manual correction; locks the item so sync never renames it. */
     suspend fun updateItem(itemId: Long, title: String?, year: Int?): AppResult<Unit>
 

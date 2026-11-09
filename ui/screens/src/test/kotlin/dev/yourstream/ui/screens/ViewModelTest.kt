@@ -93,6 +93,8 @@ class ViewModelTest {
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
         assistant,
         ReviewQueue { review },
+        IndexingMonitor(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
+        HomeCatalogs { flowOf(emptyList()) },
     )
 
     private val review = MutableStateFlow(0)
@@ -224,7 +226,7 @@ class ViewModelTest {
         advanceUntilIdle()
         assertEquals(42, vm.state.value.count)
         vm.onAction(BrowseAction.SetKind(LibraryKind.SERIES)); vm.onAction(BrowseAction.SetWatch(WatchFilter.UNWATCHED)); advanceUntilIdle()
-        assertEquals(LibraryQuery(kinds = setOf(LibraryKind.SERIES), sort = LibrarySort.TITLE, watch = WatchFilter.UNWATCHED), queries.last())
+        assertEquals(LibraryQuery(kinds = setOf(LibraryKind.SERIES), myLibraryOnly = true, sort = LibrarySort.TITLE, watch = WatchFilter.UNWATCHED), queries.last())
         vm.onAction(BrowseAction.Tile(TileAction.SetFavorite(4, true))); advanceUntilIdle()
         assertEquals(listOf(4L to true), favorites)
     }

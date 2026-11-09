@@ -36,6 +36,7 @@ dependencies {
     implementation(projects.assistant.core)
     implementation(projects.assistant.engine)
     implementation(projects.sync)
+    implementation(projects.catalog.sync)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
