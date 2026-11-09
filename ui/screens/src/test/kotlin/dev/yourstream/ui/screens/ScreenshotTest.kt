@@ -24,6 +24,8 @@ import dev.yourstream.ui.screens.browse.BrowseScreen
 import dev.yourstream.ui.screens.browse.BrowseControls
 import dev.yourstream.ui.screens.browse.BrowseUiState
 import dev.yourstream.ui.screens.home.HeroItem
+import dev.yourstream.ui.screens.home.HomeBanner
+import dev.yourstream.ui.screens.home.ForYou
 import dev.yourstream.ui.screens.home.HomeRows
 import dev.yourstream.ui.screens.home.HomeScreen
 import dev.yourstream.ui.screens.home.HomeUiState
@@ -79,7 +81,13 @@ class ScreenshotTest {
         val s = flowOf(PagingData.from(series, done)).collectAsLazyPagingItems()
         val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
         val hero = HeroItem(HeroItem.Kind.CONTINUE, "hero:20", "Ben 10", "2005 · Washington B.C.", null, 0.35f, OpenTarget.Play(PlaybackTarget(20, 6)), OpenTarget.Details(20), "S01E06")
-        HomeScreen(HomeUiState(null, UiState.Content(hero), UiState.Content(continueTiles), 240), HomeRows(r, r, s, none), {}, {}, {}, {}, {})
+        val forYou = ForYou("Tamil, action", listOf(
+            Tile(MediaCardModel("fy:30", "Pushpa", "2021"), OpenTarget.Details(30), 30, caption = TileCaption.Reason("Telugu · action · ★ 7.6")),
+            Tile(MediaCardModel("fy:31", "Asuran", "2019"), OpenTarget.Details(31), 31, caption = TileCaption.Reason("Tamil · drama · ★ 8.4")),
+            Tile(MediaCardModel("fy:32", "Super Deluxe", "2019"), OpenTarget.Details(32), 32, caption = TileCaption.Reason("Tamil · ★ 8.3")),
+            Tile(MediaCardModel("fy:33", "Soorarai Pottru", "2020"), OpenTarget.Details(33), 33, caption = TileCaption.Reason("Tamil · drama · ★ 8.7")),
+        ))
+        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, r, s, none), {}, {}, {}, {}, {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -166,4 +174,67 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayerError() = playerShot("phone-player-error", WindowLayout.COMPACT, playerState.copy(resumedFromMs = null, status = dev.yourstream.playback.media3.PlaybackStatus.ERROR,
         error = dev.yourstream.ui.core.UiError(dev.yourstream.ui.core.ErrorKind.OFFLINE, "Telegram is not reachable")))
+
+    // ---- Advanced features
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryStatus() = shot("phone-library-status", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.library.LibraryStatusScreen(
+            dev.yourstream.ui.screens.library.LibraryStatus(
+                sources = listOf(
+                    dev.yourstream.ui.screens.library.SourceSync(1, "Tamil Movies HD", false, 980, 0, null, null),
+                    dev.yourstream.ui.screens.library.SourceSync(2, "Kids Cartoons", true, 260, 0, null, 42),
+                ),
+                files = 1240, titles = 240, movies = 180, series = 60, matched = 204, review = 12, unmatched = 18, providers = listOf("TMDB", "Cinemeta"),
+            ), {}, {}, {}, {}, now = 5 * 60_000,
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneReview() = shot("phone-review", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        fun c(id: String, title: String, year: Int, pct: Int) = dev.yourstream.ui.screens.library.MatchCandidate(
+            dev.yourstream.metadata.api.MetadataRef(dev.yourstream.metadata.api.ProviderId("tmdb"), dev.yourstream.metadata.api.MetadataType.MOVIE, id), title, year, null, null, pct)
+        dev.yourstream.ui.screens.library.MatchScreen(
+            "Check matches",
+            dev.yourstream.ui.screens.library.MatchUiState(UiState.Content(listOf(
+                dev.yourstream.ui.screens.library.MatchEntry(1, "Vikram", 2022, listOf(c("1", "Vikram", 2022, 71), c("2", "Vikram", 1986, 64), c("3", "Vikram Vedha", 2017, 58))),
+                dev.yourstream.ui.screens.library.MatchEntry(2, "Master", null, listOf(c("4", "Master", 2021, 62), c("5", "The Master", 2012, 57))),
+            ))),
+            {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneStats() = shot("phone-stats", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        val today = java.time.LocalDate.of(2026, 11, 9)
+        val minutes = listOf(0, 45, 90, 0, 22, 130, 60, 0, 0, 44, 88, 150, 66, 95)
+        dev.yourstream.ui.screens.stats.StatsScreen(UiState.Content(dev.yourstream.watch.core.WatchStats(
+            totalMs = 61 * 3_600_000L, last7DaysMs = 493 * 60_000L, previous7DaysMs = 347 * 60_000L,
+            daily = minutes.mapIndexed { i, m -> dev.yourstream.watch.core.DayTotal(today.minusDays((13 - i).toLong()), m * 60_000L) },
+            moviesFinished = 9, episodesFinished = 47, titlesWatched = 23, sessions = 84, averageSessionMs = 43 * 60_000,
+            currentStreakDays = 5, longestStreakDays = 11,
+            topLanguages = listOf(dev.yourstream.watch.core.Share("ta", 1, 0.58f), dev.yourstream.watch.core.Share("hi", 1, 0.27f), dev.yourstream.watch.core.Share("en", 1, 0.15f)),
+            topGenres = listOf(dev.yourstream.watch.core.Share("action", 1, 0.44f), dev.yourstream.watch.core.Share("animation", 1, 0.31f)),
+            busiestHour = 21,
+        )), {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSync() = shot("phone-sync", WindowLayout.COMPACT, TopLevel.SETTINGS) {
+        dev.yourstream.ui.screens.sync.ProgressSyncScreen(
+            dev.yourstream.ui.screens.sync.SyncUiState(dev.yourstream.sync.SyncStatus(enabled = true, lastSyncAt = 0, lastFrom = "Google Chromecast", lastPulled = 3, shared = 128)),
+            {}, {}, now = 4 * 60_000,
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSearchBrain() = shot("phone-search-brain", WindowLayout.COMPACT, TopLevel.SEARCH) {
+        val tiles = movies.take(4).map { it.copy(caption = TileCaption.Reason("Tamil · unwatched")) }
+        dev.yourstream.ui.screens.search.SearchScreen(
+            dev.yourstream.ui.screens.search.SearchUiState(
+                "unwatched tamil movies", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(null, emptyList(), 0)),
+                brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched Tamil movies.", listOf("language Tamil", "unwatched", "movies"), tiles, 4),
+            ), {}, {},
+        )
+    }
 }

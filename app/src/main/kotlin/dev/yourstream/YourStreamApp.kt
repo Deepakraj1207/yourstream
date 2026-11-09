@@ -31,6 +31,7 @@ class YourStreamApp : Application(), Configuration.Provider {
     @Inject lateinit var telegram: TelegramInitializer
     @Inject lateinit var telegramManager: TelegramManager
     @Inject lateinit var indexer: IndexerInitializer
+    @Inject lateinit var progressSync: dagger.Lazy<dev.yourstream.sync.ProgressSync>
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var database: dagger.Lazy<OpenedDatabase>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
@@ -78,6 +79,8 @@ class YourStreamApp : Application(), Configuration.Provider {
             // External metadata: periodic retries/refresh; matching also follows index changes.
             step("metadata sync") { dev.yourstream.metadata.sync.MetadataSyncWorker.schedule(this@YourStreamApp) }
             step("maintenance") { MaintenanceWorker.schedule(this@YourStreamApp) }
+            // Optional multi-device progress sync: does nothing unless the user turned it on.
+            step("progress sync") { progressSync.get().start() }
         } else {
             journal.warn(DiagnosticCategory.STARTUP, "Safe mode: Telegram, indexing and background work not started")
         }

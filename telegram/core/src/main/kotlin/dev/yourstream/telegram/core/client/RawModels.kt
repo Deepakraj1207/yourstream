@@ -27,3 +27,14 @@ data class TgBasicGroup(
 data class TgBasicGroupFullInfo(val description: String)
 
 data class TgUserFullInfo(val bio: String?)
+
+/** A document message, as the Saved Messages store needs it. */
+data class TgDocumentMessage(
+    val messageId: Long,
+    /** Epoch seconds. */
+    val date: Long,
+    val fileId: Int,
+    val fileName: String,
+    val caption: String,
+    val size: Long,
+)

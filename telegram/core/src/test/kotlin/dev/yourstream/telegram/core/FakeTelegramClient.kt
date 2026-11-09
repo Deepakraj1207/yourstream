@@ -235,10 +235,11 @@ class FakeTelegramClient : TelegramClient {
     ): AppResult<List<dev.yourstream.telegram.api.model.MessageLookup>> =
         messageIds.map { dev.yourstream.telegram.api.model.MessageLookup.Missing(it) }.ok()
 
-    override suspend fun getFile(fileId: Int): AppResult<TelegramFile> = file(fileId).ok()
+    override suspend fun getFile(fileId: Int): AppResult<TelegramFile> = (savedFile(fileId) ?: file(fileId)).ok()
 
     override suspend fun downloadFile(fileId: Int, priority: Int, offset: Long, limit: Long): AppResult<TelegramFile> {
         calls += "downloadFile:$fileId:$priority"
+        savedFile(fileId)?.let { return it.ok() }
         return file(fileId).copy(isDownloadingActive = true).ok()
     }
 
@@ -249,7 +250,39 @@ class FakeTelegramClient : TelegramClient {
         return 0L.ok()
     }
 
-    override suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray> = ByteArray(0).ok()
+    override suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray> =
+        savedBytes[fileId]?.let { b -> b.copyOfRange(offset.toInt(), (offset + count).toInt().coerceAtMost(b.size)).ok() } ?: ByteArray(0).ok()
+
+    // ---- Saved Messages: an in-memory chat of documents
+
+    val saved = mutableListOf<dev.yourstream.telegram.core.client.TgDocumentMessage>()
+    val savedBytes = mutableMapOf<Int, ByteArray>()
+    private var nextSavedId = 1L
+
+    private fun savedFile(fileId: Int) = savedBytes[fileId]?.let { b ->
+        file(fileId).copy(size = b.size.toLong(), isDownloadingCompleted = true, downloadedPrefixSize = b.size.toLong(), downloadedSize = b.size.toLong())
+    }
+
+    override suspend fun savedMessagesChatId(): AppResult<Long> = SAVED_CHAT.ok()
+
+    override suspend fun searchDocuments(chatId: Long, query: String, limit: Int) =
+        saved.filter { query in it.caption }.sortedByDescending { it.messageId }.take(limit).ok()
+
+    override suspend fun sendDocument(chatId: Long, localPath: String, caption: String): AppResult<Long> {
+        val bytes = java.io.File(localPath).readBytes()
+        val id = nextSavedId++
+        val fileId = 90_000 + id.toInt()
+        savedBytes[fileId] = bytes
+        saved += dev.yourstream.telegram.core.client.TgDocumentMessage(id, id, fileId, java.io.File(localPath).name, caption, bytes.size.toLong())
+        calls += "sendDocument:$chatId"
+        return id.ok()
+    }
+
+    override suspend fun deleteMessages(chatId: Long, messageIds: List<Long>): AppResult<Unit> {
+        saved.removeAll { it.messageId in messageIds }
+        calls += "deleteMessages:${messageIds.joinToString(",")}"
+        return Unit.ok()
+    }
 
     override suspend fun deleteFile(fileId: Int): AppResult<Unit> {
         calls += "deleteFile:$fileId"
@@ -268,6 +301,8 @@ class FakeTelegramClient : TelegramClient {
             positions = listOf(ChatPosition(ChatListType.Main, order, isPinned = false)),
             unreadCount = 0, lastMessageDate = null, hasProtectedContent = false, smallPhotoFileId = null,
         )
+
+        const val SAVED_CHAT = 777L
 
         fun file(id: Int) = TelegramFile(
             id = id, remoteUniqueId = "u$id", remoteId = "r$id", size = 100, expectedSize = 100, localPath = null,

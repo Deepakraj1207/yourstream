@@ -39,6 +39,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -61,6 +63,8 @@ class HomeViewModel @Inject constructor(
     private val telegram: TelegramManager,
     private val artwork: ArtworkLookup,
     private val actions: TileActionHandler,
+    private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
+    private val reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
 ) : ViewModel() {
     private val retry = MutableStateFlow(0)
 
@@ -103,7 +107,28 @@ class HomeViewModel @Inject constructor(
 
     private val count: Flow<Int?> = media.count(LibraryQuery()).map<Int, Int?> { it }.catch { emit(null) }
 
-    val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count) { b, h, cw, n -> HomeUiState(b, h, cw, n) }
+    /**
+     * Recommendations from the local watch profile (nothing leaves the device), recomputed when the
+     * viewing history or the library changes.
+     */
+    private val forYou: Flow<UiState<ForYou>> = combine(watch.recentlyWatched(1), count) { recent, n -> recent.firstOrNull()?.lastWatchedAt to n }
+        .distinctUntilChanged()
+        .mapLatest {
+            val r = assistant.recommendations(FOR_YOU)
+            val tiles = r.items.mapIndexed { i, a -> Presentation.tile(a, if (i < 12) artwork.poster(a.itemId) else null) }
+            if (tiles.isEmpty()) UiState.Empty(EmptyKind.GENERIC) else UiState.Content(ForYou(r.basis, tiles))
+        }
+        .onStart { emit(UiState.Loading) }
+        .catch { emit(UiState.Error(it.toUiError())) }
+
+    private val review: Flow<Int> = reviewQueue.count()
+
+    private val extras = combine(forYou, review) { f, r -> f to r }
+
+    val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, (f, r) ->
+        // Lowest-priority banner: only when nothing more urgent is shown.
+        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { r > 0 }, h, cw, n, f, r)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun onAction(action: HomeAction) {
@@ -114,6 +139,8 @@ class HomeViewModel @Inject constructor(
     }
 
     companion object {
+        const val FOR_YOU = 20
+
         fun heroOf(e: ContinueEntry, poster: String?) = HeroItem(
             HeroItem.Kind.CONTINUE, "hero:${e.target.itemId}:${e.target.episodeKey}", e.title,
             listOfNotNull(e.year?.toString(), e.episode?.title).joinToString(" · ").ifEmpty { null },

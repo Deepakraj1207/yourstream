@@ -37,4 +37,8 @@
     <string name="ui_back">Back</string>
     <string name="ui_close">Close</string>
     <string name="cd_watched">watched</string>
+    <string name="empty_review_title">Nothing to check</string>
+    <string name="empty_review_message">Every title is matched, or kept with the details from its file name.</string>
+    <string name="empty_history_title">Nothing watched yet</string>
+    <string name="empty_history_message">Your statistics appear here once you start watching. They are computed on this device only.</string>
 </resources>

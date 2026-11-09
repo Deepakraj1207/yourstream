@@ -12,4 +12,64 @@
         <item quantity="one">%1$d chat selected</item>
         <item quantity="other">%1$d chats selected</item>
     </plurals>
+    <plurals name="status_summary">
+        <item quantity="one">%1$d title from %2$s in %3$s</item>
+        <item quantity="other">%1$d titles from %2$s in %3$s</item>
+    </plurals>
+    <plurals name="status_files">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <plurals name="status_matching_pending">
+        <item quantity="one">Matching %1$d more title…</item>
+        <item quantity="other">Matching %1$d more titles…</item>
+    </plurals>
+    <plurals name="status_matching_retry">
+        <item quantity="one">%1$d title will be retried when the provider is reachable</item>
+        <item quantity="other">%1$d titles will be retried when the provider is reachable</item>
+    </plurals>
+    <plurals name="status_review_count">
+        <item quantity="one">%1$d title</item>
+        <item quantity="other">%1$d titles</item>
+    </plurals>
+    <plurals name="status_unmatched">
+        <item quantity="one">%1$d kept with file-name details (still playable)</item>
+        <item quantity="other">%1$d kept with file-name details (still playable)</item>
+    </plurals>
+    <plurals name="settings_review_count">
+        <item quantity="one">%1$d title waits for you</item>
+        <item quantity="other">%1$d titles wait for you</item>
+    </plurals>
+    <plurals name="stats_sessions">
+        <item quantity="one">%1$d sitting</item>
+        <item quantity="other">%1$d sittings</item>
+    </plurals>
+    <plurals name="stats_movies">
+        <item quantity="one">%1$d movie</item>
+        <item quantity="other">%1$d movies</item>
+    </plurals>
+    <plurals name="stats_episodes">
+        <item quantity="one">%1$d episode</item>
+        <item quantity="other">%1$d episodes</item>
+    </plurals>
+    <plurals name="stats_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="stats_titles">
+        <item quantity="one">%1$d title watched</item>
+        <item quantity="other">%1$d titles watched</item>
+    </plurals>
+    <plurals name="stats_daily_description">
+        <item quantity="one">Watched on %1$d of the last %2$d days</item>
+        <item quantity="other">Watched on %1$d of the last %2$d days</item>
+    </plurals>
+    <plurals name="home_banner_review">
+        <item quantity="one">%1$d title needs a quick check</item>
+        <item quantity="other">%1$d titles need a quick check</item>
+    </plurals>
+    <plurals name="status_chats">
+        <item quantity="one">%1$d chat</item>
+        <item quantity="other">%1$d chats</item>
+    </plurals>
 </resources>

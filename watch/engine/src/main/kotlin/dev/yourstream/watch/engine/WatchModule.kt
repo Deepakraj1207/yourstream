@@ -9,4 +9,5 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class WatchModule {
     @Binds abstract fun watchIntelligence(impl: RoomWatchIntelligence): WatchIntelligence
+    @Binds abstract fun watchStatistics(impl: RoomWatchStatistics): WatchStatistics
 }

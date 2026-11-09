@@ -1,6 +1,7 @@
 package dev.yourstream.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -53,10 +54,10 @@ class HomeRows(
 )
 
 @Composable
-fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, vm: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit = {}, vm: HomeViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val rows = HomeRows(vm.recentlyAdded.collectAsLazyPagingItems(), vm.movies.collectAsLazyPagingItems(), vm.series.collectAsLazyPagingItems(), vm.favorites.collectAsLazyPagingItems())
-    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources)
+    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
 }
 
 /** Stateless: renders [HomeUiState] + [HomeRows]; every user intent goes out through the callbacks. */
@@ -69,6 +70,7 @@ fun HomeScreen(
     onSeeAll: (HomeSection) -> Unit,
     onSignIn: () -> Unit,
     onChooseSources: () -> Unit,
+    onReview: () -> Unit = {},
 ) {
     val blocking = state.blocking
     if (blocking != null) {
@@ -88,7 +90,7 @@ fun HomeScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
-        state.banner?.let { b -> item(key = "banner") { Banner(b, onSignIn, onChooseSources) } }
+        state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
         item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
@@ -97,6 +99,17 @@ fun HomeScreen(
             }
         }
         continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
+        (state.forYou as? UiState.Content)?.value?.let { f ->
+            item(key = "for-you") {
+                Column(Modifier.testTag("for-you")) {
+                    MediaRow(stringResource(R.string.home_for_you), f.tiles, card, { onOpen(it.open) }, actions = actions)
+                    f.basis?.let { b ->
+                        Text(stringResource(R.string.home_for_you_basis, b), style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter, vertical = 4.dp))
+                    }
+                }
+            }
+        }
         paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
         paged("movies", R.string.home_unwatched_movies, rows.movies, HomeSection.MOVIES, card, actions, onOpen, onSeeAll)
         paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
@@ -145,21 +158,22 @@ private fun LazyListScope.paged(
 }
 
 @Composable
-private fun Banner(banner: HomeBanner, onSignIn: () -> Unit, onChooseSources: () -> Unit) {
+private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit) {
     val (text, action) = when (banner) {
-        HomeBanner.NOT_SIGNED_IN -> R.string.home_banner_signed_out to onSignIn
-        HomeBanner.NO_SOURCES -> R.string.home_banner_no_sources to onChooseSources
-        HomeBanner.OFFLINE -> R.string.home_banner_offline to null
-        HomeBanner.INDEXING -> R.string.home_banner_indexing to null
+        HomeBanner.NOT_SIGNED_IN -> stringResource(R.string.home_banner_signed_out) to onSignIn
+        HomeBanner.NO_SOURCES -> stringResource(R.string.home_banner_no_sources) to onChooseSources
+        HomeBanner.OFFLINE -> stringResource(R.string.home_banner_offline) to null
+        HomeBanner.INDEXING -> stringResource(R.string.home_banner_indexing) to null
+        HomeBanner.REVIEW -> androidx.compose.ui.res.pluralStringResource(R.plurals.home_banner_review, reviewCount, reviewCount) to onReview
     }
     val m = Modifier.padding(horizontal = LocalDimens.current.gutter).testTag("banner")
     if (action != null) {
-        AssistChip(onClick = action, label = { Text(stringResource(text)) }, leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) }, modifier = m.focusHighlight())
+        AssistChip(onClick = action, label = { Text(text) }, leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) }, modifier = m.focusHighlight())
     } else {
         // Information only: not a button (screen readers would announce an action that does nothing).
         androidx.compose.foundation.layout.Row(m, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Icon(Icons.Filled.Info, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
-            Text(stringResource(text), style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+            Text(text, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

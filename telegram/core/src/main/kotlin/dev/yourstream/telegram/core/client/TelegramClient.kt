@@ -72,6 +72,19 @@ interface TelegramClient {
     suspend fun getFileDownloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long>
     suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray>
     suspend fun deleteFile(fileId: Int): AppResult<Unit>
+
+    // ---- Saved Messages (optional progress sync)
+
+    /** Id of the user's own "Saved Messages" chat (a private chat with themselves). */
+    suspend fun savedMessagesChatId(): AppResult<Long>
+
+    /** Document messages of [chatId] whose text matches [query], newest first. */
+    suspend fun searchDocuments(chatId: Long, query: String, limit: Int): AppResult<List<TgDocumentMessage>>
+
+    /** Sends a local file as a document; returns the (pending) message id. */
+    suspend fun sendDocument(chatId: Long, localPath: String, caption: String): AppResult<Long>
+
+    suspend fun deleteMessages(chatId: Long, messageIds: List<Long>): AppResult<Unit>
 }
 
 enum class LoadChatsResult {

@@ -16,6 +16,12 @@ import dev.yourstream.ui.screens.browse.RecentlyAddedRoute as RecentlyAddedScree
 import dev.yourstream.ui.screens.home.HomeRoute as HomeScreenRoute
 import dev.yourstream.ui.screens.home.HomeSection
 import dev.yourstream.ui.screens.player.PlayerRoute as PlayerScreenRoute
+import dev.yourstream.ui.screens.library.FixMatchDestination
+import dev.yourstream.ui.screens.library.LibraryStatusDestination
+import dev.yourstream.ui.screens.library.MatchReviewDestination
+import dev.yourstream.ui.screens.settings.SettingsLinks
+import dev.yourstream.ui.screens.stats.StatsDestination
+import dev.yourstream.ui.screens.sync.ProgressSyncDestination
 import dev.yourstream.ui.screens.search.SearchRoute as SearchScreenRoute
 import dev.yourstream.ui.screens.settings.AccountRoute as AccountScreenRoute
 import dev.yourstream.ui.screens.settings.LanguagesRoute as LanguagesScreenRoute
@@ -41,6 +47,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
                 },
                 onSignIn = navigator::account,
                 onChooseSources = navigator::sources,
+                onReview = navigator::review,
             )
         }
         composable<LibraryRoute> { LibraryScreenRoute(navigator::open) }
@@ -50,12 +57,22 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, onDeveloperTools
         composable<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         composable<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
         composable<FavoritesRoute> { FavoritesScreenRoute(navigator::open) }
-        composable<SettingsRoute> { SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, onDeveloperTools) }
-        composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back) }
+        composable<SettingsRoute> {
+            SettingsScreenRoute(
+                appVersion, navigator::account, navigator::sources, navigator::languages, onDeveloperTools,
+                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync),
+            )
+        }
+        composable<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         composable<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
         composable<PlayerRoute> { PlayerScreenRoute(onBack = back, onPlay = navigator::replacePlayer) }
         composable<AccountRoute> { AccountScreenRoute(back) }
         composable<SourcesRoute> { SourcesScreenRoute(back) }
         composable<LanguagesRoute> { LanguagesScreenRoute(back) }
+        composable<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
+        composable<MatchReviewRoute> { MatchReviewDestination(back) }
+        composable<FixMatchRoute> { FixMatchDestination(back) }
+        composable<StatsRoute> { StatsDestination(back) }
+        composable<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }
 }

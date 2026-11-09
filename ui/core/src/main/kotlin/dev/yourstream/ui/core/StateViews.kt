@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
@@ -146,6 +147,8 @@ private fun emptyTexts(kind: EmptyKind): EmptyTexts = when (kind) {
     EmptyKind.NO_FAVORITES -> EmptyTexts(R.string.empty_favorites_title, R.string.empty_favorites_message, null)
     EmptyKind.NO_EPISODES -> EmptyTexts(R.string.empty_episodes_title, R.string.empty_episodes_message, null)
     EmptyKind.NO_CHATS -> EmptyTexts(R.string.empty_chats_title, R.string.empty_chats_message, null)
+    EmptyKind.NOTHING_TO_REVIEW -> EmptyTexts(R.string.empty_review_title, R.string.empty_review_message, null)
+    EmptyKind.NO_HISTORY -> EmptyTexts(R.string.empty_history_title, R.string.empty_history_message, null)
     EmptyKind.GENERIC -> EmptyTexts(R.string.empty_generic_title, null, null)
 }
 
@@ -166,5 +169,7 @@ private fun emptyIcon(kind: EmptyKind): ImageVector = when (kind) {
     EmptyKind.NO_RESULTS -> Icons.Filled.Search
     EmptyKind.NOTHING_IN_PROGRESS -> Icons.Filled.PlayArrow
     EmptyKind.NO_FAVORITES -> Icons.Filled.Favorite
+    EmptyKind.NOTHING_TO_REVIEW -> Icons.Filled.CheckCircle
+    EmptyKind.NO_HISTORY -> Icons.Filled.PlayArrow
     EmptyKind.GENERIC -> Icons.Filled.Info
 }

@@ -50,6 +50,10 @@ enum class EmptyKind {
     NO_FAVORITES,
     NO_EPISODES,
     NO_CHATS,
+    /** Every title is matched or decided: nothing waits for the user. */
+    NOTHING_TO_REVIEW,
+    /** Nothing watched yet on this device. */
+    NO_HISTORY,
     GENERIC,
 }
 

@@ -20,6 +20,9 @@ sealed interface TileCaption {
     data object NextEpisode : TileCaption
     data object NewEpisode : TileCaption
     data object Start : TileCaption
+    /** A reason the domain gives as text ("Tamil · action · ★ 7.6"). */
+    data class Reason(val text: String) : TileCaption
+    data object Resume : TileCaption
 }
 
 /**
@@ -88,6 +91,31 @@ object Presentation {
         ),
         OpenTarget.Details(w.itemId), itemId = w.itemId, isFavorite = w.favorite,
     )
+
+    /**
+     * A Media Brain or recommendation result. Episodes and "continue" picks open the player
+     * directly (one click); titles open their details. The reason becomes the caption.
+     */
+    fun tile(a: dev.yourstream.assistant.engine.AssistantItem, posterUrl: String? = null): Tile {
+        val episode = a.episodeId?.let { OpenTarget.Play(PlaybackTarget(a.itemId, it)) }
+        val open = episode ?: if (a.reason == "continue") OpenTarget.Play(PlaybackTarget(a.itemId)) else OpenTarget.Details(a.itemId)
+        val label = when {
+            a.season != null && a.episode != null -> "S%02dE%02d".format(a.season, a.episode)
+            a.episode != null -> "E%02d".format(a.episode)
+            else -> null
+        }
+        val caption = when (a.reason) {
+            null, "" -> null
+            "continue" -> TileCaption.Resume
+            "next episode" -> TileCaption.NextEpisode
+            else -> TileCaption.Reason(a.reason!!)
+        }
+        return Tile(
+            MediaCardModel("brain:${a.itemId}:${a.episodeId ?: 0}", a.title,
+                listOfNotNull(a.year?.toString(), label, a.episodeTitle).joinToString(" · ").ifEmpty { null }, progress = a.progress, posterUrl = posterUrl),
+            open, itemId = a.itemId, caption = caption,
+        )
+    }
 
     fun tile(h: SearchHit, posterUrl: String? = null): Tile {
         // "ben 10 s2e5" resolved to an episode: open it directly.

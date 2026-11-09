@@ -33,5 +33,10 @@ class AppNavigator(private val nav: NavHostController) {
     fun account() = nav.navigate(AccountRoute)
     fun sources() = nav.navigate(SourcesRoute)
     fun languages() = nav.navigate(LanguagesRoute)
+    fun libraryStatus() = nav.navigate(LibraryStatusRoute) { launchSingleTop = true }
+    fun review() = nav.navigate(MatchReviewRoute) { launchSingleTop = true }
+    fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
+    fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
+    fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
     fun back(): Boolean = nav.popBackStack()
 }

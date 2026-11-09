@@ -61,12 +61,17 @@
     <string name="episodes_title">Episodes</string>
     <string name="episode_unavailable">Not available</string>
 
-    <string name="search_hint">Search your library</string>
+    <string name="search_hint">Search or ask: “unwatched Tamil movies”</string>
     <string name="search_clear">Clear search</string>
-    <string name="search_examples">Search titles in any spelling, or combine words with language, genre, year and season.</string>
+    <string name="search_examples">Type a title in any spelling, or ask for what you want. Requests are understood on this device.</string>
     <string name="search_example_1">tamil comedy</string>
-    <string name="search_example_2">movies 2023</string>
+    <string name="search_example_2">unwatched movies from 2023</string>
     <string name="search_example_3">s2e5</string>
+    <string name="search_example_4">what should I watch</string>
+    <string name="search_example_5">continue watching</string>
+    <string name="search_brain_heading">Media Brain</string>
+    <string name="search_brain_play">Play now</string>
+    <string name="search_title_matches">Title matches</string>
     <string name="search_top_result">Top result</string>
     <string name="search_more_results">More results</string>
 
@@ -145,4 +150,103 @@
     <string name="subtitle_mode_foreign">When I don’t understand the audio</string>
     <string name="subtitle_mode_always">Always</string>
     <string name="subtitle_mode_off">Never</string>
+
+    <!-- Library status -->
+    <string name="status_title">Library status</string>
+    <string name="status_stage_files">From Telegram</string>
+    <string name="status_syncing">Syncing…</string>
+    <string name="status_synced_at">Up to date · checked %1$s</string>
+    <string name="status_not_synced">Not synced yet</string>
+    <string name="status_sync_now">Sync now</string>
+    <string name="status_stage_titles">Recognised titles</string>
+    <string name="status_titles_split">%1$d movies · %2$d series</string>
+    <string name="status_stage_matched">Posters and details</string>
+    <string name="status_matched_of">%1$d of %2$d</string>
+    <string name="status_matching_off">No metadata provider is set up: titles keep the details from their file names.</string>
+    <string name="status_matching_done">All titles checked</string>
+    <string name="status_stage_review">Needs your check</string>
+    <string name="status_review_none">Nothing to check</string>
+    <string name="status_review_action">Review</string>
+    <string name="status_sources">Sources</string>
+    <string name="status_manage_sources">Manage</string>
+    <string name="status_source_found">%1$d files found so far</string>
+    <string name="status_privacy">Your files stay in Telegram. To find posters and details, only a title and year are sent to %1$s: no account and nothing about what you watch.</string>
+    <string name="status_privacy_no_providers">Your files stay in Telegram, and nothing about your library leaves this device.</string>
+
+    <!-- Match review -->
+    <string name="review_title">Check matches</string>
+    <string name="fix_match_title">Fix match</string>
+    <string name="review_explainer">These titles were not matched automatically because the match was not certain. Pick the right one, search, or keep the title as it is.</string>
+    <string name="review_from_file">From the file name</string>
+    <string name="review_pick">Is it one of these?</string>
+    <string name="review_no_candidates">No suggestions. Search by another title or year.</string>
+    <string name="review_no_results">Nothing found for that search.</string>
+    <string name="review_match_percent">%1$d%% match</string>
+    <string name="review_search_other">Search…</string>
+    <string name="review_search">Search</string>
+    <string name="review_search_title">Title</string>
+    <string name="review_search_year">Year</string>
+    <string name="review_none">None of these</string>
+    <string name="review_error">That did not work. Try again.</string>
+    <string name="action_fix_match">Fix match</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Watch statistics</string>
+    <string name="stats_this_week">Last 7 days</string>
+    <string name="stats_total">All time</string>
+    <string name="stats_finished">Finished</string>
+    <string name="stats_streak">Streak</string>
+    <string name="stats_longest">Longest: %1$s</string>
+    <string name="stats_trend_up">+%1$d%% on the week before</string>
+    <string name="stats_trend_down">−%1$d%% on the week before</string>
+    <string name="stats_trend_new">Nothing the week before</string>
+    <string name="stats_daily">Last 14 days</string>
+    <string name="stats_today">Today</string>
+    <string name="stats_languages">Languages</string>
+    <string name="stats_genres">Genres</string>
+    <string name="stats_average">%1$s per sitting on average</string>
+    <string name="stats_busiest_hour">most often around %1$s</string>
+    <string name="stats_privacy">Computed on this device from its own watch history. Nothing is uploaded.</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_days_hours">%1$d days %2$d h</string>
+
+    <!-- Settings additions -->
+    <string name="settings_status">Library status</string>
+    <string name="settings_review">Check matches</string>
+    <string name="settings_stats">Watch statistics</string>
+    <string name="settings_stats_detail">On this device only</string>
+    <string name="settings_group_you">You</string>
+    <string name="home_for_you">For you</string>
+    <string name="home_for_you_basis">Unwatched picks based on what you watch on this device: %1$s</string>
+    <string name="settings_status_detail">Sync and matching progress</string>
+    <string name="settings_sync">Sync across devices</string>
+    <string name="settings_sync_on">On · encrypted, in your Saved Messages</string>
+    <string name="settings_sync_off">Off · progress stays on this device</string>
+
+    <!-- Progress sync (optional) -->
+    <string name="sync_title">Sync across devices</string>
+    <string name="sync_intro">Stop on your phone, continue on your TV. Optional and off until you turn it on; without it, everything works on this device alone.</string>
+    <string name="sync_point_where">Stored as one file in your own Telegram Saved Messages. No other account or cloud service.</string>
+    <string name="sync_point_encrypted">Encrypted on this device with your sync passphrase. Telegram cannot read it.</string>
+    <string name="sync_point_what">Only where you stopped and what you finished. No titles in clear text, no viewing history, no statistics.</string>
+    <string name="sync_point_same">Use the same passphrase on each of your devices.</string>
+    <string name="sync_passphrase">Sync passphrase</string>
+    <string name="sync_passphrase_help">At least %1$d characters. It is never stored; only a key derived from it stays on this device.</string>
+    <string name="sync_turn_on">Turn on</string>
+    <string name="sync_is_on">Sync is on</string>
+    <string name="sync_last">Last synced %1$s</string>
+    <string name="sync_last_from">Last synced %1$s, with progress from %2$s</string>
+    <string name="sync_never">Not synced yet</string>
+    <string name="sync_counts">%1$d updated from other devices · %2$d shared in total</string>
+    <string name="sync_now">Sync now</string>
+    <string name="sync_turn_off">Turn off</string>
+    <string name="sync_off_title">Turn off sync?</string>
+    <string name="sync_off_message">Progress stays on this device either way. You can also delete the encrypted copy from Saved Messages (your other devices then stop syncing too).</string>
+    <string name="sync_off_delete">Turn off and delete</string>
+    <string name="sync_off_keep">Turn off, keep copy</string>
+    <string name="sync_problem_passphrase">This passphrase does not match the one used on your other devices. Nothing was changed.</string>
+    <string name="sync_problem_signed_out">Sign in to Telegram first.</string>
+    <string name="sync_problem_network">Telegram is not reachable. Sync will try again later.</string>
+    <string name="sync_problem_failed">Sync did not work this time. It will try again later.</string>
 </resources>

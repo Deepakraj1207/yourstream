@@ -129,6 +129,8 @@ fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = 
             Column(Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
                 Text(model.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 model.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                // Why it is here ("Tamil · action · ★ 7.6", "Next episode"), when the screen gives a reason.
+                model.caption?.takeIf { it != model.badge }?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }

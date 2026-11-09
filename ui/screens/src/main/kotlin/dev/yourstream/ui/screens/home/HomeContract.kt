@@ -7,7 +7,10 @@ import dev.yourstream.ui.screens.TileAction
 import dev.yourstream.ui.screens.navigation.OpenTarget
 
 /** Something the user should do or know before the rows make sense. */
-enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, INDEXING }
+enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, INDEXING, REVIEW }
+
+/** Unwatched picks from the local watch profile; [basis] says what it is built from. */
+data class ForYou(val basis: String?, val tiles: List<dev.yourstream.ui.screens.Tile>)
 
 /** The featured title. [kind] decides the wording; the targets come from the domain's entries. */
 data class HeroItem(
@@ -31,6 +34,9 @@ data class HomeUiState(
     val continueWatching: UiState<List<Tile>> = UiState.Loading,
     /** Titles in the library (null while unknown). */
     val libraryCount: Int? = null,
+    val forYou: UiState<ForYou> = UiState.Loading,
+    /** Titles waiting for the user's match check. */
+    val reviewCount: Int = 0,
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?

@@ -59,6 +59,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ViewModelTest {
@@ -81,7 +82,7 @@ class ViewModelTest {
     }
 
     private fun home() = HomeViewModel(
-        stub<WatchIntelligence> { name, _ -> when (name) { "continueWatching" -> flowOf(emptyList<Any>()); "recentlyAdded" -> added; else -> error(name) } },
+        stub<WatchIntelligence> { name, _ -> when (name) { "continueWatching", "recentlyWatched" -> flowOf(emptyList<Any>()); "recentlyAdded" -> added; else -> error(name) } },
         media,
         stub<MovieRepository> { _, _ -> flowOf(PagingData.empty<LibraryItemSummary>()) },
         stub<SeriesRepository> { _, _ -> flowOf(PagingData.empty<LibraryItemSummary>()) },
@@ -90,7 +91,23 @@ class ViewModelTest {
         stub<TelegramManager> { name, _ -> if (name == "getConnectionState") MutableStateFlow(TelegramConnectionState.READY) else error(name) },
         ArtworkLookup(media),
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
+        assistant,
+        ReviewQueue { review },
     )
+
+    private val review = MutableStateFlow(0)
+    private val brainAsked = mutableListOf<String>()
+    private val assistant = object : dev.yourstream.assistant.engine.MediaAssistant {
+        override suspend fun ask(text: String): dev.yourstream.assistant.engine.AssistantResponse {
+            brainAsked += text
+            val i = dev.yourstream.assistant.core.IntentParser().parse(text)
+            val items = if (text.contains("tamil")) listOf(dev.yourstream.assistant.engine.AssistantItem(9, ItemKind.MOVIE, "Jailer", 2023)) else emptyList()
+            return dev.yourstream.assistant.engine.AssistantResponse(i, dev.yourstream.assistant.core.Planner.plan(i), "${items.size} Tamil movies.", items, items.size, 0)
+        }
+        override suspend fun recommendations(limit: Int) = dev.yourstream.assistant.engine.Recommendations(
+            "Tamil, action", listOf(dev.yourstream.assistant.engine.AssistantItem(9, ItemKind.MOVIE, "Jailer", 2023, reason = "Tamil · action")),
+        )
+    }
 
     @Test
     fun homeGuidesThroughSignInAndSourcesThenShowsTheLibrary() = runTest(dispatcher) {
@@ -116,6 +133,15 @@ class ViewModelTest {
         val hero = (vm.state.value.hero as UiState.Content).value
         assertEquals("Vikram" to HeroItem.Kind.NEW, hero.title to hero.kind)
         assertEquals(OpenTarget.Play(PlaybackTarget(7)), hero.primary, "a movie plays straight from the hero")
+
+        // Local recommendations with their reason; the review banner only when nothing is more urgent.
+        val forYou = (vm.state.value.forYou as UiState.Content).value
+        assertEquals("Tamil, action", forYou.basis)
+        assertEquals(TileCaption.Reason("Tamil · action"), forYou.tiles.single().caption)
+        review.value = 2
+        advanceUntilIdle()
+        assertEquals(HomeBanner.REVIEW, vm.state.value.banner)
+        assertEquals(2, vm.state.value.reviewCount)
     }
 
     @Test
@@ -130,7 +156,7 @@ class ViewModelTest {
             }
             override suspend fun suggest(prefix: String, limit: Int) = listOf("vikram")
         }
-        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media))
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant)
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
         assertNull(vm.state.value.results, "blank query: hint, no search")
@@ -141,6 +167,12 @@ class ViewModelTest {
         assertEquals("Vikram", r.top!!.card.title, "a single hit is the top result")
         assertEquals(emptyList(), r.rest)
         assertEquals(listOf("read as vikram"), vm.state.value.interpretation)
+        assertNull(vm.state.value.brain, "a bare title is a search, not a request")
+        vm.onAction(SearchAction.QueryChanged("unwatched tamil movies")); advanceUntilIdle()
+        val brain = vm.state.value.brain!!
+        assertEquals("1 Tamil movies.", brain.message)
+        assertEquals("Jailer", brain.tiles.single().card.title)
+        assertTrue(brain.understood.isNotEmpty())
         vm.onAction(SearchAction.QueryChanged("zzz")); advanceUntilIdle()
         assertEquals(UiState.Empty(EmptyKind.NO_RESULTS), vm.state.value.results)
         vm.onAction(SearchAction.QueryChanged("boom")); advanceUntilIdle()

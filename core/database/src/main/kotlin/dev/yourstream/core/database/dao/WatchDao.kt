@@ -86,4 +86,31 @@ interface WatchDao {
 
     @Query("DELETE FROM watch_history WHERE item_id = :itemId AND episode_key = :episodeKey")
     suspend fun clearHistory(itemId: Long, episodeKey: Long)
+
+    /**
+     * Every viewing sitting since [since], with the title's kind, audio languages and genres (read
+     * from the library and metadata tables, not the lazily refreshed search index), oldest first.
+     * For local watch statistics.
+     */
+    @Query(
+        """SELECT h.item_id, h.episode_key, h.started_at, h.watched_at, h.duration_ms, h.completed,
+        i.kind AS kind,
+        IFNULL((SELECT GROUP_CONCAT(l.language) FROM library_item_language l WHERE l.item_id = h.item_id), '') AS languages,
+        IFNULL((SELECT m.genres FROM item_metadata m WHERE m.item_id = h.item_id), '') AS genres
+        FROM watch_history h LEFT JOIN library_item i ON i.id = h.item_id
+        WHERE h.watched_at >= :since ORDER BY h.started_at""",
+    )
+    fun observeSessions(since: Long): Flow<List<StatsSessionRow>>
 }
+
+data class StatsSessionRow(
+    @androidx.room.ColumnInfo(name = "item_id") val itemId: Long,
+    @androidx.room.ColumnInfo(name = "episode_key") val episodeKey: Long,
+    @androidx.room.ColumnInfo(name = "started_at") val startedAt: Long,
+    @androidx.room.ColumnInfo(name = "watched_at") val watchedAt: Long,
+    @androidx.room.ColumnInfo(name = "duration_ms") val durationMs: Long,
+    val completed: Boolean,
+    val kind: String?,
+    val languages: String,
+    val genres: String,
+)

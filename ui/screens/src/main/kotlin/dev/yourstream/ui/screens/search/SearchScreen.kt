@@ -1,6 +1,7 @@
 package dev.yourstream.ui.screens.search
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import dev.yourstream.ui.screens.tileCard
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -82,7 +85,7 @@ fun SearchScreen(state: SearchUiState, onAction: (SearchAction) -> Unit, onOpen:
             if (results == null) {
                 Idle(onAction)
             } else {
-                StateContent(results, loading = { SkeletonGrid() }) { r -> Results(r, onOpen) }
+                StateContent(results, loading = { SkeletonGrid() }) { r -> Results(r, state.brain, onOpen) }
             }
         }
     }
@@ -91,7 +94,7 @@ fun SearchScreen(state: SearchUiState, onAction: (SearchAction) -> Unit, onOpen:
 /** Blank query: what kinds of searches work (the engine's own capabilities, not sample data). */
 @Composable
 private fun Idle(onAction: (SearchAction) -> Unit) {
-    val examples = listOf(stringResource(R.string.search_example_1), stringResource(R.string.search_example_2), stringResource(R.string.search_example_3))
+    val examples = listOf(R.string.search_example_4, R.string.search_example_1, R.string.search_example_2, R.string.search_example_5, R.string.search_example_3).map { stringResource(it) }
     Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.search_examples), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = LocalDimens.current.gutter))
@@ -100,13 +103,16 @@ private fun Idle(onAction: (SearchAction) -> Unit) {
 }
 
 @Composable
-private fun Results(r: SearchResults, onOpen: (OpenTarget) -> Unit) {
+private fun Results(r: SearchResults, brain: BrainAnswer?, onOpen: (OpenTarget) -> Unit) {
     val count = pluralStringResource(R.plurals.results_count, r.total, r.total)
+    val card = tileCard()
     MediaGrid(
-        r.rest, Tile::card, { onOpen(it.open) },
+        r.rest, card, { onOpen(it.open) },
         header = {
             Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
-                Text(count, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("results-count"))
+                brain?.let { Brain(it, card, onOpen) }
+                if (brain != null && r.rest.isNotEmpty()) GridHeading(stringResource(R.string.search_title_matches))
+                if (brain == null || r.rest.isNotEmpty()) Text(count, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("results-count"))
                 r.top?.let { top ->
                     GridHeading(stringResource(R.string.search_top_result))
                     MediaCard(top.card, { onOpen(top.open) }, Modifier.widthIn(max = LocalDimens.current.wideCardWidth * 1.4f).padding(vertical = 8.dp).testTag("top-result"), CardStyle.WIDE)
@@ -115,6 +121,37 @@ private fun Results(r: SearchResults, onOpen: (OpenTarget) -> Unit) {
             }
         },
     )
+}
+
+/** The request's answer: the domain's sentence, what was understood, one-click play, the results. */
+@Composable
+private fun Brain(b: BrainAnswer, card: (Tile) -> dev.yourstream.ui.core.MediaCardModel, onOpen: (OpenTarget) -> Unit) {
+    Column(Modifier.padding(vertical = 8.dp).testTag("brain"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.search_brain_heading), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text(b.message, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }.testTag("brain-message"))
+        if (b.understood.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                b.understood.forEach { u ->
+                    androidx.compose.material3.Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text(u, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                    }
+                }
+            }
+        }
+        b.play?.let { p ->
+            androidx.compose.material3.Button(onClick = { onOpen(p) }, modifier = Modifier.focusHighlight().testTag("brain-play")) {
+                Icon(Icons.Filled.PlayArrow, null); Text(stringResource(R.string.search_brain_play), Modifier.padding(start = 6.dp))
+            }
+        }
+        if (b.tiles.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(LocalDimens.current.cardGap), modifier = Modifier.testTag("brain-results")) {
+                items(b.tiles.size) { i ->
+                    val t = b.tiles[i]
+                    MediaCard(card(t), { onOpen(t.open) }, Modifier.width(LocalDimens.current.posterWidth))
+                }
+            }
+        }
+    }
 }
 
 /** A heading inside the grid (the grid already applies the gutter). */

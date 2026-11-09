@@ -176,6 +176,16 @@ class LocalMediaAssistantTest {
     }
 
     @Test
+    fun homeRecommendationsAreDiscoveryOnly() = kotlinx.coroutines.runBlocking {
+        val r = assistant.recommendations(10)
+        // Nothing started (the Continue Watching row covers those), nothing watched or hidden.
+        assertTrue(r.items.none { it.itemId in setOf(jailer, ben10, vikram, baahubali, hidden) })
+        assertEquals(pushpa, r.items.first().itemId, "same ranking as \"what should I watch\"")
+        assertTrue(r.items.all { !it.reason.isNullOrBlank() })
+        assertTrue(r.basis!!.isNotBlank())
+    }
+
+    @Test
     fun unwatchedEpisodesAndPlay() {
         val r = ask("unwatched episodes of ben 10")
         assertEquals(4, r.total)

@@ -53,8 +53,21 @@ data class AssistantResponse(
     val tookMs: Long,
 )
 
+/** Unwatched titles ranked by the local watch profile, each with its reason. */
+data class Recommendations(
+    /** What the profile is built from ("Tamil, Hindi, action, animation"); null without history. */
+    val basis: String?,
+    val items: List<AssistantItem>,
+)
+
 interface MediaAssistant {
     suspend fun ask(text: String): AssistantResponse
+
+    /**
+     * Discovery picks only (nothing started): unwatched, available, non-hidden titles ranked by
+     * the watch profile (language, genre, type shares of recent viewing, plus rating). Local only.
+     */
+    suspend fun recommendations(limit: Int = 20): Recommendations
 }
 
 /**
@@ -240,6 +253,26 @@ class LocalMediaAssistant @Inject constructor(
             out += nextUp(2, exclude = out.map { it.itemId }.toSet())
         }
         val profile = Profile.of(dao.watchProfile())
+        out += discover(plan, profile, plan.limit - out.size)
+        val message = when {
+            out.isEmpty() && filtered -> "Nothing unwatched matches that."
+            out.isEmpty() -> "Nothing new to suggest: everything has been watched."
+            profile.isEmpty -> "Highest rated titles you haven't watched yet."
+            else -> "Based on what you watch (${profile.summary()})."
+        }
+        return Result(message, out.take(plan.limit), out.size.coerceAtMost(plan.limit))
+    }
+
+    override suspend fun recommendations(limit: Int): Recommendations {
+        indexer.flush()
+        val profile = Profile.of(dao.watchProfile())
+        val picks = discover(QueryPlan.Recommend(emptySet(), emptySet(), emptySet(), limit), profile, limit)
+        return Recommendations(profile.summary().takeUnless { profile.isEmpty }, picks)
+    }
+
+    /** Unwatched titles matching the plan's filters, best profile score first. */
+    private suspend fun discover(plan: QueryPlan.Recommend, profile: Profile, limit: Int): List<AssistantItem> {
+        if (limit <= 0) return emptyList()
         val clauses = mutableListOf("d.hidden = 0", "d.available_count > 0", "NOT EXISTS (SELECT 1 FROM watch_state w WHERE w.item_id = d.item_id)")
         val args = mutableListOf<Any>()
         if (plan.kinds.isNotEmpty()) { clauses += "d.kind IN (${plan.kinds.joinToString { "?" }})"; args.addAll(plan.kinds.map { it.name }) }
@@ -248,19 +281,11 @@ class LocalMediaAssistant @Inject constructor(
         val candidates = dao.items(
             SimpleSQLiteQuery("$ITEM_SELECT WHERE ${clauses.joinToString(" AND ")} ORDER BY IFNULL(d.rating, 0) DESC, d.added_at DESC LIMIT 2000", args.toTypedArray()),
         )
-        val fresh = candidates
+        return candidates
             .map { it to profile.score(it) }
             .sortedWith(compareByDescending<Pair<AssistantItemRow, Double>> { it.second }.thenByDescending { it.first.addedAt })
-            .take(plan.limit - out.size)
+            .take(limit)
             .map { (row, _) -> AssistantItem(row.itemId, ItemKind.valueOf(row.kind), row.title, row.year, reason = profile.reason(row)) }
-        out += fresh
-        val message = when {
-            out.isEmpty() && filtered -> "Nothing unwatched matches that."
-            out.isEmpty() -> "Nothing new to suggest: everything has been watched."
-            profile.isEmpty -> "Highest rated titles you haven't watched yet."
-            else -> "Based on what you watch (${profile.summary()})."
-        }
-        return Result(message, out.take(plan.limit), out.size.coerceAtMost(plan.limit))
     }
 
     /** What the user tends to watch: language, genre and type shares, recent viewing counting more. */

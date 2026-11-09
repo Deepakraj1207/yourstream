@@ -26,6 +26,10 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
+import kotlinx.coroutines.flow.map
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +55,10 @@ data class SettingsUiState(
     val signedIn: Boolean = false,
     val enabledSources: Int = 0,
     val languages: String = "",
+    /** Titles waiting for a match check. */
+    val reviewCount: Int = 0,
+    /** Multi-device progress sync: on/off (it is optional and off until the user turns it on). */
+    val syncOn: Boolean = false,
 )
 
 @HiltViewModel
@@ -59,15 +67,21 @@ class SettingsViewModel @Inject constructor(
     users: TelegramUserRepository,
     index: MediaIndexRepository,
     private val tracks: TrackPreferenceStore,
+    reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
+    sync: dev.yourstream.sync.ProgressSync,
 ) : ViewModel() {
     private val languages = MutableStateFlow("")
 
-    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages) { a, user, chats, langs ->
+    private val review = reviewQueue.count()
+
+    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages, combine(review, sync.status) { r, s -> r to s.enabled }) { a, user, chats, langs, (r, syncOn) ->
         SettingsUiState(
             signedInAs = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
             signedIn = a == AuthState.Ready,
             enabledSources = chats.count { it.enabled },
             languages = langs,
+            reviewCount = r,
+            syncOn = syncOn,
         )
     }.catch { emit(SettingsUiState()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -79,15 +93,29 @@ class SettingsViewModel @Inject constructor(
 }
 
 @Composable
-fun SettingsRoute(appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(
+    appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?,
+    more: SettingsLinks = SettingsLinks(), vm: SettingsViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
-    SettingsScreen(state, appVersion, onAccount, onSources, onLanguages, onDeveloperTools)
+    SettingsScreen(state, appVersion, onAccount, onSources, onLanguages, onDeveloperTools, more)
 }
+
+/** The advanced screens reachable from Settings. */
+data class SettingsLinks(
+    val libraryStatus: (() -> Unit)? = null,
+    val review: (() -> Unit)? = null,
+    val stats: (() -> Unit)? = null,
+    val sync: (() -> Unit)? = null,
+)
 
 /** Grouped settings; content width is capped on large screens and TV for readability. */
 @Composable
-fun SettingsScreen(state: SettingsUiState, appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?) {
+fun SettingsScreen(
+    state: SettingsUiState, appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit, onDeveloperTools: (() -> Unit)?,
+    more: SettingsLinks = SettingsLinks(),
+) {
     ScreenScaffold(stringResource(R.string.nav_settings)) {
         LazyColumn(
             Modifier.testTag("settings").widthIn(max = 760.dp),
@@ -103,10 +131,35 @@ fun SettingsScreen(state: SettingsUiState, appVersion: String?, onAccount: () ->
                 ListRow(stringResource(R.string.settings_sources), supporting = pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
                     leading = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) }, onClick = onSources)
             }
+            more.libraryStatus?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_status), supporting = stringResource(R.string.settings_status_detail),
+                        leading = { Icon(dev.yourstream.ui.core.AppIcons.Episodes, contentDescription = null) }, onClick = open)
+                }
+            }
+            more.review?.takeIf { state.reviewCount > 0 }?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_review), supporting = pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
+                        leading = { Icon(Icons.Filled.Warning, contentDescription = null) }, onClick = open)
+                }
+            }
             item { Group(R.string.settings_group_playback) }
             item {
                 ListRow(stringResource(R.string.settings_languages), supporting = state.languages.ifEmpty { null },
                     leading = { Icon(Icons.Filled.Settings, contentDescription = null) }, onClick = onLanguages)
+            }
+            if (more.stats != null || more.sync != null) item { Group(R.string.settings_group_you) }
+            more.stats?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_stats), supporting = stringResource(R.string.settings_stats_detail),
+                        leading = { Icon(Icons.Filled.DateRange, contentDescription = null) }, onClick = open)
+                }
+            }
+            more.sync?.let { open ->
+                item {
+                    ListRow(stringResource(R.string.settings_sync), supporting = stringResource(if (state.syncOn) R.string.settings_sync_on else R.string.settings_sync_off),
+                        leading = { Icon(Icons.Filled.Refresh, contentDescription = null) }, onClick = open)
+                }
             }
             item { Group(R.string.settings_group_about) }
             item {

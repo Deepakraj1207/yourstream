@@ -18,6 +18,7 @@ test player. Catalogs are information only; what you can watch is always your ow
 
 - Architecture, roadmap and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - UI (design system, screens, navigation, states, layouts, TV/remote, accessibility): [docs/UI.md](docs/UI.md)
+- Advanced UX (library status, match review, Media Brain, recommendations, statistics, optional encrypted progress sync; privacy): [docs/UX.md](docs/UX.md)
 - Functional audit (checklist, bugs, performance, recommendations): [docs/AUDIT.md](docs/AUDIT.md) · interfaces: [docs/API.md](docs/API.md)
 - Robustness and diagnostics (failure handling, database safety, crash/safe mode, recovery, diagnostics screen): [docs/ROBUSTNESS.md](docs/ROBUSTNESS.md)
 - Watch intelligence (progress, next-episode rules, continue watching, abandonment): [docs/WATCH.md](docs/WATCH.md)

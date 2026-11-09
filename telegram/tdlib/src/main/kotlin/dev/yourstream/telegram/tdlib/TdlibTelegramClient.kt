@@ -28,6 +28,7 @@ import dev.yourstream.telegram.core.client.TgBasicGroupFullInfo
 import dev.yourstream.telegram.core.client.TgSupergroup
 import dev.yourstream.telegram.core.client.TgSupergroupFullInfo
 import dev.yourstream.telegram.core.client.TgUserFullInfo
+import dev.yourstream.telegram.core.client.TgDocumentMessage
 import dev.yourstream.telegram.core.error.TelegramErrorMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -264,6 +265,41 @@ class TdlibTelegramClient @Inject constructor(
         request("readFilePart", LOCAL_TIMEOUT) { readFilePart(fileId, offset, count) }.mapValue { it.data }
 
     override suspend fun deleteFile(fileId: Int): AppResult<Unit> = request("deleteFile") { deleteFile(fileId) }.unit()
+
+    // ---- Saved Messages (optional progress sync) ----
+
+    override suspend fun savedMessagesChatId(): AppResult<Long> {
+        val me = request("getMe") { getMe() }.mapValue { it.id }
+        val userId = (me as? AppResult.Ok)?.value ?: return me
+        return request("createPrivateChat") { createPrivateChat(userId, true) }.mapValue { it.id }
+    }
+
+    override suspend fun searchDocuments(chatId: Long, query: String, limit: Int): AppResult<List<TgDocumentMessage>> =
+        request("searchChatMessages", LOAD_TIMEOUT) {
+            searchChatMessages(
+                chatId = chatId, topicId = null, query = query, senderId = null, fromMessageId = 0, offset = 0, limit = limit,
+                filter = dev.g000sha256.tdl.dto.SearchMessagesFilterDocument(),
+            )
+        }.mapValue { found ->
+            found.messages.mapNotNull { m ->
+                val doc = m.content as? dev.g000sha256.tdl.dto.MessageDocument ?: return@mapNotNull null
+                TgDocumentMessage(m.id, m.date.toLong(), doc.document.document.id, doc.document.fileName, doc.caption.text, doc.document.document.size)
+            }
+        }
+
+    override suspend fun sendDocument(chatId: Long, localPath: String, caption: String): AppResult<Long> =
+        request("sendMessage") {
+            sendMessage(
+                chatId, null, null, null, null,
+                dev.g000sha256.tdl.dto.InputMessageDocument(
+                    dev.g000sha256.tdl.dto.InputDocument(dev.g000sha256.tdl.dto.InputFileLocal(localPath), null, true),
+                    dev.g000sha256.tdl.dto.FormattedText(caption, emptyArray()),
+                ),
+            )
+        }.mapValue { it.id }
+
+    override suspend fun deleteMessages(chatId: Long, messageIds: List<Long>): AppResult<Unit> =
+        request("deleteMessages") { deleteMessages(chatId, messageIds.toLongArray(), true) }.unit()
 
     // ---- plumbing ----
 

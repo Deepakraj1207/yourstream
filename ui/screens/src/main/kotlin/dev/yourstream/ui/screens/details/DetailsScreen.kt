@@ -44,13 +44,13 @@ import dev.yourstream.ui.screens.navigation.OpenTarget
 import dev.yourstream.ui.screens.timeLabel
 
 @Composable
-fun DetailsRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm: DetailsViewModel = hiltViewModel()) {
+fun DetailsRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, onFixMatch: ((Long) -> Unit)? = null, vm: DetailsViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    DetailsScreen(state, vm::onAction, onOpen, onBack)
+    DetailsScreen(state, vm::onAction, onOpen, onBack, onFixMatch)
 }
 
 @Composable
-fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOpen: (OpenTarget) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, onFixMatch: ((Long) -> Unit)? = null) {
     ScreenScaffold("", onBack = onBack) {
         StateContent(state.content, Modifier.fillMaxSize(), onRetry = { onAction(DetailsAction.Retry) }) { c ->
             val gutter = LocalWindowLayout.current.gutter
@@ -76,6 +76,12 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                                 }
                                 FilledTonalButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("favorite")) {
                                     Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))
+                                }
+                                // Wrong poster or details? The user decides the match.
+                                onFixMatch?.let { fix ->
+                                    androidx.compose.material3.TextButton(onClick = { fix(c.itemId) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("fix-match")) {
+                                        Text(stringResource(R.string.action_fix_match))
+                                    }
                                 }
                             }
                         }

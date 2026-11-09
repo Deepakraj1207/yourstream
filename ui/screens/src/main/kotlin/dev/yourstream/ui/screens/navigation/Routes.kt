@@ -38,6 +38,15 @@ import kotlinx.serialization.Serializable
 @Serializable data object AccountRoute : Route
 @Serializable data object SourcesRoute : Route
 @Serializable data object LanguagesRoute : Route
+/** The automatic library: sync and matching progress, stage by stage. */
+@Serializable data object LibraryStatusRoute : Route
+/** Titles the matcher was unsure about. */
+@Serializable data object MatchReviewRoute : Route
+/** Choose the right metadata for one title (from Details). */
+@Serializable data class FixMatchRoute(val itemId: Long) : Route
+@Serializable data object StatsRoute : Route
+/** Optional multi-device progress sync. */
+@Serializable data object ProgressSyncRoute : Route
 
 /**
  * Top-level destinations. [compact] = shown in the phone's bottom bar (max 5); all appear in the

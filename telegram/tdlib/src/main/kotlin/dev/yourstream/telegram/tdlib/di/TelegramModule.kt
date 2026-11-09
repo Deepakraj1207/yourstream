@@ -42,6 +42,7 @@ abstract class TelegramModule {
     @Binds abstract fun users(impl: DefaultTelegramUserRepository): TelegramUserRepository
     @Binds abstract fun files(impl: DefaultTelegramFileRepository): TelegramFileRepository
     @Binds abstract fun messages(impl: DefaultTelegramMessageRepository): TelegramMessageRepository
+    @Binds abstract fun savedMessages(impl: dev.yourstream.telegram.core.saved.DefaultTelegramSavedMessages): dev.yourstream.telegram.api.TelegramSavedMessages
 
     companion object {
         @Provides
