@@ -75,7 +75,7 @@ fun HomeScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         // Pinned above the rows: what indexing is doing (the rows below update live).
-        if (state.indexing.active) IndexingBar(state.indexing)
+        // Indexing progress floats above the navigation on every tab (IndexingPill).
         HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
     }
 }
@@ -217,44 +217,6 @@ private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, o
 }
 
 /** "Indexing 2 chats · 134 files found" with progress. Status only. */
-@Composable
-private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
-    val d = LocalDimens.current
-    androidx.compose.material3.Surface(
-        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = androidx.compose.material3.MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter, vertical = 8.dp).inkPanel(androidx.compose.material3.MaterialTheme.shapes.large).testTag("indexing-bar"),
-    ) {
-        Column {
-            androidx.compose.foundation.layout.Row(
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    val chats = status.chats + status.queued
-                    Text(
-                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_chats, chats, chats),
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1,
-                    )
-                    Text(
-                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_found, status.found, status.found),
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-                        modifier = Modifier.testTag("indexing-detail"),
-                    )
-                }
-            }
-            val fraction = status.fraction
-            if (fraction != null) {
-                androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(3.dp), drawStopIndicator = {}, gapSize = 0.dp)
-            } else {
-                androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp))
-            }
-        }
-    }
-}
-
 /** "Sign in to watch your own videos" above the catalogs, while the library is still empty. */
 @Composable
 private fun SetupPanel(kind: EmptyKind, action: (() -> Unit)?) {

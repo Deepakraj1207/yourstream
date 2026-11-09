@@ -79,6 +79,8 @@ class IndexingEngine @Inject constructor(
         var updated = 0
         var deleted = 0
         var estimatedTotal = -1
+        /** Telegram's estimate per search filter: the filters are walked side by side. */
+        val totals = HashMap<MediaSearchFilter, Int>()
         /** Pages with new/changed files since the library was last told. */
         var pagesSinceNotify = 0
         /** Filters write and count from parallel coroutines. */
@@ -178,7 +180,7 @@ class IndexingEngine @Inject constructor(
                 val page = fetchPage(run, filter, from)
                 val fresh = page.messages.filter { it.messageId > boundary }
                 maxSeen = maxOf(maxSeen, page.messages.maxOfOrNull { it.messageId } ?: 0)
-                write(run, page, normalize(run, page.messages, fresh, context), cursor = null)
+                write(run, filter, page, normalize(run, page.messages, fresh, context), cursor = null)
                 // Stop as soon as the page reaches already indexed territory.
                 if (page.messages.isEmpty() || page.nextFromMessageId == 0L || page.nextFromMessageId <= boundary || fresh.size < page.messages.size) break
                 from = page.nextFromMessageId
@@ -212,14 +214,14 @@ class IndexingEngine @Inject constructor(
                     backfillComplete = done,
                     estimatedTotal = page.totalCount,
                 )
-                write(run, page, normalize(run, page.messages, page.messages, context), cursor)
+                write(run, filter, page, normalize(run, page.messages, page.messages, context), cursor)
                 if (done) break
                 from = page.nextFromMessageId
             }
         }
     }
 
-    private suspend fun write(run: Run, page: MediaMessagePage, items: List<dev.yourstream.media.parser.NormalizedMedia>, cursor: ScanCursor?) {
+    private suspend fun write(run: Run, filter: MediaSearchFilter, page: MediaMessagePage, items: List<dev.yourstream.media.parser.NormalizedMedia>, cursor: ScanCursor?) {
         val result = if (items.isEmpty() && cursor != null) {
             store.saveCursor(cursor); null
         } else if (items.isNotEmpty() || cursor != null) {
@@ -228,7 +230,8 @@ class IndexingEngine @Inject constructor(
         val notify = run.lock.withLock {
             run.pages++
             run.seen += page.messages.size
-            run.estimatedTotal = page.totalCount
+            if (page.totalCount >= 0) run.totals[filter] = page.totalCount
+            run.estimatedTotal = if (run.totals.isEmpty()) -1 else run.totals.values.sum()
             result?.let { run.added += it.added; run.updated += it.updated }
             run.publish()
             if (result != null && result.added + result.updated > 0) run.pagesSinceNotify++

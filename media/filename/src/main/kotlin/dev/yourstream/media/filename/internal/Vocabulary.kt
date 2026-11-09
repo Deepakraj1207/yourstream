@@ -111,11 +111,11 @@ internal object Vocabulary {
     /** Words a chat title adds that are not part of a show title. */
     /** Words of channel names and upload tags, never a title by themselves ("TR Movies", "Dual Audio"). */
     val CHANNEL_WORDS: Set<String> = setOf(
-        "movies", "movie", "film", "films", "cinema", "cinemas", "cinemaz", "links", "linkz", "link", "telegram", "channel", "official",
-        "hd", "hq", "fhd", "uhd", "new", "latest", "hub", "club", "bot", "updates", "update", "join", "group", "dubbed", "dub",
-        "audio", "audios", "dual", "multi", "video", "videos", "web", "series", "full", "print", "rip", "hdrip", "original", "org",
-        "size", "mb", "gb", "quality", "language", "languages", "esub", "esubs", "subs", "subtitle", "subtitles", "x264", "x265",
-        "hevc", "mkv", "mp4", "tv", "flix", "zone", "mania", "store", "collection", "collections",
+        // Plural / brand words only: singular nouns make real titles with numbers ("Movie 43", "Series 7").
+        "movies", "cinemas", "cinemaz", "links", "linkz", "telegram", "channel", "official", "hd", "hq", "fhd", "uhd", "latest",
+        "hub", "club", "bot", "updates", "update", "join", "group", "dubbed", "dub", "audio", "audios", "dual", "multi", "print",
+        "rip", "hdrip", "org", "size", "mb", "gb", "quality", "language", "languages", "esub", "esubs", "subs", "subtitle",
+        "subtitles", "x264", "x265", "hevc", "mkv", "mp4", "tv", "flix", "zone", "mania", "store", "collection", "collections",
     )
 
     /** Channel-name words: a chat named with one of them holds many titles, so its name is never a title. */

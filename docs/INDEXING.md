@@ -76,6 +76,24 @@ Running and background work:
   - User cancel → state `CANCELLED`. System stop (WorkManager constraints or timeout) → `PAUSED`, and WorkManager resumes it.
   - A process killed mid-run leaves `RUNNING` behind; it is reset to `PAUSED` at the next start.
 
+## Titles from the post above a file
+
+Movie channels usually post the title first (a poster with a caption, or a text post) and then
+the files, captioned only "Tel+Hin 450MB" or nothing, with machine-made file names. For a video
+whose own name and caption carry no title (the parser finds none, only a language list or a
+channel name, or only its chat's name), the engine reads the chat's history from the file towards
+older messages (`ContextFinder`): the group's other files are skipped, promotions ("Join @…",
+links) are not titles, and the walk stops after 12 messages or 6 hours. The first text that names
+a title becomes the file's context (`media.context_caption`, database v12; "" = looked, none):
+the parser takes title, year and season from it, and the episode from the file.
+
+- One page of history (100 messages) serves the neighbouring files: a channel costs about one
+  request per 100 messages that need it.
+- Re-checks and live updates pass the stored context back in, so they never lose the title.
+- Files indexed before (or whose lookup failed) are looked up by the next runs, newest first, up
+  to 5,000 per run and chat (`IndexPhase.TITLES`).
+- A failed request stops lookups for the rest of the run (no hammering); they are retried later.
+
 ## Incremental indexing, by example
 
 A chat with 50,000 messages, 3,000 of them media, gets 20 new files overnight:

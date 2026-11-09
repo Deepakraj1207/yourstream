@@ -54,7 +54,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class TmdbUiState(val source: TmdbKeySource = TmdbKeySource.NONE, val saving: Boolean = false, val error: String? = null, val saved: Boolean = false)
+data class TmdbUiState(
+    val source: TmdbKeySource = TmdbKeySource.NONE,
+    val saving: Boolean = false,
+    val error: String? = null,
+    val saved: Boolean = false,
+    /** TMDB could not be reached at all: some networks (Jio and others in India) block it. */
+    val unreachable: Boolean = false,
+)
 
 @HiltViewModel
 class TmdbViewModel @Inject constructor(private val keys: TmdbKeys, private val save: SaveTmdbKey) : ViewModel() {
@@ -66,7 +73,9 @@ class TmdbViewModel @Inject constructor(private val keys: TmdbKeys, private val 
         ui.value = TmdbUiState(saving = true)
         ui.value = when (val r = save.invoke(key)) {
             is AppResult.Ok -> TmdbUiState(saved = true)
-            is AppResult.Err -> TmdbUiState(error = r.error.message)
+            is AppResult.Err -> TmdbUiState(error = r.error.message,
+                unreachable = r.error is dev.yourstream.core.common.AppError.Network || r.error is dev.yourstream.core.common.AppError.Timeout ||
+                    r.error is dev.yourstream.core.common.AppError.Unknown)
         }
     }
 }
@@ -110,7 +119,7 @@ fun TmdbScreen(state: TmdbUiState, onSave: (String?) -> Unit, onBack: () -> Unit
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = { TextButton(onClick = { show = !show }) { Text(stringResource(if (show) R.string.tmdb_hide else R.string.tmdb_show)) } },
                 isError = state.error != null,
-                supportingText = { Text(state.error ?: stringResource(R.string.tmdb_key_help)) },
+                supportingText = { Text(if (state.unreachable) stringResource(R.string.tmdb_unreachable) else state.error ?: stringResource(R.string.tmdb_key_help)) },
                 modifier = Modifier.fillMaxWidth().testTag("tmdb-key"),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -105,6 +105,19 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Sources | `SourcesRoute` | Settings; Home "Choose chats" |
 | Audio & subtitles | `LanguagesRoute` | Settings |
 
+### Phone dock and indexing status
+
+Phones navigate with a floating dock (like Nuvio's): a capsule the width of its tabs, centred
+above the bottom edge. The current tab is a filled pill with its name; the names fold away while
+a list is scrolled down and come back on scrolling up or switching tabs (`DockState`, a nested
+scroll connection on the content). Manga style: paper, ink outline, hard shadow, the current tab
+inked with its name in comic lettering. A light haptic tick on change.
+
+While chats are indexed, `IndexingPill` floats at the bottom of every tab and layout: files
+found, a progress bar from Telegram's estimate of the chats' size (summed over the video,
+document and audio walks), the time left and messages per second (`IndexingMonitor.Speed`,
+smoothed), chats running and waiting. Tap: Library status.
+
 ## Screen contracts
 
 | Screen | UiState | Actions | Domain sources |

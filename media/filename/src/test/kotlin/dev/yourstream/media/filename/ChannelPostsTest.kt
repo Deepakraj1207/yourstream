@@ -40,6 +40,8 @@ class ChannelPostsTest {
         assertEquals("Ben 10", parse("Ben.10.S01E06.mkv").title?.value)
         assertEquals("Hindi Medium", parse("Hindi.Medium.2017.1080p.mkv").title?.value)
         assertEquals("Us", parse("Us.2019.720p.mkv").title?.value)
+        assertEquals("Movie 43", parse("Movie.43.2013.720p.mkv").title?.value)
+        assertEquals("Film 0001", parse("Film 0001.1961.1080p.mkv").title?.value)
         assertFalse(MediaFilenameParser.isTagsOnly("Ben"))
         assertTrue(MediaFilenameParser.isTagsOnly("Tel Hin"))
         assertTrue(MediaFilenameParser.isTagsOnly("Tel", fromCaption = true))

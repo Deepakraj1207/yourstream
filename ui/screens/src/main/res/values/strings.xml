@@ -280,6 +280,20 @@
         <item quantity="other">%1$d files found</item>
     </plurals>
     <string name="caption_in_library">In your library</string>
+    <plurals name="indexing_pill_found">
+        <item quantity="one">Indexing · %1$s file found</item>
+        <item quantity="other">Indexing · %1$s files found</item>
+    </plurals>
+    <plurals name="indexing_pill_chats">
+        <item quantity="one">%1$d chat</item>
+        <item quantity="other">%1$d chats</item>
+    </plurals>
+    <plurals name="indexing_pill_waiting">
+        <item quantity="one">%1$d waiting</item>
+        <item quantity="other">%1$d waiting</item>
+    </plurals>
+    <string name="indexing_pill_rate">%1$d/s</string>
+    <string name="indexing_pill_eta">About %1$s left</string>
     <string name="settings_addons">Add-ons</string>
     <string name="settings_addons_detail">Stremio and Nuvio add-ons: catalogs and streams</string>
     <string name="addons_intro">Add-ons made for Stremio: catalogs for Home, details, and streams, including torrents. Find more at stremio-addons.net and paste the install link here.</string>
@@ -428,4 +442,5 @@
     <string name="tmdb_remove">Remove my key</string>
     <string name="tmdb_saved">Saved. Titles without posters are being matched again now.</string>
     <string name="tmdb_privacy">Stored only on this device. Used only for requests to TMDB.</string>
+    <string name="tmdb_unreachable">TMDB can\'t be reached from this network. Some providers (Jio among them) block it. Try again on another network or Wi-Fi. Meanwhile titles are matched with Cinemeta, and posters load through an image proxy.</string>
 </resources>

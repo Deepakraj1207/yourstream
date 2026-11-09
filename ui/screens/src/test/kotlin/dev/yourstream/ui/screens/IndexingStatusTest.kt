@@ -27,4 +27,20 @@ class IndexingStatusTest {
         assertEquals(true, s.active)
         assertEquals(false, IndexingStatus.of(listOf(chat(5, IndexState.COMPLETED))).active)
     }
+
+    @Test
+    fun speedAndTimeLeftAreSmoothed() {
+        val base = IndexingStatus(chats = 1, scanned = 0, total = 10_000)
+        var speed = IndexingMonitor.Speed().next(base, 1_000)
+        assertEquals(null, speed.status.perSecond, "one sample: no speed yet")
+        speed = speed.next(base.copy(scanned = 1_000), 11_000) // 100/s
+        assertEquals(100f, speed.status.perSecond)
+        assertEquals(90L, speed.status.etaSeconds, "9,000 left at 100/s")
+        speed = speed.next(base.copy(scanned = 4_000), 21_000) // 300/s now: smoothed towards it
+        assertEquals(160f, speed.status.perSecond)
+        assertEquals(37L, speed.status.etaSeconds)
+        assertEquals(null, speed.next(IndexingStatus(), 22_000).status.perSecond, "idle: reset")
+        assertEquals("1 min", dev.yourstream.ui.screens.navigation.durationLabel(40))
+        assertEquals("1 h 5 min", dev.yourstream.ui.screens.navigation.durationLabel(3_900))
+    }
 }

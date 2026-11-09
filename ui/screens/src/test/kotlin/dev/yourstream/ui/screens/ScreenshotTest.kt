@@ -67,8 +67,8 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, manga: Boolean = false, content: @Composable () -> Unit) {
-        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}) { content() } } } }
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
+        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } } }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -193,6 +193,14 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeManga() = shot("phone-home-manga", WindowLayout.COMPACT, TopLevel.HOME, dark = false, manga = true) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeMangaIndexing() = shot("phone-home-manga-indexing", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true,
+        indexing = IndexingStatus(chats = 2, queued = 1, found = 12_340, scanned = 24_000, total = 98_000, perSecond = 140f, etaSeconds = 530)) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryClassicIndexing() = shot("phone-library-classic-indexing", WindowLayout.COMPACT, TopLevel.LIBRARY, dark = true,
+        indexing = IndexingStatus(chats = 1, found = 870, scanned = 1_200, total = 0)) { home() }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeMangaInk() = shot("phone-home-manga-ink", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true) { home() }
