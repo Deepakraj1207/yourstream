@@ -14,9 +14,13 @@ import javax.inject.Singleton
 
 enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
+/** The app's look: manga / comic-store (default) or the plain classic style. */
+enum class UiStyle { MANGA, CLASSIC }
+
 /** App-wide choices from Settings (stored on the device). */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    val style: UiStyle = UiStyle.MANGA,
     /** Double-tap, arrow keys and the ±buttons seek this far. */
     val seekSeconds: Int = 10,
     /** Start the next episode when one ends (after a short countdown). */
@@ -49,6 +53,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         val s = change(_settings.value)
         prefs.edit()
             .putString("theme", s.theme.name)
+            .putString("style", s.style.name)
             .putInt("seek_seconds", s.seekSeconds)
             .putBoolean("autoplay_next", s.autoplayNext)
             .putString("default_fit", s.defaultFit.name)
@@ -60,6 +65,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
 
     private fun load() = AppSettings(
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null)!!) }.getOrDefault(ThemeMode.SYSTEM),
+        style = runCatching { UiStyle.valueOf(prefs.getString("style", null)!!) }.getOrDefault(UiStyle.MANGA),
         seekSeconds = prefs.getInt("seek_seconds", 10).takeIf { it in AppSettings.SEEK_OPTIONS } ?: 10,
         autoplayNext = prefs.getBoolean("autoplay_next", true),
         defaultFit = runCatching { VideoFit.valueOf(prefs.getString("default_fit", null)!!) }.getOrDefault(VideoFit.FIT),

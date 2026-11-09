@@ -122,7 +122,7 @@ private fun CardFrame(
 fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(MaterialTheme.shapes.medium)) {
+            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
                 Artwork(model.posterUrl, model.title, Modifier.fillMaxSize())
                 Overlays(model)
             }
@@ -140,7 +140,7 @@ fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 fun WideCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.medium)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
             Artwork(model.posterUrl, model.title, Modifier.fillMaxSize(), showInitials = false)
             Box(Modifier.fillMaxSize().background(BottomScrim))
             Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
@@ -327,7 +327,10 @@ fun SectionHeader(title: String, onSeeAll: (() -> Unit)? = null, count: String? 
         Modifier.fillMaxWidth().padding(start = LocalDimens.current.gutter, end = LocalDimens.current.gutter - 8.dp, top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        Box(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }
+                .then(if (LocalMangaStyle.current) Modifier.padding(bottom = 4.dp).inkUnderline(MaterialTheme.colorScheme.onSurface) else Modifier))
+        }
         count?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp)) }
         onSeeAll?.let { TextButton(onClick = it, modifier = Modifier.focusHighlight()) { Text(stringResource(R.string.ui_see_all)) } }
     }

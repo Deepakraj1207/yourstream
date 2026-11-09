@@ -42,7 +42,7 @@ fun Artwork(
     // One retry (a dropped connection while scrolling), then the title placeholder stays.
     var attempt by remember(src) { mutableStateOf(0) }
     Box(modifier) {
-        TitleArt(title, Modifier.fillMaxSize(), showInitials)
+        if (LocalMangaStyle.current) MangaTitleArt(title, Modifier.fillMaxSize(), showInitials) else TitleArt(title, Modifier.fillMaxSize(), showInitials)
         if (src != null && attempt < 2) {
             AsyncImage(
                 model = if (attempt == 0) src else "$src#retry", contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(),
@@ -95,7 +95,8 @@ fun ProgressLine(progress: Float, modifier: Modifier = Modifier, trackColor: Col
     androidx.compose.material3.LinearProgressIndicator(
         progress = { progress.coerceIn(0f, 1f) },
         modifier = modifier.height(4.dp),
-        color = MaterialTheme.colorScheme.primary,
+        // Manga: progress is the one red accent on the page.
+        color = if (LocalMangaStyle.current) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
         trackColor = trackColor,
         strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
         gapSize = 0.dp,

@@ -78,9 +78,9 @@ fun dimensFor(layout: WindowLayout): Dimens = when (layout) {
 private fun scale(t: TextStyle, by: Float) = t.copy(fontSize = t.fontSize * by, lineHeight = if (t.lineHeight == TextUnit.Unspecified) t.lineHeight else t.lineHeight * by)
 
 /** Material type scale with heavier titles; TV is ~15 % larger (10-foot viewing). */
-fun typographyFor(layout: WindowLayout): Typography {
+fun typographyFor(layout: WindowLayout, manga: Boolean = false): Typography {
     val base = Typography()
-    val t = base.copy(
+    val plain = base.copy(
         displaySmall = base.displaySmall.copy(fontWeight = FontWeight.Bold),
         headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold),
         headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -89,6 +89,7 @@ fun typographyFor(layout: WindowLayout): Typography {
         titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold),
         labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp),
     )
+    val t = if (manga) Manga.typography(plain) else plain
     if (!layout.isTv) return t
     val k = 1.15f
     return Typography(
@@ -107,12 +108,19 @@ val BrandShapes = Shapes(
 
 /**
  * The app theme. TV is always dark (living rooms; focus reads best on dark surfaces); other
- * layouts follow the system setting.
+ * layouts follow the system setting. [manga]: the manga / comic-store style ([Manga]): paper and
+ * ink palettes, comic lettering, panel shapes; components add ink borders and screentones.
  */
 @Composable
-fun YourStreamTheme(layout: WindowLayout, darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun YourStreamTheme(layout: WindowLayout, darkTheme: Boolean = isSystemInDarkTheme(), manga: Boolean = false, content: @Composable () -> Unit) {
     val dark = layout.isTv || darkTheme
-    CompositionLocalProvider(LocalWindowLayout provides layout, LocalDimens provides dimensFor(layout)) {
-        MaterialTheme(colorScheme = if (dark) Brand.dark else Brand.light, typography = typographyFor(layout), shapes = BrandShapes, content = content)
+    val scheme = when {
+        manga && dark -> Manga.ink
+        manga -> Manga.paper
+        dark -> Brand.dark
+        else -> Brand.light
+    }
+    CompositionLocalProvider(LocalWindowLayout provides layout, LocalDimens provides dimensFor(layout), LocalMangaStyle provides manga) {
+        MaterialTheme(colorScheme = scheme, typography = typographyFor(layout, manga), shapes = if (manga) Manga.shapes else BrandShapes, content = content)
     }
 }

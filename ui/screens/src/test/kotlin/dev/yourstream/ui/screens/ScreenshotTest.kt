@@ -67,8 +67,8 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, content: @Composable () -> Unit) {
-        compose.setContent { YourStreamTheme(layout, darkTheme = dark) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}) { content() } } } }
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, manga: Boolean = false, content: @Composable () -> Unit) {
+        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}) { content() } } } }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -182,6 +182,23 @@ class ScreenshotTest {
     fun phoneSettings() = shot("phone-settings", WindowLayout.COMPACT, TopLevel.SETTINGS) {
         SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.5.1", {}, {}, {},
             dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.5.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeManga() = shot("phone-home-manga", WindowLayout.COMPACT, TopLevel.HOME, dark = false, manga = true) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeMangaInk() = shot("phone-home-manga-ink", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryManga() = shot("phone-library-manga", WindowLayout.COMPACT, TopLevel.LIBRARY, dark = false, manga = true) {
+        BrowseScreen("Library", EmptyKind.LIBRARY_EMPTY, BrowseUiState(count = 240), flowOf(PagingData.from(movies + series, done)).collectAsLazyPagingItems(), {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsManga() = shot("phone-settings-manga", WindowLayout.COMPACT, TopLevel.SETTINGS, dark = false, manga = true) {
+        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.6.1", {}, {}, {},
+            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.6.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")

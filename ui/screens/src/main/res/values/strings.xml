@@ -358,4 +358,7 @@
     <string name="settings_source">Source code</string>
     <string name="settings_source_detail">github.com/Deepakraj1207/yourstream</string>
     <string name="settings_sign_in_hint">Sign in to Telegram to see your videos</string>
+    <string name="settings_style">Style</string>
+    <string name="settings_style_manga">Manga</string>
+    <string name="settings_style_classic">Classic</string>
 </resources>

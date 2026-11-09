@@ -51,6 +51,7 @@ import dev.yourstream.core.common.AppResult
 import dev.yourstream.ui.core.LocalDimens
 import dev.yourstream.ui.core.ScreenScaffold
 import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.core.inkPanel
 import dev.yourstream.ui.screens.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -170,7 +171,8 @@ private fun AddBox(state: AddonsUiState, onAction: (AddonsAction) -> Unit) {
 @Composable
 private fun AddonCard(row: AddonRow, onAction: (AddonsAction) -> Unit) {
     val a = row.addon
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().testTag("addon:${a.id}")) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(end = 4.dp, bottom = 4.dp).inkPanel(MaterialTheme.shapes.large).testTag("addon:${a.id}")) {
         Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(a.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)

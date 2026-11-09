@@ -1,6 +1,7 @@
 package dev.yourstream.ui.screens.navigation
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,7 +52,7 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
         dev.yourstream.ui.screens.settings.ThemeMode.LIGHT -> false
     }
     androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
-    YourStreamTheme(layout, darkTheme = dark) {
+    YourStreamTheme(layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
             val navigator = remember(nav) { AppNavigator(nav) }
@@ -75,7 +76,10 @@ fun AdaptiveShell(layout: WindowLayout, current: TopLevel?, onSelect: (TopLevel)
     when (layout) {
         WindowLayout.COMPACT -> Scaffold(
             bottomBar = {
-                NavigationBar(Modifier.testTag("nav:bar")) {
+                // Manga: the bar is the bottom panel of the page, ruled off with ink.
+                val ink = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                val manga = dev.yourstream.ui.core.LocalMangaStyle.current
+                NavigationBar(Modifier.testTag("nav:bar").then(if (manga) Modifier.drawWithContent { drawContent(); drawRect(ink, size = androidx.compose.ui.geometry.Size(size.width, 2.dp.toPx())) } else Modifier)) {
                     TopLevel.entries.filter { it.compact }.forEach { t ->
                         NavigationBarItem(
                             selected = t == current, onClick = { onSelect(t) },
