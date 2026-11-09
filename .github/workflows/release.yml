@@ -1,5 +1,6 @@
-# Builds the Android APK and publishes it on the Releases page when a version tag is pushed:
-#   git tag v0.2.0 && git push origin v0.2.0
+# Builds the Android APK and publishes it on the Releases page, either when a version tag is
+# pushed (git tag v0.2.0 && git push origin v0.2.0), or from Actions -> Release APK -> Run
+# workflow with a version (the release and its tag are then created at that commit).
 #
 # The published APK has NO Telegram API credentials built in (this repository is public and an
 # APK can be unpacked). Users enter their own API ID and hash once in Settings -> Telegram API.
@@ -13,9 +14,17 @@ name: Release APK
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to create, e.g. v0.2.0'
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
 
 jobs:
   apk:
@@ -47,9 +56,13 @@ jobs:
             echo "::warning::No release key: signing with a throwaway debug key"
           fi
 
+      - name: Version
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "::error::Version must look like v0.2.0, got '$TAG'"; exit 1 ;; esac
+
       - name: Build APK (no built-in Telegram credentials)
         env:
-          VERSION_NAME: ${{ github.ref_name }}
+          VERSION_NAME: ${{ env.TAG }}
           VERSION_CODE: ${{ github.run_number }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -58,7 +71,7 @@ jobs:
           export VERSION_NAME="${VERSION_NAME#v}"
           ./gradlew --no-daemon assembleRelease
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
 
       - name: Check that no credentials are built in
@@ -72,7 +85,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "YourStream $GITHUB_REF_NAME" \
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "YourStream $TAG" \
             --notes-file .github/release-notes.md \
             --generate-notes
