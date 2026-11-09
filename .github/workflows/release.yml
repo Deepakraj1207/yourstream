@@ -38,10 +38,12 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v3
-
+      # The runner image ships the Android SDK (ANDROID_HOME); add what this project compiles against.
       - name: Android SDK packages
-        run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+        run: |
+          SDKMANAGER=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 
       - uses: gradle/actions/setup-gradle@v4
 
