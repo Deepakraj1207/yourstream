@@ -2,6 +2,7 @@ package dev.yourstream.ui.core
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -9,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,9 +27,12 @@ import coil3.compose.AsyncImage
 import kotlin.math.absoluteValue
 
 /**
- * Artwork for a title: the poster from matched metadata when there is one, otherwise (and while it
- * loads, or if it fails) a placeholder derived from the real title — colour from a hash of the
- * title, its initials. No stock or demo images. Decorative: the card carries the description.
+ * Artwork for a title. [url] may hold several sources, one per line ([artworkSources]): the
+ * poster from matched metadata, then the video's Telegram thumbnail. Each is tried in turn (web
+ * images once more after a dropped connection); while loading, and when all fail, a placeholder
+ * from the real title shows its first letter. In portrait slots a Telegram thumbnail is only
+ * used when it is portrait itself, so channel logos never stand in for posters. Decorative: the
+ * card carries the description.
  */
 @Composable
 fun Artwork(
@@ -38,15 +43,19 @@ fun Artwork(
     /** False where the title is already drawn over the art (wide cards, hero background). */
     showInitials: Boolean = true,
 ) {
-    val src = remember(url) { posterUrl(url) }
-    // One retry (a dropped connection while scrolling), then the title placeholder stays.
-    var attempt by remember(src) { mutableStateOf(0) }
-    Box(modifier) {
+    BoxWithConstraints(modifier) {
+        val portrait = constraints.hasBoundedWidth && constraints.hasBoundedHeight && maxHeight > maxWidth
+        val sources = remember(url, portrait) { artworkSources(url, portrait) }
+        var index by remember(sources) { mutableIntStateOf(0) }
+        var retried by remember(sources) { mutableStateOf(false) }
         if (LocalMangaStyle.current) MangaTitleArt(title, Modifier.fillMaxSize(), showInitials) else TitleArt(title, Modifier.fillMaxSize(), showInitials)
-        if (src != null && attempt < 2) {
+        sources.getOrNull(index)?.let { src ->
             AsyncImage(
-                model = if (attempt == 0) src else "$src#retry", contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(),
-                onError = { attempt++ },
+                model = if (retried) "$src#retry" else src, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(),
+                onError = {
+                    if (!retried && src.startsWith("https://")) retried = true
+                    else { retried = false; index++ }
+                },
             )
         }
     }

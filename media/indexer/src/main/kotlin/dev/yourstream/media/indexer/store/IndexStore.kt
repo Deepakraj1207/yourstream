@@ -41,6 +41,15 @@ interface IndexStore {
 
     /** The caption one file of an album carries (Telegram stores it once per album), if any. */
     suspend fun albumCaption(chatId: Long, albumId: Long): String? = null
+
+    /** Stored posts-above of these messages (only files whose title came from one). */
+    suspend fun contextCaptions(chatId: Long, messageIds: List<Long>): Map<Long, String> = emptyMap()
+
+    /** Video files of [chatId] below [beforeMessageId] with no title of their own and no post above looked up yet, newest first. */
+    suspend fun untitledWithoutContext(chatId: Long, beforeMessageId: Long, limit: Int): List<UntitledFile> = emptyList()
+
+    /** Records the post above [file] ("" = none) and re-parses the file with it. */
+    suspend fun applyContext(file: UntitledFile, context: String) {}
     suspend fun cursor(chatId: Long, filter: MediaSearchFilter): ScanCursor
     suspend fun saveCursor(cursor: ScanCursor)
     suspend fun resetCursors(chatId: Long)
@@ -69,3 +78,16 @@ interface IndexStore {
     /** Records a download state change for files the index knows (by session file id). */
     suspend fun updateDownload(file: TelegramFile)
 }
+
+/** A file whose title is missing or only guessed from its chat's name. */
+data class UntitledFile(
+    val id: Long,
+    val messageId: Long,
+    /** Epoch seconds. */
+    val messageDate: Long,
+    val fileName: String,
+    val caption: String,
+    val audioTitle: String?,
+    val audioPerformer: String?,
+    val chatTitle: String?,
+)

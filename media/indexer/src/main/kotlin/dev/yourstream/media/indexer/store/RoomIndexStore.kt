@@ -138,6 +138,23 @@ class RoomIndexStore @Inject constructor(
         messageIds.chunked(SQL_CHUNK).forEach { media.touch(chatId, it, now) }
     }
 
+    override suspend fun contextCaptions(chatId: Long, messageIds: List<Long>): Map<Long, String> =
+        messageIds.chunked(500).flatMap { media.contextCaptions(chatId, it) }.associate { it.messageId to it.contextCaption }
+
+    override suspend fun untitledWithoutContext(chatId: Long, beforeMessageId: Long, limit: Int): List<UntitledFile> =
+        media.untitledWithoutContext(chatId, beforeMessageId, limit).map {
+            UntitledFile(it.id, it.messageId, it.messageDate, it.fileName, it.caption, it.audioTitle, it.audioPerformer, it.chatTitle)
+        }
+
+    override suspend fun applyContext(file: UntitledFile, context: String) = db.withTransaction {
+        media.setContextCaption(file.id, context)
+        if (context.isNotBlank()) {
+            val parsed = dev.yourstream.media.parser.ParsedMediaMapper.parse(file.fileName, file.caption, file.chatTitle, context)
+            media.upsertParsed(parsed.toEntity(file.id))
+            media.setSearchTitle(file.id, dev.yourstream.media.parser.MediaNormalizer.searchTitle(parsed, file.audioTitle, file.audioPerformer))
+        }
+    }
+
     override suspend fun albumCaption(chatId: Long, albumId: Long): String? =
         if (albumId == 0L) null else media.albumCaption(chatId, albumId)
 

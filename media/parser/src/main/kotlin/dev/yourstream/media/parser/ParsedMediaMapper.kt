@@ -10,8 +10,12 @@ object ParsedMediaMapper {
 
     val PARSER_VERSION: Int get() = MediaFilenameParser.VERSION
 
-    fun parse(fileName: String, caption: String?, chatTitle: String?): ParsedMedia =
-        MediaFilenameParser.parse(fileName, ParseHints(caption = caption, chatTitle = chatTitle)).toParsedMedia()
+    fun parse(fileName: String, caption: String?, chatTitle: String?, context: String? = null): ParsedMedia =
+        MediaFilenameParser.parse(fileName, ParseHints(caption = caption, chatTitle = chatTitle, context = context?.ifBlank { null })).toParsedMedia()
+
+    /** No title of its own (missing, or guessed from the chat's name): the post above the file may have it. */
+    fun needsContext(p: ParsedMedia): Boolean =
+        p.title == null || p.warnings.any { it == MediaFilenameParser.CHAT_TITLE_WARNING || it == MediaFilenameParser.GENERIC_TITLE_WARNING }
 
     fun FilenameMetadata.toParsedMedia(): ParsedMedia = ParsedMedia(
         title = title?.value,

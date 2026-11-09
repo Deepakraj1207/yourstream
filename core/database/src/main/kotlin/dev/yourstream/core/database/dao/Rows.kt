@@ -64,4 +64,22 @@ data class ReparseRow(
     @ColumnInfo(name = "audio_title") val audioTitle: String?,
     @ColumnInfo(name = "audio_performer") val audioPerformer: String?,
     @ColumnInfo(name = "chat_title") val chatTitle: String?,
+    @ColumnInfo(name = "context_caption") val contextCaption: String? = null,
+)
+
+/** A file whose title is missing or only guessed, for looking up the post above it. */
+data class UntitledMediaRow(
+    val id: Long,
+    @ColumnInfo(name = "message_id") val messageId: Long,
+    @ColumnInfo(name = "message_date") val messageDate: Long,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    val caption: String,
+    @ColumnInfo(name = "audio_title") val audioTitle: String?,
+    @ColumnInfo(name = "audio_performer") val audioPerformer: String?,
+    @ColumnInfo(name = "chat_title") val chatTitle: String?,
+)
+
+data class ContextCaptionRow(
+    @ColumnInfo(name = "message_id") val messageId: Long,
+    @ColumnInfo(name = "context_caption") val contextCaption: String,
 )

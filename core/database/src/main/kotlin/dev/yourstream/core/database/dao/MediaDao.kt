@@ -92,11 +92,31 @@ interface MediaDao {
           CASE WHEN m.caption = '' AND m.album_id != 0
                THEN IFNULL((SELECT a.caption FROM media a WHERE a.chat_id = m.chat_id AND a.album_id = m.album_id AND a.caption != '' LIMIT 1), '')
                ELSE m.caption END AS caption,
-          m.audio_title, m.audio_performer, c.title AS chat_title
+          m.audio_title, m.audio_performer, c.title AS chat_title, m.context_caption
         FROM media m JOIN media_parsed p ON p.media_id = m.id LEFT JOIN indexed_chat c ON c.chat_id = m.chat_id
         WHERE p.parser_version < :version AND m.id > :afterId ORDER BY m.id LIMIT :limit""",
     )
     suspend fun outdatedParses(version: Int, afterId: Long, limit: Int): List<ReparseRow>
+
+    /** Stored posts-above for these messages (files whose title came from one). */
+    @Query("SELECT message_id, context_caption FROM media WHERE chat_id = :chatId AND message_id IN (:messageIds) AND context_caption IS NOT NULL AND context_caption != ''")
+    suspend fun contextCaptions(chatId: Long, messageIds: List<Long>): List<ContextCaptionRow>
+
+    /**
+     * Live files of [chatId] without a title of their own (missing, or guessed from the chat's
+     * name) whose post above was never looked for, newest first.
+     */
+    @Query(
+        """SELECT m.id, m.message_id, m.message_date, m.file_name, m.caption, m.audio_title, m.audio_performer, c.title AS chat_title
+        FROM media m JOIN media_parsed p ON p.media_id = m.id LEFT JOIN indexed_chat c ON c.chat_id = m.chat_id
+        WHERE m.chat_id = :chatId AND m.is_deleted = 0 AND m.context_caption IS NULL AND m.media_type = 'VIDEO'
+          AND (p.title IS NULL OR p.warnings LIKE '%chat title%' OR p.warnings LIKE '%generic name%') AND m.message_id < :beforeMessageId
+        ORDER BY m.message_id DESC LIMIT :limit""",
+    )
+    suspend fun untitledWithoutContext(chatId: Long, beforeMessageId: Long, limit: Int): List<UntitledMediaRow>
+
+    @Query("UPDATE media SET context_caption = :context WHERE id = :id")
+    suspend fun setContextCaption(id: Long, context: String)
 
     @Query("UPDATE media SET search_title = :searchTitle WHERE id = :id")
     suspend fun setSearchTitle(id: Long, searchTitle: String)

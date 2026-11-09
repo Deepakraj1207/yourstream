@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)

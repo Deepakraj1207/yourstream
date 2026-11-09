@@ -63,6 +63,9 @@ interface TelegramClient {
     /** searchChatMessages with a media filter. Messages without a supported file are dropped. */
     suspend fun searchChatMedia(chatId: Long, filter: MediaSearchFilter, fromMessageId: Long, limit: Int): AppResult<MediaMessagePage>
 
+    /** getChatHistory from [fromMessageId] (included) towards older messages. */
+    suspend fun getChatHistory(chatId: Long, fromMessageId: Long, limit: Int): AppResult<List<dev.yourstream.telegram.api.model.ChatPost>> = AppResult.Ok(emptyList())
+
     /** getMessages: one [MessageLookup] per requested id, same order. */
     suspend fun getMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>>
 

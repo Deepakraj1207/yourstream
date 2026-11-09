@@ -30,4 +30,8 @@ data class EngineConfig(
     val verifyInterval: Duration = 24.hours,
     /** How many chats may scan at once (process-wide). */
     val maxConcurrentChats: Int = 3,
+    /** Files without a title of their own take it from the post above them in the chat. */
+    val contextLookups: Boolean = true,
+    /** Files indexed earlier whose post above is looked up, per run. */
+    val titleBackfillPerRun: Int = 5_000,
 )
