@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
     implementation(libs.androidx.media3.ui)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.zxing.core)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

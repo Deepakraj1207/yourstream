@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -56,7 +55,8 @@ abstract class BrowseViewModel(
         ),
     )
 
-    private val count: Flow<Int?> = filters.flatMapLatest { f -> media.count(query(f)).map<Int, Int?> { it }.onStart { emit(null) } }.catch { emit(null) }
+    // The previous count stays until the new one is known, so the title does not blink on each filter change.
+    private val count: Flow<Int?> = filters.flatMapLatest { f -> media.count(query(f)) }.distinctUntilChanged().map<Int, Int?> { it }.catch { emit(null) }
 
     val state: StateFlow<BrowseUiState> = combine(filters, count) { f, n -> BrowseUiState(f, controls, n) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BrowseUiState(filters.value, controls))

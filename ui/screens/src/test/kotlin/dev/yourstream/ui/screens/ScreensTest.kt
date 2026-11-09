@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performScrollTo
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -149,14 +151,13 @@ class ScreensTest {
     @Test
     fun settingsGroupsAndVersion() {
         var sources = 0
-        set { SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", {}, { sources++ }, {}, {}) }
+        set { SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", {}, { sources++ }, {}) }
         compose.onNodeWithText("Signed in as Asha").assertExists()
         compose.onNodeWithText("3 chats selected").performClick()
         assertEquals(1, sources)
         compose.onNodeWithTag("settings").performScrollToNode(hasText("Version 1.2.0"))
         compose.onNodeWithText("Version 1.2.0").assertExists()
-        compose.onNodeWithTag("settings").performScrollToNode(hasText("Developer tools"))
-        compose.onNodeWithText("Developer tools").assertExists()
+        compose.onNodeWithText("Developer tools").assertDoesNotExist()
     }
 
     @Test
@@ -181,11 +182,19 @@ class ScreensTest {
         val account = mutableListOf<AccountAction>()
         var step by androidx.compose.runtime.mutableStateOf<AccountStep>(AccountStep.Phone)
         set { AccountScreen(AccountUiState(step), { account += it }, {}) }
-        compose.onNodeWithTag("account-input").performTextInput("+491701234567")
+        compose.onNodeWithTag("account-dial").performTextReplacement("+49")
+        compose.onNodeWithText("Germany", substring = true).assertExists()
+        compose.onNodeWithTag("account-input").performTextInput("170 1234567")
         compose.onNodeWithTag("account-submit").performClick()
         assertEquals(listOf<AccountAction>(AccountAction.Submit("+491701234567")), account)
+        compose.onNodeWithTag("account-qr").performScrollTo().performClick()
+        assertEquals(AccountAction.UseQr, account.last())
         step = AccountStep.Code("+49***67", 5)
-        compose.onNodeWithText("Code sent to +49***67").assertExists()
+        compose.onNodeWithText("We've sent an SMS with the code to +49***67.").assertExists()
+        compose.onNodeWithTag("account-input").performTextInput("12345")
+        assertEquals(AccountAction.Submit("12345"), account.last(), "a complete code submits by itself")
+        compose.onNodeWithText("Wrong number?").performClick()
+        assertEquals(AccountAction.ChangeNumber, account.last())
     }
 
     @Test

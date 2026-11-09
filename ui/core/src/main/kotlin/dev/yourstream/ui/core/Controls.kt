@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -89,6 +90,34 @@ fun <T> SortMenu(label: String, options: List<ChipOption<T>>, selected: T, onSel
                     text = { Text(o.label) }, onClick = { open = false; onSelect(o.value) },
                     leadingIcon = if (o.value == selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
                     modifier = Modifier.testTag("sort:${o.label}"),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A chip that opens a single-choice menu ("A–Z ▾"). Shown as selected when [highlighted] (a filter
+ * is active), so a whole filter bar fits in one row of equal-height chips.
+ */
+@Composable
+fun <T> MenuChip(
+    label: String, options: List<ChipOption<T>>, selected: T, onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier, highlighted: Boolean = false, tag: String = "menu:$label",
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        FilterChip(
+            selected = highlighted, onClick = { open = true }, label = { Text(label, maxLines = 1) },
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+            modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag(tag),
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { o ->
+                DropdownMenuItem(
+                    text = { Text(o.label) }, onClick = { open = false; onSelect(o.value) },
+                    leadingIcon = if (o.value == selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
+                    modifier = Modifier.testTag("$tag:${o.label}"),
                 )
             }
         }

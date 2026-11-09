@@ -31,7 +31,7 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 |---|---|---|
 | `:ui:core` | Design system (brand theme, `Dimens`, typography, shapes); `UiState` / `UiError` / `EmptyKind`; state views and skeletons; artwork; poster/wide cards, rows, grids, hero; card menus; controls; `WindowLayout`; focus highlight | `core:common` only (for `AppError` → `UiError`) |
 | `:ui:screens` | Routes, `AppNavigator`, `AdaptiveShell`, `AppNavHost`; one package per screen (contract + ViewModel + screen); `Presentation` mappers; `TileActionHandler`; `ArtworkLookup` | `:ui:core` and the domain API modules |
-| `:app` | `MainActivity` (launcher + TV leanback launcher); the Stage-1 debug activity (Settings → Developer tools) | everything |
+| `:app` | `MainActivity` (launcher + TV leanback launcher); the app shell | everything |
 
 ## Rules
 
@@ -116,7 +116,7 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Search | `SearchUiState(query, results?, suggestions, interpretation)`. `results` = top result (when it clearly leads) + the rest + total; `null` = blank query (example chips) | `QueryChanged` (250 ms debounce), `PickSuggestion`, `Clear` | `LibrarySearch.search/suggest` |
 | Continue watching | `ContinueWatchingUiState(items)` | `Tile(action)` (incl. dismiss), `Retry` | `WatchIntelligence.continueWatching/dismiss` |
 | Player | `PlayerUiState(title, subtitle, status, position, duration, buffered, speed, quality, error, recovery, audio/subtitle options + selection, previous, next, resumedFrom, episodes)` + `episodeItems: Flow<PagingData<EpisodeItem>>` | `TogglePlay`, `Pause`, `SeekTo`, `SeekBy`, `ScrubStart`, `ScrubEnd`, `SetSpeed`, `SelectAudio`, `SelectSubtitle`, `SelectSeason`, `StartOver`, `DismissResume`, `Retry` | `TelegramPlaybackControllerFactory` (one controller per screen), `WatchHistoryRepository.progress`, `PlaybackSessionStore`, `EpisodeRepository.episode/nextEpisode/previousEpisode/episodes`, `SeriesRepository.seasons` |
-| Settings | `SettingsUiState(signedInAs, enabledSources, languages)`, grouped Library / Playback / About / Advanced, with the app version | callbacks to sub-screens and developer tools | auth, user, index, `TrackPreferenceStore` |
+| Settings | `SettingsUiState(signedInAs, enabledSources, languages)`, grouped Library / Playback / You / About, with the app version | callbacks to sub-screens | auth, user, index, `TrackPreferenceStore` |
 | Account | `AccountUiState(step, busy, error)`. `AccountStep` mirrors `AuthState` | `Submit(text)`, `Resend`, `UseQr`, `LogOut` | `TelegramAuthManager` |
 | Sources | `SourcesUiState(chats: UiState<List<SourceRow>>, hasMore, actionError)` | `Toggle`, `Rescan`, `LoadMore` | `TelegramChatRepository.chatList/loadMore`, `MediaIndexer.enableChat/disableChat/schedule`, `MediaIndexRepository.observeChats` |
 | Languages | `LanguagesUiState(prefs)` | `PreferAudio`, `PreferSubtitles`, `SetSubtitleMode` | `TrackPreferenceStore` |
