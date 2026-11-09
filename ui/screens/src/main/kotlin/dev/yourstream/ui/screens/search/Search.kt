@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -59,6 +61,8 @@ data class SearchUiState(
     val interpretation: List<String> = emptyList(),
     /** Set when the query is a request rather than a bare title. */
     val brain: BrainAnswer? = null,
+    /** Matching titles from the add-ons (open their title page with streams). */
+    val addons: List<Tile> = emptyList(),
 )
 
 sealed interface SearchAction {
@@ -74,6 +78,7 @@ class SearchViewModel @Inject constructor(
     private val search: LibrarySearch,
     private val artwork: ArtworkLookup,
     private val assistant: MediaAssistant,
+    private val addonSearch: dev.yourstream.ui.screens.AddonSearch,
 ) : ViewModel() {
     private val query = saved.getMutableStateFlow(QUERY, "")
 
@@ -112,7 +117,12 @@ class SearchViewModel @Inject constructor(
         return BrainAnswer(r.message, MediaBrain.understood(r.interpretation), tiles, r.total, play)
     }
 
-    val state: StateFlow<SearchUiState> = combine(query, results) { q, r -> SearchUiState(q, r.results, r.suggestions, r.interpretation, r.brain) }
+    /** Network search in the add-ons, after typing pauses a little longer than the local one. */
+    private val addonHits = query.debounce(ADDON_DEBOUNCE_MS).distinctUntilChanged().mapLatest { q ->
+        if (q.trim().length < 2) emptyList() else runCatching { addonSearch.search(q.trim()) }.getOrDefault(emptyList())
+    }.onStart { emit(emptyList()) }
+
+    val state: StateFlow<SearchUiState> = combine(query, results, addonHits) { q, r, a -> SearchUiState(q, r.results, r.suggestions, r.interpretation, r.brain, if (q.isBlank()) emptyList() else a) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState(query.value))
 
     fun onAction(action: SearchAction) {
@@ -125,6 +135,7 @@ class SearchViewModel @Inject constructor(
 
     companion object {
         const val DEBOUNCE_MS = 250L
+        const val ADDON_DEBOUNCE_MS = 600L
         private const val QUERY = "query"
         private const val ARTWORK_FOR = 24
         /** The first hit is a "top result" when it scores this much above the second. */

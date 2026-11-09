@@ -80,9 +80,6 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                                 FilledTonalButton(onClick = { onAction(DetailsAction.ToggleLibrary) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("my-library")) {
                                     Text(stringResource(if (c.inLibrary) R.string.action_remove_from_library else R.string.action_add_to_library))
                                 }
-                                FilledTonalButton(onClick = { onAction(DetailsAction.ToggleFavorite) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("favorite")) {
-                                    Text(stringResource(if (c.isFavorite) R.string.action_unfavorite else R.string.action_favorite))
-                                }
                                 // Wrong poster or details? The user decides the match.
                                 onFixMatch?.let { fix ->
                                     androidx.compose.material3.TextButton(onClick = { fix(c.itemId) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("fix-match")) {

@@ -43,7 +43,7 @@ class TmdbProviderTest {
         val c = r.single()
         assertEquals("603", c.ref.id)
         assertEquals(1999, c.year)
-        assertEquals("https://image.tmdb.org/t/p/w500/p.jpg", c.posterUrl)
+        assertEquals("https://image.tmdb.org/t/p/w342/p.jpg", c.posterUrl)
         assertEquals("https://image.tmdb.org/t/p/w1280/b.jpg", c.backdropUrl)
         val url = requests.single().url
         assertEquals("/3/search/movie", url.encodedPath)

@@ -21,6 +21,8 @@ class AppNavigator(private val nav: NavHostController) {
         is OpenTarget.Details -> nav.navigate(DetailsRoute(target.itemId))
         is OpenTarget.Episodes -> nav.navigate(EpisodesRoute(target.seriesId, target.seasonId))
         is OpenTarget.Play -> nav.navigate(PlayerRoute(target.target.itemId, target.target.episodeId, target.mediaId)) { launchSingleTop = true }
+        is OpenTarget.CatalogTitle -> nav.navigate(target.route)
+        is OpenTarget.Stream -> nav.navigate(target.route) { launchSingleTop = true }
         is OpenTarget.Search -> nav.navigate(SearchRoute(target.query)) {
             popUpTo(nav.graph.findStartDestination().id) { saveState = false }
             launchSingleTop = true

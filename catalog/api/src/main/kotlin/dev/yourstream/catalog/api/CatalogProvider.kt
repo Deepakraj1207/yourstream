@@ -56,3 +56,32 @@ enum class PresenceMatch { IMDB_ID, TMDB_ID, TITLE_YEAR }
 interface LibraryAvailability {
     suspend fun presence(items: List<CatalogItem>): Map<CatalogItemRef, LibraryPresence>
 }
+
+/**
+ * One way to watch a title, as a stream add-on (Stremio protocol) offers it. Exactly one of
+ * [url] (playable over HTTP: a file, HLS or DASH), [externalUrl] (opens elsewhere) or
+ * [infoHash] (a torrent, which this app does not play) is normally set.
+ */
+data class AddonStream(
+    val addon: String,
+    /** Short label the add-on gives ("1080p", "Torrentio\n4K"). */
+    val name: String,
+    /** Longer description: file name, size, source. */
+    val description: String?,
+    val url: String?,
+    val externalUrl: String?,
+    val infoHash: String?,
+    /** HTTP headers the stream needs (behaviorHints.proxyHeaders.request). */
+    val headers: Map<String, String> = emptyMap(),
+) {
+    val playable: Boolean get() = url != null && (url.startsWith("https://") || url.startsWith("http://"))
+}
+
+/** An add-on that answers "how can I watch X?" ([type] movie/series, [id] e.g. "tt0111161" or "tt0903747:1:2"). */
+interface StreamProvider {
+    val id: CatalogProviderId
+    val displayName: String
+    /** Whether the add-on offers streams at all (from its manifest). */
+    suspend fun hasStreams(): Boolean
+    suspend fun streams(type: CatalogType, id: String): AppResult<List<AddonStream>>
+}

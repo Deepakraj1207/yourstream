@@ -13,6 +13,7 @@ import dev.yourstream.catalog.stremio.StremioAddonDefinition
 import dev.yourstream.catalog.stremio.StremioCatalogProvider
 import dev.yourstream.catalog.api.CatalogProvider
 import dev.yourstream.catalog.sync.CatalogProviderFactory
+import dev.yourstream.catalog.sync.CatalogAddons
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
 import dev.yourstream.core.network.HttpClients
@@ -76,7 +77,9 @@ object AppModule {
             val known = IndianCatalogs.create(ids, { HttpClients.create() }, clock)
             val custom = BuildConfig.CATALOG_CUSTOM_MANIFESTS.split(',').map { it.trim() }.filter { it.startsWith("https://") || it.startsWith("stremio://") }
                 .map { StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(it), clock) }
-            return known + custom
+            // Cinemeta: Stremio's own catalog of popular movies and series (on by default, switchable).
+            val cinemeta = StremioCatalogProvider(HttpClients.create(), StremioAddonDefinition.custom(CatalogAddons.CINEMETA, "Cinemeta").copy(id = dev.yourstream.catalog.api.CatalogProviderId("cinemeta")), clock)
+            return listOf(cinemeta) + known + custom
         }
 
         override fun custom(manifestUrl: String, name: String): CatalogProvider =

@@ -85,7 +85,7 @@ class ScreensTest {
     private fun rows(vararg recent: Tile): HomeRows {
         val r = kotlinx.coroutines.flow.flowOf(PagingData.from(recent.toList())).collectAsLazyPagingItems()
         val none = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>())).collectAsLazyPagingItems()
-        return HomeRows(r, none, none, none)
+        return HomeRows(r, none)
     }
 
     @Test
@@ -152,7 +152,8 @@ class ScreensTest {
     fun settingsGroupsAndVersion() {
         var sources = 0
         set { SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", {}, { sources++ }, {}) }
-        compose.onNodeWithText("Signed in as Asha").assertExists()
+        compose.onNodeWithText("Asha").assertExists()
+        compose.onNodeWithText("Telegram account").assertExists()
         compose.onNodeWithText("3 chats selected").performClick()
         assertEquals(1, sources)
         compose.onNodeWithTag("settings").performScrollToNode(hasText("Version 1.2.0"))
@@ -161,7 +162,24 @@ class ScreensTest {
     }
 
     @Test
-    fun detailsShowsResumeAndTogglesFavorite() {
+    fun settingsChangePlayerPreferences() {
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsScreen(SettingsUiState("Asha", true, 3, ""), "1.2.0", {}, {}, {}, prefs = prefs, onPrefs = { prefs = it }) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-autoplay"))
+        compose.onNodeWithTag("pref-autoplay").performClick()
+        assertEquals(false, prefs.autoplayNext)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-seek"))
+        compose.onNodeWithTag("pref-seek").performClick()
+        compose.onNodeWithTag("choice:30 seconds").performClick()
+        assertEquals(30, prefs.seekSeconds)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-theme"))
+        compose.onNodeWithTag("pref-theme").performClick()
+        compose.onNodeWithTag("choice:Dark").performClick()
+        assertEquals(dev.yourstream.ui.screens.settings.ThemeMode.DARK, prefs.theme)
+    }
+
+    @Test
+    fun detailsShowsResumeAndAddsToLibrary() {
         val actions = mutableListOf<DetailsAction>()
         val opened = mutableListOf<OpenTarget>()
         val play = OpenTarget.Play(PlaybackTarget(1))
@@ -173,8 +191,9 @@ class ScreensTest {
         }
         compose.onNodeWithText("Resume from 1:02:03").performClick()
         assertEquals(listOf<OpenTarget>(play), opened)
-        compose.onNodeWithTag("favorite").performScrollTo().performClick()
-        assertEquals(listOf<DetailsAction>(DetailsAction.ToggleFavorite), actions)
+        compose.onNodeWithTag("my-library").performScrollTo().performClick()
+        assertEquals(listOf<DetailsAction>(DetailsAction.ToggleLibrary), actions)
+        compose.onNodeWithTag("favorite").assertDoesNotExist()
     }
 
     @Test

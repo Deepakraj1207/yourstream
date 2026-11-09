@@ -1,8 +1,19 @@
 package dev.yourstream.ui.screens.settings
 
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.screens.player.label
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -99,8 +110,39 @@ fun SettingsRoute(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
-    SettingsScreen(state, appVersion, onAccount, onSources, onLanguages, more)
+    val updates: dev.yourstream.ui.screens.update.UpdateViewModel = hiltViewModel()
+    val update by updates.state.collectAsStateWithLifecycle()
+    val prefsVm: AppPreferencesViewModel = hiltViewModel()
+    val prefs by prefsVm.settings.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val cleared = stringResource(R.string.settings_cache_cleared)
+    SettingsScreen(
+        state, appVersion, onAccount, onSources, onLanguages, more,
+        updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
+        onUpdate = {
+            when (update) {
+                is dev.yourstream.ui.screens.update.UpdateState.Available, is dev.yourstream.ui.screens.update.UpdateState.Ready -> updates.install()
+                is dev.yourstream.ui.screens.update.UpdateState.Downloading, dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
+                else -> updates.check()
+            }
+        },
+        prefs = prefs, onPrefs = { new -> prefsVm.update { new } },
+        onClearCache = {
+            runCatching {
+                val loader = coil3.SingletonImageLoader.get(context)
+                loader.memoryCache?.clear(); loader.diskCache?.clear()
+            }
+            android.widget.Toast.makeText(context, cleared, android.widget.Toast.LENGTH_SHORT).show()
+        },
+        onSourceCode = {
+            runCatching {
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(SOURCE_URL)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        },
+    )
 }
+
+private const val SOURCE_URL = "https://github.com/Deepakraj1207/yourstream"
 
 /** The advanced screens reachable from Settings. */
 data class SettingsLinks(
@@ -111,74 +153,193 @@ data class SettingsLinks(
     val addons: (() -> Unit)? = null,
 )
 
-/** Grouped settings; content width is capped on large screens and TV for readability. */
+/**
+ * Settings in the style of Stremio/Nuvio: a profile card, then rounded groups (Content, Player,
+ * Appearance, Your data, About) with switches and choices right in the list. Content width is
+ * capped on large screens and TV.
+ */
 @Composable
 fun SettingsScreen(
     state: SettingsUiState, appVersion: String?, onAccount: () -> Unit, onSources: () -> Unit, onLanguages: () -> Unit,
     more: SettingsLinks = SettingsLinks(),
+    /** "Version 0.4.0 · Up to date", "Update to 0.5.0"; null shows the plain version. */
+    updateLine: String? = null,
+    onUpdate: (() -> Unit)? = null,
+    prefs: AppSettings = AppSettings(),
+    onPrefs: (AppSettings) -> Unit = {},
+    onClearCache: (() -> Unit)? = null,
+    onSourceCode: (() -> Unit)? = null,
 ) {
+    var picker by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Picker?>(null) }
     ScreenScaffold(stringResource(R.string.nav_settings)) {
         LazyColumn(
             Modifier.testTag("settings").widthIn(max = 760.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = LocalDimens.current.gutter - 16.dp, vertical = 8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = LocalDimens.current.gutter, vertical = 8.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
         ) {
-            item { Group(R.string.settings_group_library) }
+            item { Profile(state, onAccount) }
+
+            item { Group(R.string.settings_group_content) }
             item {
-                ListRow(stringResource(R.string.settings_account),
-                    supporting = if (state.signedIn) stringResource(R.string.settings_signed_in_as, state.signedInAs.orEmpty()) else stringResource(R.string.settings_not_signed_in),
-                    leading = { Icon(Icons.Filled.AccountCircle, contentDescription = null) }, onClick = onAccount)
+                Card {
+                    more.addons?.let { Row(stringResource(R.string.settings_addons), stringResource(R.string.settings_addons_detail), Icons.Filled.Add, onClick = it) }
+                    Row(stringResource(R.string.settings_sources), pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
+                        Icons.AutoMirrored.Filled.List, onClick = onSources)
+                    more.libraryStatus?.let { Row(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), dev.yourstream.ui.core.AppIcons.Episodes, onClick = it) }
+                    more.review?.takeIf { state.reviewCount > 0 }?.let {
+                        Row(stringResource(R.string.settings_review), pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount), Icons.Filled.Warning, onClick = it)
+                    }
+                }
             }
+
+            item { Group(R.string.settings_group_player) }
             item {
-                ListRow(stringResource(R.string.settings_sources), supporting = pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
-                    leading = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) }, onClick = onSources)
-            }
-            more.libraryStatus?.let { open ->
-                item {
-                    ListRow(stringResource(R.string.settings_status), supporting = stringResource(R.string.settings_status_detail),
-                        leading = { Icon(dev.yourstream.ui.core.AppIcons.Episodes, contentDescription = null) }, onClick = open)
+                Card {
+                    Row(stringResource(R.string.settings_languages), state.languages.ifEmpty { null }, Icons.Filled.Settings, onClick = onLanguages)
+                    Row(stringResource(R.string.settings_seek), stringResource(R.string.settings_seconds, prefs.seekSeconds), dev.yourstream.ui.core.AppIcons.FastForward,
+                        tag = "pref-seek", onClick = { picker = Picker.SEEK })
+                    Toggle(stringResource(R.string.settings_autoplay), stringResource(R.string.settings_autoplay_detail), Icons.Filled.PlayArrow, prefs.autoplayNext, "pref-autoplay") {
+                        onPrefs(prefs.copy(autoplayNext = it))
+                    }
+                    Row(stringResource(R.string.settings_fit), prefs.defaultFit.label(), dev.yourstream.ui.core.AppIcons.AspectRatio,
+                        tag = "pref-fit", onClick = { picker = Picker.FIT })
+                    Toggle(stringResource(R.string.settings_landscape), stringResource(R.string.settings_landscape_detail), dev.yourstream.ui.core.AppIcons.ScreenRotation,
+                        prefs.playerLandscape, "pref-landscape") { onPrefs(prefs.copy(playerLandscape = it)) }
+                    Row(stringResource(R.string.settings_hold_speed), speedLabel(prefs.holdSpeed), dev.yourstream.ui.core.AppIcons.Speed,
+                        tag = "pref-hold", onClick = { picker = Picker.HOLD })
                 }
             }
-            more.review?.takeIf { state.reviewCount > 0 }?.let { open ->
-                item {
-                    ListRow(stringResource(R.string.settings_review), supporting = pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
-                        leading = { Icon(Icons.Filled.Warning, contentDescription = null) }, onClick = open)
-                }
-            }
-            more.addons?.let { open ->
-                item {
-                    ListRow(stringResource(R.string.settings_addons), supporting = stringResource(R.string.settings_addons_detail),
-                        leading = { Icon(Icons.Filled.Add, contentDescription = null) }, onClick = open)
-                }
-            }
-            item { Group(R.string.settings_group_playback) }
+
+            item { Group(R.string.settings_group_appearance) }
             item {
-                ListRow(stringResource(R.string.settings_languages), supporting = state.languages.ifEmpty { null },
-                    leading = { Icon(Icons.Filled.Settings, contentDescription = null) }, onClick = onLanguages)
-            }
-            if (more.stats != null || more.sync != null) item { Group(R.string.settings_group_you) }
-            more.stats?.let { open ->
-                item {
-                    ListRow(stringResource(R.string.settings_stats), supporting = stringResource(R.string.settings_stats_detail),
-                        leading = { Icon(Icons.Filled.DateRange, contentDescription = null) }, onClick = open)
+                Card {
+                    Row(stringResource(R.string.settings_theme), themeLabel(prefs.theme), Icons.Filled.Star, tag = "pref-theme", onClick = { picker = Picker.THEME })
                 }
             }
-            more.sync?.let { open ->
+
+            if (more.stats != null || more.sync != null || onClearCache != null) {
+                item { Group(R.string.settings_group_you) }
                 item {
-                    ListRow(stringResource(R.string.settings_sync), supporting = stringResource(if (state.syncOn) R.string.settings_sync_on else R.string.settings_sync_off),
-                        leading = { Icon(Icons.Filled.Refresh, contentDescription = null) }, onClick = open)
+                    Card {
+                        more.stats?.let { Row(stringResource(R.string.settings_stats), stringResource(R.string.settings_stats_detail), Icons.Filled.DateRange, onClick = it) }
+                        more.sync?.let {
+                            Row(stringResource(R.string.settings_sync), stringResource(if (state.syncOn) R.string.settings_sync_on else R.string.settings_sync_off), Icons.Filled.Refresh, onClick = it)
+                        }
+                        onClearCache?.let { Row(stringResource(R.string.settings_clear_cache), stringResource(R.string.settings_clear_cache_detail), Icons.Filled.Delete, onClick = it) }
+                    }
                 }
             }
+
             item { Group(R.string.settings_group_about) }
             item {
-                ListRow(stringResource(R.string.app_name), supporting = appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(R.string.settings_about_line),
-                    leading = { Icon(Icons.Filled.Info, contentDescription = null) })
+                Card {
+                    Row(stringResource(R.string.app_name), appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(R.string.settings_about_line), Icons.Filled.Info)
+                    onUpdate?.let { Row(stringResource(R.string.update_row), updateLine, dev.yourstream.ui.core.AppIcons.Update, tag = "update-row", onClick = it) }
+                    onSourceCode?.let { Row(stringResource(R.string.settings_source), stringResource(R.string.settings_source_detail), Icons.Filled.Share, onClick = it) }
+                }
             }
         }
     }
+
+    picker?.let { p ->
+        when (p) {
+            Picker.SEEK -> Choose(stringResource(R.string.settings_seek), AppSettings.SEEK_OPTIONS.map { it to stringResource(R.string.settings_seconds, it) }, prefs.seekSeconds,
+                { onPrefs(prefs.copy(seekSeconds = it)) }) { picker = null }
+            Picker.FIT -> Choose(stringResource(R.string.settings_fit), dev.yourstream.ui.screens.player.VideoFit.entries.map { it to it.label() },
+                prefs.defaultFit, { onPrefs(prefs.copy(defaultFit = it)) }) { picker = null }
+            Picker.HOLD -> Choose(stringResource(R.string.settings_hold_speed), AppSettings.HOLD_SPEEDS.map { it to speedLabel(it) }, prefs.holdSpeed,
+                { onPrefs(prefs.copy(holdSpeed = it)) }) { picker = null }
+            Picker.THEME -> Choose(stringResource(R.string.settings_theme), ThemeMode.entries.map { it to themeLabel(it) }, prefs.theme,
+                { onPrefs(prefs.copy(theme = it)) }) { picker = null }
+        }
+    }
+}
+
+private enum class Picker { SEEK, FIT, HOLD, THEME }
+
+private fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
+
+@Composable
+private fun themeLabel(t: ThemeMode) = stringResource(
+    when (t) {
+        ThemeMode.SYSTEM -> R.string.settings_theme_system
+        ThemeMode.DARK -> R.string.settings_theme_dark
+        ThemeMode.LIGHT -> R.string.settings_theme_light
+    },
+)
+
+/** The Telegram account as a profile card (avatar with initials, name, state). */
+@Composable
+private fun Profile(state: SettingsUiState, onAccount: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onAccount, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp).focusHighlight(MaterialTheme.shapes.large).testTag("profile"),
+    ) {
+        androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(52.dp)) {
+                androidx.compose.foundation.layout.Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    if (state.signedIn && !state.signedInAs.isNullOrBlank()) {
+                        Text(dev.yourstream.ui.core.initials(state.signedInAs), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary)
+                    } else Icon(Icons.Filled.AccountCircle, null, tint = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                Text(if (state.signedIn) state.signedInAs.orEmpty() else stringResource(R.string.settings_not_signed_in), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (state.signedIn) stringResource(R.string.settings_account) else stringResource(R.string.settings_sign_in_hint),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+        }
+    }
+}
+
+/** A rounded group of rows, like the cards in Stremio's and Nuvio's settings. */
+@Composable
+private fun Card(content: @Composable () -> Unit) {
+    androidx.compose.material3.Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(vertical = 4.dp)) { content() }
+    }
+}
+
+@Composable
+private fun Row(title: String, supporting: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, tag: String? = null, onClick: (() -> Unit)? = null) {
+    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = onClick,
+        trailing = onClick?.let { { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) } },
+        modifier = if (tag != null) Modifier.testTag(tag) else Modifier)
+}
+
+@Composable
+private fun Toggle(title: String, supporting: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
+    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = { onChange(!checked) },
+        trailing = { androidx.compose.material3.Switch(checked = checked, onCheckedChange = null) }, modifier = Modifier.testTag(tag))
+}
+
+/** A single-choice dialog. */
+@Composable
+private fun <T> Choose(title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit, onClose: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onClose, title = { Text(title) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                options.forEach { (value, label) ->
+                    androidx.compose.foundation.layout.Row(
+                        Modifier.fillMaxWidth().clickable { onPick(value); onClose() }.padding(vertical = 12.dp).testTag("choice:$label"),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = value == selected, onClick = null)
+                        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 16.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onClose) { Text(stringResource(R.string.action_close)) } },
+    )
 }
 
 @Composable
 private fun Group(title: Int) {
     Text(stringResource(title), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 4.dp).semantics { heading() })
+        modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).semantics { heading() })
 }

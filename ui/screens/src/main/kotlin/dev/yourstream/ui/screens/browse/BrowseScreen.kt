@@ -55,9 +55,6 @@ fun SeriesRoute(onOpen: (OpenTarget) -> Unit, vm: SeriesViewModel = hiltViewMode
 fun RecentlyAddedRoute(onOpen: (OpenTarget) -> Unit, vm: RecentlyAddedViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_recent, EmptyKind.LIBRARY_EMPTY, vm, onOpen)
 
 @Composable
-fun FavoritesRoute(onOpen: (OpenTarget) -> Unit, vm: FavoritesViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_favorites, EmptyKind.NO_FAVORITES, vm, onOpen)
-
-@Composable
 private fun BrowseRoute(@StringRes title: Int, empty: EmptyKind, vm: BrowseViewModel, onOpen: (OpenTarget) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     BrowseScreen(stringResource(title), empty, state, vm.items.collectAsLazyPagingItems(), vm::onAction, onOpen)

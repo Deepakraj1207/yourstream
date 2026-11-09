@@ -40,8 +40,6 @@ class TileActionHandler @Inject constructor(
 @Composable
 fun tileActions(onAction: (TileAction) -> Unit, onOpen: (OpenTarget) -> Unit): (Tile) -> List<CardAction> {
     val details = stringResource(R.string.action_details)
-    val fav = stringResource(R.string.action_favorite)
-    val unfav = stringResource(R.string.action_unfavorite)
     val watched = stringResource(R.string.action_mark_watched)
     val unwatched = stringResource(R.string.action_mark_unwatched)
     val remove = stringResource(R.string.action_remove_continue)
@@ -52,7 +50,6 @@ fun tileActions(onAction: (TileAction) -> Unit, onOpen: (OpenTarget) -> Unit): (
         if (id == null) emptyList() else buildList {
             if (t.open !is OpenTarget.Details) add(CardAction(details) { onOpen(OpenTarget.Details(id)) })
             t.inLibrary?.let { l -> add(CardAction(if (l) removeLib else addLib) { onAction(TileAction.SetInLibrary(id, !l)) }) }
-            t.isFavorite?.let { f -> add(CardAction(if (f) unfav else fav) { onAction(TileAction.SetFavorite(id, !f)) }) }
             t.watched?.let { w -> add(CardAction(if (w) unwatched else watched) { onAction(TileAction.SetWatched(id, !w)) }) }
             if (t.dismissible) add(CardAction(remove) { onAction(TileAction.Dismiss(id)) })
         }

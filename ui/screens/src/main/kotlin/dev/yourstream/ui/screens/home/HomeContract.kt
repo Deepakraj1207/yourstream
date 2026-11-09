@@ -54,7 +54,7 @@ data class HomeUiState(
         }
 }
 
-enum class HomeSection { CONTINUE_WATCHING, RECENTLY_ADDED, MOVIES, SERIES, FAVORITES }
+enum class HomeSection { CONTINUE_WATCHING, RECENTLY_ADDED, MOVIES, SERIES }
 
 sealed interface HomeAction {
     data object Retry : HomeAction

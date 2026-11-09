@@ -113,14 +113,15 @@ fun mediaMessage(
 )
 
 /** Real Room (in memory) + real engine + fake Telegram. */
-class IndexerTestEnv {
+class IndexerTestEnv(parallelFilters: Boolean = false) {
     val clock = TestClock()
     val db: YourStreamDatabase = YourStreamDatabase.inMemory(ApplicationProvider.getApplicationContext())
     val telegram = FakeMessageRepository(clock)
     val tracker = IndexProgressTracker()
     val store = RoomIndexStore(db, clock)
     val normalizer = MediaNormalizer()
-    val config = EngineConfig(pageSize = 3, pageDelay = 0.milliseconds, retryBaseDelay = 10.milliseconds, verifyBatch = 2)
+    // Sequential by default so call-order assertions are deterministic; the parallel default has its own test.
+    val config = EngineConfig(pageSize = 3, pageDelay = 0.milliseconds, retryBaseDelay = 10.milliseconds, verifyBatch = 2, parallelFilters = parallelFilters)
     var indexChanges = 0
     val engine = IndexingEngine(telegram, store, normalizer, tracker, clock, NoOpLogger, config, setOf(dev.yourstream.media.api.MediaIndexListener { indexChanges++ }))
     val repository = RoomMediaIndexRepository(db, tracker)

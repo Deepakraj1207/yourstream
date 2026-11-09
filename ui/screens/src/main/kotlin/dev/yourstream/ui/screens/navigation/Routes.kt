@@ -26,7 +26,6 @@ import kotlinx.serialization.Serializable
 @Serializable data class SearchRoute(val query: String = "") : Route
 @Serializable data object ContinueWatchingRoute : Route
 @Serializable data object RecentlyAddedRoute : Route
-@Serializable data object FavoritesRoute : Route
 @Serializable data object SettingsRoute : Route
 
 /** A movie, video or series. */
@@ -46,6 +45,13 @@ import kotlinx.serialization.Serializable
 /** Choose the right metadata for one title (from Details). */
 @Serializable data class FixMatchRoute(val itemId: Long) : Route
 @Serializable data object StatsRoute : Route
+/** A title from an add-on catalog: details, episodes and the add-ons' streams. */
+@Serializable data class CatalogTitleRoute(
+    val provider: String, val type: String, val id: String, val title: String,
+    val year: Int? = null, val poster: String? = null, val imdb: String? = null,
+) : Route
+/** Plays an add-on stream (HTTP file, HLS or DASH). [headers]: JSON object of request headers. */
+@Serializable data class StreamPlayerRoute(val url: String, val title: String, val subtitle: String? = null, val headers: String = "{}") : Route
 /** Catalog add-ons: built-in ones and those added by link. */
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
@@ -63,7 +69,6 @@ enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: Image
     SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search, true),
     CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
     RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
-    FAVORITES(FavoritesRoute, R.string.nav_favorites, Icons.Filled.Favorite, true),
     SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings, true),
 }
 
@@ -72,6 +77,10 @@ sealed interface OpenTarget {
     data class Details(val itemId: Long) : OpenTarget
     data class Episodes(val seriesId: Long, val seasonId: Long? = null) : OpenTarget
     data class Play(val target: PlaybackTarget, val mediaId: Long? = null) : OpenTarget
-    /** Look for a title in the library (catalog titles that are not in it). */
+    /** Look for a title in the library. */
     data class Search(val query: String) : OpenTarget
+    /** An add-on catalog title (not in the library). */
+    data class CatalogTitle(val route: CatalogTitleRoute) : OpenTarget
+    /** An add-on stream. */
+    data class Stream(val route: StreamPlayerRoute) : OpenTarget
 }

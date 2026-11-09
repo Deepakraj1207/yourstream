@@ -33,6 +33,16 @@ import kotlin.test.assertEquals
 
 class UiModelsTest {
     @Test
+    fun posterLinksAreMadeLoadable() {
+        kotlin.test.assertEquals("https://img.example.com/p.jpg", posterUrl("http://img.example.com/p.jpg"))
+        kotlin.test.assertEquals("https://img.example.com/p.jpg", posterUrl("//img.example.com/p.jpg"))
+        kotlin.test.assertEquals("https://img.example.com/p.jpg", posterUrl(" https://img.example.com/p.jpg "))
+        kotlin.test.assertEquals(null, posterUrl("N/A"))
+        kotlin.test.assertEquals(null, posterUrl("/relative.jpg"))
+        kotlin.test.assertEquals(null, posterUrl(null))
+    }
+
+    @Test
     fun layoutBreakpoints() {
         assertEquals(WindowLayout.COMPACT, WindowLayout.of(411, false))
         assertEquals(WindowLayout.MEDIUM, WindowLayout.of(700, false))

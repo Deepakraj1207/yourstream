@@ -43,6 +43,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.tv.material)
     implementation(libs.androidx.media3.ui)
+    // Add-on streams are often HLS (.m3u8) or DASH.
+    implementation(libs.androidx.media3.hls)
+    implementation(libs.androidx.media3.dash)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.zxing.core)
     implementation(libs.hilt.android)

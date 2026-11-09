@@ -75,6 +75,8 @@ android {
         versionCode = (System.getenv("VERSION_CODE") ?: "2").toInt()
         versionName = System.getenv("VERSION_NAME") ?: "0.2.0"
 
+        // In-app updates come from this repository's GitHub Releases (CI passes its own name).
+        buildConfigField("String", "UPDATE_REPO", quoted(System.getenv("GITHUB_REPOSITORY") ?: "Deepakraj1207/yourstream"))
         buildConfigField("int", "TELEGRAM_API_ID", telegramApiId)
         buildConfigField("String", "TELEGRAM_API_HASH", "\"$telegramApiHash\"")
         buildConfigField("boolean", "TELEGRAM_USE_TEST_DC", telegramUseTestDc.toBoolean().toString())

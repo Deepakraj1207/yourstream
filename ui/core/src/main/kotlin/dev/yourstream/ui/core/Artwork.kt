@@ -38,11 +38,16 @@ fun Artwork(
     /** False where the title is already drawn over the art (wide cards, hero background). */
     showInitials: Boolean = true,
 ) {
-    var failed by remember(url) { mutableStateOf(false) }
+    val src = remember(url) { posterUrl(url) }
+    // One retry (a dropped connection while scrolling), then the title placeholder stays.
+    var attempt by remember(src) { mutableStateOf(0) }
     Box(modifier) {
         TitleArt(title, Modifier.fillMaxSize(), showInitials)
-        if (url != null && !failed) {
-            AsyncImage(model = url, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(), onError = { failed = true })
+        if (src != null && attempt < 2) {
+            AsyncImage(
+                model = if (attempt == 0) src else "$src#retry", contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(),
+                onError = { attempt++ },
+            )
         }
     }
 }

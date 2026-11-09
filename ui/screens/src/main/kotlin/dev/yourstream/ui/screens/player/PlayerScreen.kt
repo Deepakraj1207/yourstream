@@ -129,17 +129,21 @@ fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: Playe
     ImmersiveMode()
     // Phones and tablets open the player in landscape; the rotate button switches to portrait and back.
     val tv = LocalWindowLayout.current == WindowLayout.TV
-    var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    var landscape by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(settings.playerLandscape) }
+    var fit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(settings.defaultFit) }
     if (!tv) Orientation(landscape)
+    RestoreBrightnessOnExit()
     PlayerScreen(
         state, vm::onAction, onBack, onPlay, vm.episodeItems.collectAsLazyPagingItems(),
         onRotate = if (tv) null else ({ landscape = !landscape }),
-    ) { PlayerSurface(vm.player, state.isPlaying) }
+        fit = fit, onFit = { fit = fit.next() },
+    ) { PlayerSurface(vm.player, state.isPlaying, fit) }
 }
 
 /** Locks the screen to landscape (either way up) or portrait while the player is shown; back to normal after. */
 @Composable
-private fun Orientation(landscape: Boolean) {
+internal fun Orientation(landscape: Boolean) {
     val activity = LocalActivity.current ?: return
     DisposableEffect(activity, landscape) {
         activity.requestedOrientation = if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -150,7 +154,7 @@ private fun Orientation(landscape: Boolean) {
 
 /** Full screen video: system bars hidden while the player is shown (a swipe brings them back briefly). */
 @Composable
-private fun ImmersiveMode() {
+internal fun ImmersiveMode() {
     val activity = LocalActivity.current ?: return
     DisposableEffect(activity) {
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
@@ -161,17 +165,16 @@ private fun ImmersiveMode() {
 }
 
 @Composable
-private fun PlayerSurface(player: Player, playing: Boolean) {
+internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = VideoFit.FIT) {
     AndroidView(
         factory = { ctx -> PlayerView(ctx).apply { useController = false; this.player = player } },
-        update = { it.keepScreenOn = playing },
+        update = { it.keepScreenOn = playing; it.resizeMode = fit.resizeMode },
         modifier = Modifier.fillMaxSize(),
     )
 }
 
 enum class PlayerPanel { EPISODES, AUDIO, SUBTITLES, SPEED, INFO }
 
-private const val SEEK_STEP_MS = 10_000L
 private const val UP_NEXT_BEFORE_END_MS = 30_000L
 private const val UP_NEXT_COUNTDOWN_S = 10
 
@@ -196,10 +199,15 @@ fun PlayerScreen(
     episodes: LazyPagingItems<EpisodeItem>? = null,
     /** Switches landscape/portrait; null hides the button (TV). */
     onRotate: (() -> Unit)? = null,
+    fit: VideoFit = VideoFit.FIT,
+    /** Cycles [VideoFit]; null hides the button. */
+    onFit: (() -> Unit)? = null,
     surface: @Composable () -> Unit,
 ) {
     val layout = LocalWindowLayout.current
     val tv = layout == WindowLayout.TV
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    val seekStepMs = settings.seekMs
     var controls by remember { mutableStateOf(true) }
     var interactions by remember { mutableIntStateOf(0) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
@@ -207,6 +215,11 @@ fun PlayerScreen(
     var upNextDismissed by remember(state.next) { mutableStateOf(false) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    var hint by remember { mutableStateOf<PlayerHint?>(null) }
+    var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
+    val fitLabel = fit.label()
+    val fitChanged = remember { mutableStateOf(false) }
+    LaunchedEffect(fit) { if (fitChanged.value) hint = PlayerHint(AppIcons.AspectRatio, fitLabel) else fitChanged.value = true }
 
     fun poke() { controls = true; interactions++ }
     fun seek(deltaMs: Long) {
@@ -219,7 +232,7 @@ fun PlayerScreen(
     }
 
     val a11y = LocalAccessibilityManager.current
-    val hideAfter = remember(a11y) { a11y?.calculateRecommendedTimeoutMillis(4_000, containsIcons = true, containsText = true, containsControls = true) ?: 4_000 }
+    val hideAfter = remember(a11y) { a11y?.calculateRecommendedTimeoutMillis(3_000, containsIcons = true, containsText = true, containsControls = true) ?: 3_000 }
     val autoHide = state.isPlaying && panel == null && state.error == null && !state.ended
     LaunchedEffect(controls, interactions, autoHide) {
         if (controls && autoHide) { delay(hideAfter); controls = false }
@@ -249,8 +262,8 @@ fun PlayerScreen(
                     Key.MediaPlayPause, Key.Spacebar -> { onAction(PlayerAction.TogglePlay); poke(); true }
                     Key.MediaPlay -> { if (!state.isPlaying) onAction(PlayerAction.TogglePlay); true }
                     Key.MediaPause -> { onAction(PlayerAction.Pause); poke(); true }
-                    Key.MediaFastForward -> { seek(SEEK_STEP_MS); true }
-                    Key.MediaRewind -> { seek(-SEEK_STEP_MS); true }
+                    Key.MediaFastForward -> { seek(seekStepMs); true }
+                    Key.MediaRewind -> { seek(-seekStepMs); true }
                     Key.MediaNext -> { state.next?.let { onPlay(it.play) }; true }
                     Key.MediaPrevious -> { state.previous?.let { onPlay(it.play) }; true }
                     else -> false
@@ -260,8 +273,8 @@ fun PlayerScreen(
                 // Only reached with nothing else focused, i.e. while the controls are hidden.
                 if (controls || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
-                    Key.DirectionLeft -> { seek(-SEEK_STEP_MS); true }
-                    Key.DirectionRight -> { seek(SEEK_STEP_MS); true }
+                    Key.DirectionLeft -> { seek(-seekStepMs); true }
+                    Key.DirectionRight -> { seek(seekStepMs); true }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { onAction(PlayerAction.TogglePlay); poke(); true }
                     Key.DirectionUp, Key.DirectionDown, Key.Menu, Key.Info -> { poke(); true }
                     else -> false
@@ -272,21 +285,35 @@ fun PlayerScreen(
     ) {
         surface()
         // Gesture layer above the video (the video view itself does not take touches).
+        val context = androidx.activity.compose.LocalActivity.current ?: androidx.compose.ui.platform.LocalContext.current
+        val brightness = stringResource(R.string.player_brightness)
+        val volume = stringResource(R.string.player_volume)
+        val holdLabel = stringResource(R.string.player_speed_hold)
         Box(
-            Modifier.fillMaxSize().testTag("player-gestures").pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { if (controls && autoHide) controls = false else poke() },
-                    onDoubleTap = { o -> seek(if (o.x > size.width / 2) SEEK_STEP_MS else -SEEK_STEP_MS) },
-                )
-            },
+            Modifier.fillMaxSize().testTag("player-gestures").playerGestures(
+                context,
+                onTap = { if (controls) controls = false else poke() },
+                onSeek = { forward -> seek(if (forward) seekStepMs else -seekStepMs) },
+                onHoldSpeed = { holding ->
+                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
+                    else { onAction(PlayerAction.SetSpeed(speedBeforeHold ?: 1f)); speedBeforeHold = null; hint = null }
+                },
+                onHint = { hint = it },
+                brightnessLabel = brightness, volumeLabel = volume,
+            ),
         )
 
         val showSpinner = state.loading && state.error == null
         if (showSpinner && !(controls && !tv)) Buffering(Modifier.align(Alignment.Center))
 
-        AnimatedVisibility(controls && state.error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate)
+        AnimatedVisibility(
+            controls && state.error == null,
+            enter = fadeIn(androidx.compose.animation.core.tween(150)), exit = fadeOut(androidx.compose.animation.core.tween(150)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate, onFit)
         }
+        PlayerHintBubble(hint, onDone = { if (speedBeforeHold == null) hint = null }, Modifier.align(Alignment.Center))
 
         state.recovery?.let { r ->
             Surface(
@@ -305,7 +332,7 @@ fun PlayerScreen(
         val nearEnd = duration > 5 * 60_000 && duration - state.positionMs in 0..UP_NEXT_BEFORE_END_MS
         if (next != null && !upNextDismissed && state.error == null && (state.ended || nearEnd)) {
             UpNext(
-                next, countdown = state.ended,
+                next, countdown = state.ended && settings.autoplayNext,
                 onPlay = { onPlay(next.play) },
                 onCancel = { upNextDismissed = true; poke() },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = if (controls) 168.dp else 32.dp),
@@ -371,7 +398,9 @@ private fun Controls(
     poke: () -> Unit,
     seek: (Long) -> Unit,
     onRotate: (() -> Unit)? = null,
+    onFit: (() -> Unit)? = null,
 ) {
+    val seekStepMs = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekMs
     val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
     Box(Modifier.fillMaxSize()) {
         // Top: back, title, quality.
@@ -407,11 +436,11 @@ private fun Controls(
         // Centre: large touch transport (phones and tablets).
         if (!tv) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 32.dp else 56.dp)) {
-                RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp, Modifier.testTag("rewind")) { seek(-SEEK_STEP_MS) }
+                RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp, Modifier.testTag("rewind")) { seek(-seekStepMs) }
                 Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                     if (state.loading) Buffering(Modifier) else PlayPause(state, 80.dp, playFocus, onAction)
                 }
-                RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp, Modifier.testTag("forward")) { seek(SEEK_STEP_MS) }
+                RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp, Modifier.testTag("forward")) { seek(seekStepMs) }
             }
         }
 
@@ -443,15 +472,16 @@ private fun Controls(
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (tv) 12.dp else 4.dp)) {
                 state.previous?.let { p -> BarIcon(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
                 if (tv) {
-                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-SEEK_STEP_MS) }
+                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
                     PlayPause(state, 56.dp, playFocus, onAction)
-                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(SEEK_STEP_MS) }
+                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
                 }
                 state.next?.let { n -> BarIcon(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
                 Spacer(Modifier.weight(1f))
                 if (state.episodes != null) BarIcon(AppIcons.Episodes, stringResource(R.string.player_episodes), "episodes") { openPanel(PlayerPanel.EPISODES) }
                 if (state.audio.size > 1) BarIcon(AppIcons.Audio, stringResource(R.string.player_audio), "audio") { openPanel(PlayerPanel.AUDIO) }
                 if (state.subtitles.isNotEmpty()) BarIcon(AppIcons.Subtitles, stringResource(R.string.player_subtitles), "subtitles") { openPanel(PlayerPanel.SUBTITLES) }
+                onFit?.let { f -> BarIcon(AppIcons.AspectRatio, stringResource(R.string.player_fit), "aspect") { f(); poke() } }
                 BarIcon(AppIcons.Speed, stringResource(R.string.player_speed), "speed") { openPanel(PlayerPanel.SPEED) }
                 // On phones the quality badge in the top bar opens the info panel.
                 if (!compact || state.quality?.badge == null) BarIcon(Icons.Filled.Info, stringResource(R.string.player_quality), "info") { openPanel(PlayerPanel.INFO) }
