@@ -29,9 +29,15 @@ class LibrarySyncTrigger @Inject constructor(
 
     init {
         scope.launch {
+            var last = 0L
             for (request in requests) {
                 delay(DEBOUNCE_MS)
+                // While a big chat is indexed, changes arrive continuously: every sync rewrites
+                // library rows and every list on screen re-reads them. At most one every 8 s.
+                val wait = last + MIN_INTERVAL_MS - System.currentTimeMillis()
+                if (wait > 0) delay(wait)
                 runCatching { synchronizer.sync() }.onFailure { logger.e("LibrarySync", "sync failed", it) }
+                last = System.currentTimeMillis()
             }
         }
     }
@@ -42,5 +48,6 @@ class LibrarySyncTrigger @Inject constructor(
 
     private companion object {
         const val DEBOUNCE_MS = 750L
+        const val MIN_INTERVAL_MS = 8_000L
     }
 }

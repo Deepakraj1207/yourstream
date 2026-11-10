@@ -119,7 +119,13 @@ fun TmdbScreen(state: TmdbUiState, onSave: (String?) -> Unit, onBack: () -> Unit
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = { TextButton(onClick = { show = !show }) { Text(stringResource(if (show) R.string.tmdb_hide else R.string.tmdb_show)) } },
                 isError = state.error != null,
-                supportingText = { Text(if (state.unreachable) stringResource(R.string.tmdb_unreachable) else state.error ?: stringResource(R.string.tmdb_key_help)) },
+                supportingText = {
+                    Text(
+                        if (state.unreachable) stringResource(R.string.tmdb_unreachable) + "\n" + stringResource(R.string.tmdb_error_detail, state.error.orEmpty())
+                        else state.error ?: stringResource(R.string.tmdb_key_help),
+                        modifier = Modifier.testTag("tmdb-error"),
+                    )
+                },
                 modifier = Modifier.fillMaxWidth().testTag("tmdb-key"),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

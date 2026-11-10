@@ -53,6 +53,7 @@ class WebStreams @Inject constructor(@ApplicationContext private val context: Co
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
+            .dns(dev.yourstream.core.network.SecureDns.dns)
             .build()
     }
 

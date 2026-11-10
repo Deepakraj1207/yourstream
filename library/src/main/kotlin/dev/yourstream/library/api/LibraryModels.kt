@@ -33,6 +33,11 @@ data class LibraryQuery(
     /** Include items whose files are all gone (kept because of progress/favorites). */
     val includeUnavailable: Boolean = false,
     val includeHidden: Boolean = false,
+    /**
+     * Files nothing names (no title found) and without a poster are left out of browsing; they
+     * still show in text searches and when [kinds] asks for videos.
+     */
+    val includeUntitled: Boolean = false,
     val sort: LibrarySort = LibrarySort.TITLE,
     /** Reverses the natural direction of [sort] (TITLE A→Z, others newest/biggest first). */
     val reversed: Boolean = false,

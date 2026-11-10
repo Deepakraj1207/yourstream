@@ -39,6 +39,8 @@ data class AppSettings(
     val subtitleBox: Boolean = false,
     /** Torrent results from stream add-ons play with the built-in torrent engine. */
     val torrentStreaming: Boolean = true,
+    /** Resolve every host through DNS over HTTPS (blocked hosts use it automatically anyway). */
+    val secureDns: Boolean = false,
 ) {
     val seekMs: Long get() = seekSeconds * 1000L
 
@@ -55,7 +57,7 @@ val LocalAppSettings = staticCompositionLocalOf { AppSettings() }
 @Singleton
 class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
     private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-    private val _settings = MutableStateFlow(load())
+    private val _settings = MutableStateFlow(load().also { dev.yourstream.core.network.SecureDns.always = it.secureDns })
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     fun update(change: (AppSettings) -> AppSettings) {
@@ -72,7 +74,9 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putFloat("subtitle_scale", s.subtitleScale)
             .putBoolean("subtitle_box", s.subtitleBox)
             .putBoolean("torrents", s.torrentStreaming)
+            .putBoolean("secure_dns", s.secureDns)
             .apply()
+        dev.yourstream.core.network.SecureDns.always = s.secureDns
         _settings.value = s
     }
 
@@ -88,6 +92,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
         torrentStreaming = prefs.getBoolean("torrents", true),
+        secureDns = prefs.getBoolean("secure_dns", false),
     )
 }
 

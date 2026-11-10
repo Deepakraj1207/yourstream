@@ -17,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -110,12 +112,16 @@ fun Modifier.inkPanel(shape: Shape? = null, shadow: Dp = 4.dp, border: Dp = 2.dp
     if (!LocalMangaStyle.current) return@composed this
     val ink = MaterialTheme.colorScheme.onSurface
     val s = shape ?: MaterialTheme.shapes.medium
-    this.drawWithContent {
+    // The outline is built once per size, not on every frame of a scroll.
+    this.drawWithCache {
         val outline = s.createOutline(size, layoutDirection, this)
         val off = shadow.toPx()
-        translate(off, off) { drawOutline(outline, ink) }
-        drawContent()
-        drawOutline(outline, ink, style = Stroke(border.toPx()))
+        val stroke = Stroke(border.toPx())
+        onDrawWithContent {
+            translate(off, off) { drawOutline(outline, ink) }
+            drawContent()
+            drawOutline(outline, ink, style = stroke)
+        }
     }
 }
 
@@ -123,11 +129,14 @@ fun Modifier.inkPanel(shape: Shape? = null, shadow: Dp = 4.dp, border: Dp = 2.dp
  * Screentone: a grid of halftone dots that grow towards one corner, like the shading in a manga.
  * [seed] varies the direction per title so neighbouring placeholders differ.
  */
-fun Modifier.screentone(color: Color, seed: Int = 0, spacing: Dp = 7.dp, maxRadius: Dp = 2.6.dp): Modifier = drawBehind {
+fun Modifier.screentone(color: Color, seed: Int = 0, spacing: Dp = 8.dp, maxRadius: Dp = 2.6.dp): Modifier = drawWithCache {
+    // Dots are computed once per size and drawn as a few batches of round points (one draw call
+    // per dot size), not hundreds of circles per frame: posterless cards scroll smoothly.
     val step = spacing.toPx()
     val rMax = maxRadius.toPx()
     val fromLeft = seed % 2 == 0
     val fromTop = (seed / 2) % 2 == 0
+    val buckets = Array(DOT_SIZES) { ArrayList<Offset>() }
     var y = 0f
     var row = 0
     while (y < size.height + step) {
@@ -135,14 +144,23 @@ fun Modifier.screentone(color: Color, seed: Int = 0, spacing: Dp = 7.dp, maxRadi
         while (x < size.width + step) {
             val fx = if (fromLeft) x / size.width else 1 - x / size.width
             val fy = if (fromTop) y / size.height else 1 - y / size.height
-            val r = rMax * ((fx + fy) / 2f).coerceIn(0.08f, 1f)
-            drawCircle(color, r, Offset(x, y))
+            val t = ((fx + fy) / 2f).coerceIn(0.08f, 1f)
+            buckets[(t * DOT_SIZES).toInt().coerceIn(0, DOT_SIZES - 1)].add(Offset(x, y))
             x += step
         }
         y += step * 0.87f
         row++
     }
+    onDrawBehind {
+        buckets.forEachIndexed { i, points ->
+            if (points.isNotEmpty()) {
+                drawPoints(points, PointMode.Points, color, strokeWidth = 2 * rMax * (i + 1f) / DOT_SIZES, cap = StrokeCap.Round)
+            }
+        }
+    }
 }
+
+private const val DOT_SIZES = 6
 
 /** Speed lines radiating from the centre, like an action panel. */
 fun Modifier.speedLines(color: Color, lines: Int = 56, seed: Int = 0): Modifier = drawBehind {

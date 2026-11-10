@@ -2,7 +2,6 @@ package dev.yourstream.ui.core
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,9 +41,10 @@ fun Artwork(
     contentScale: ContentScale = ContentScale.Crop,
     /** False where the title is already drawn over the art (wide cards, hero background). */
     showInitials: Boolean = true,
+    /** A poster-shaped (portrait) slot: Telegram thumbnails must be posters too. Wide cards draw their title over the art. */
+    portrait: Boolean = showInitials,
 ) {
-    BoxWithConstraints(modifier) {
-        val portrait = constraints.hasBoundedWidth && constraints.hasBoundedHeight && maxHeight > maxWidth
+    Box(modifier) {
         val sources = remember(url, portrait) { artworkSources(url, portrait) }
         var index by remember(sources) { mutableIntStateOf(0) }
         var retried by remember(sources) { mutableStateOf(false) }

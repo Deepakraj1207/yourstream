@@ -65,12 +65,34 @@ class TmdbProvider(
 
     /** Asks TMDB whether [candidate]'s key is accepted (GET /authentication). */
     suspend fun check(candidate: TmdbConfig): AppResult<Unit> =
-        when (val r = client.getJson(candidate.baseUrl + "/authentication", kotlinx.serialization.json.JsonElement.serializer()) {
-            if (candidate.readToken.isNotBlank()) header("Authorization", "Bearer ${candidate.readToken}") else parameter("api_key", candidate.apiKey)
-        }) {
+        when (val r = withHosts(candidate) { base -> client.getJson(base + "/authentication", kotlinx.serialization.json.JsonElement.serializer()) { auth(candidate) } }) {
             is AppResult.Ok -> AppResult.Ok(Unit)
             is AppResult.Err -> r
         }
+
+    /** The base that answered last: requests go there first. */
+    @Volatile private var activeBase: String? = null
+
+    /**
+     * TMDB answers on two domains. Some networks block api.themoviedb.org by name; on network
+     * trouble the request is repeated on api.tmdb.org (and the one that worked is used first).
+     */
+    private suspend fun <T> withHosts(c: TmdbConfig, call: suspend (String) -> AppResult<T>): AppResult<T> {
+        val bases = listOfNotNull(activeBase, c.baseUrl, ALT_BASE_URL).distinct()
+        var last: AppResult<T>? = null
+        for (base in bases) {
+            val r = call(base)
+            if (r is AppResult.Ok) { activeBase = base; return r }
+            last = r
+            val e = (r as AppResult.Err).error
+            if (!(e is AppError.Network || e is AppError.Timeout || e is AppError.Unknown || (e is AppError.Remote && e.isServerError))) return r
+        }
+        return last!!
+    }
+
+    private fun HttpRequestBuilder.auth(c: TmdbConfig) {
+        if (c.readToken.isNotBlank()) header("Authorization", "Bearer ${c.readToken}") else parameter("api_key", c.apiKey)
+    }
 
     override val id = ID
     override val displayName = "TMDB"
@@ -82,10 +104,12 @@ class TmdbProvider(
     private suspend fun <T> get(path: String, serializer: KSerializer<T>, block: HttpRequestBuilder.() -> Unit = {}): AppResult<T> {
         if (!isConfigured) return AppResult.Err(AppError.NotConfigured("TMDB API key missing"))
         limiter.acquire()
-        return client.getJson(config.baseUrl + path, serializer) {
-            if (config.readToken.isNotBlank()) header("Authorization", "Bearer ${config.readToken}")
-            else parameter("api_key", config.apiKey)
-            block()
+        val c = config
+        return withHosts(c) { base ->
+            client.getJson(base + path, serializer) {
+                auth(c)
+                block()
+            }
         }
     }
 
@@ -199,6 +223,8 @@ class TmdbProvider(
     private fun year(date: String?) = date?.take(4)?.toIntOrNull()
 
     companion object {
+        /** TMDB's second API domain (same API), for networks that block the first by name. */
+        const val ALT_BASE_URL = "https://api.tmdb.org/3"
         val ID = ProviderId("tmdb")
         private const val MAX_RESULTS = 10
         private const val MAX_CAST = 15

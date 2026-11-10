@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
@@ -38,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -105,11 +106,29 @@ fun AdaptiveShell(
     }
     when (layout) {
         WindowLayout.COMPACT -> {
-            val dock = remember { DockState() }
-            Scaffold(
-                bottomBar = { Dock(current, onSelect, dock) },
-                // Consumed here so screens' top bars do not add the status bar a second time.
-            ) { padding -> withStatus(Modifier.padding(padding).consumeWindowInsets(padding).nestedScroll(dock.connection)) }
+            // The dock floats over the content on the four main tabs (like Nuvio's); other pages
+            // (details, players, settings pages) use the whole screen.
+            val showDock = current != null
+            val clearance = if (showDock) DOCK_HEIGHT + DOCK_BOTTOM_GAP + 8.dp else 0.dp
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalBottomClearance provides clearance) {
+                    // Status bar padding applied (and consumed) here, as the old scaffold did: Home has no
+                    // top bar of its own, and screens' top bars must not add it a second time.
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.fillMaxSize()
+                            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars)
+                            .navigationBarsPadding(),
+                    ) {
+                        content(Modifier.fillMaxSize())
+                        IndexingPill(indexing, onIndexing, Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = clearance + 8.dp))
+                    }
+                }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showDock, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                    enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut(),
+                ) { Dock(current, onSelect) }
+            }
         }
 
         WindowLayout.MEDIUM -> Row(Modifier.fillMaxSize()) {

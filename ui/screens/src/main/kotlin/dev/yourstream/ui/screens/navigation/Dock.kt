@@ -16,6 +16,11 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,7 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -71,106 +76,85 @@ import dev.yourstream.ui.screens.IndexingStatus
 import dev.yourstream.ui.screens.R
 import java.text.NumberFormat
 
-/**
- * Whether the dock shows the current tab's name: folded away while the user scrolls down a list
- * (more room for content), back when they scroll up or switch tabs. Attach [connection] to the
- * content with `Modifier.nestedScroll`.
- */
-@Stable
-class DockState {
-    var expanded by mutableStateOf(true)
+/** The dock's tabs, in Nuvio's order. */
+val DOCK_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.SEARCH, TopLevel.LIBRARY, TopLevel.SETTINGS)
 
-    val connection: NestedScrollConnection = object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (available.y < -SCROLL_SLOP) expanded = false else if (available.y > SCROLL_SLOP) expanded = true
-            return Offset.Zero
-        }
-    }
-
-    private companion object {
-        const val SCROLL_SLOP = 2f
-    }
-}
+/** Height of the dock and its gap to the bottom edge: what lists keep clear (see LocalBottomClearance). */
+val DOCK_HEIGHT = 68.dp
+val DOCK_BOTTOM_GAP = 10.dp
 
 /**
- * The phone's navigation as a floating dock, like Nuvio's: a capsule the width of its tabs,
- * centred above the bottom edge. Tabs are icons; the current one is a filled pill with its name,
- * which folds away while scrolling down (see [DockState]). Manga style: paper with an ink outline
- * and a hard shadow, the current tab inked, its name in comic lettering. A light tick on change.
+ * The phone's navigation, like Nuvio's: a frosted-glass pill floating over the content (no bar
+ * around it), each tab an icon with its name underneath, the current one on a soft light pill.
+ * Manga style: the same pill in paper and ink, names in comic lettering. A light tick on change.
+ * Glass is drawn as a translucent tint, a sheen and a hairline edge: no backdrop blur, so it costs
+ * nothing per frame while the lists behind it scroll.
  */
 @Composable
-fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, state: DockState, modifier: Modifier = Modifier) {
+fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier) {
     val manga = LocalMangaStyle.current
     val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
-    LaunchedEffect(current) { state.expanded = true }
-    val capsule = CircleShape
-    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(top = 6.dp, bottom = 10.dp), contentAlignment = Alignment.Center) {
-        val shell = if (manga) {
-            Modifier.padding(end = 4.dp, bottom = 4.dp).inkPanel(capsule, shadow = 4.dp, border = 2.5.dp).clip(capsule).background(colors.surfaceContainer)
-        } else {
-            Modifier
-        }
-        val content: @Composable () -> Unit = {
-            Row(
-                Modifier.height(60.dp).padding(horizontal = 8.dp).testTag("nav:bar"),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TopLevel.entries.filter { it.compact }.forEach { t ->
-                    DockTab(t, selected = t == current, expanded = state.expanded, manga = manga) {
-                        if (t != current) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelect(t)
-                    }
-                }
+    val shape = RoundedCornerShape(34.dp)
+    val dark = colors.background.luminance() < 0.5f
+    val tint = if (manga) colors.surfaceContainer.copy(alpha = 0.94f)
+        else if (dark) Color(0xFF1E1E22).copy(alpha = 0.94f) else Color(0xFFF7F7FA).copy(alpha = 0.94f)
+    val edge = if (manga) colors.onSurface else if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+    val sheen = Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.07f else 0.35f), Color.Transparent))
+    Row(
+        modifier.navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = DOCK_BOTTOM_GAP).widthIn(max = 520.dp).fillMaxWidth()
+            .height(DOCK_HEIGHT)
+            .shadow(if (manga) 0.dp else 18.dp, shape, ambientColor = Color.Black.copy(alpha = 0.5f), spotColor = Color.Black.copy(alpha = 0.5f))
+            .clip(shape).background(tint).background(sheen)
+            .border(if (manga) 2.dp else 1.dp, edge, shape)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+            .testTag("nav:bar"),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DOCK_TABS.forEach { t ->
+            DockTab(t, selected = t == current, manga = manga, dark = dark, modifier = Modifier.weight(1f)) {
+                if (t != current) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSelect(t)
             }
         }
-        if (manga) Box(shell) { content() }
-        else Surface(shape = capsule, color = colors.surfaceContainerHigh, tonalElevation = 3.dp, shadowElevation = 8.dp) { content() }
     }
 }
 
 @Composable
-private fun DockTab(t: TopLevel, selected: Boolean, expanded: Boolean, manga: Boolean, onClick: () -> Unit) {
+private fun DockTab(t: TopLevel, selected: Boolean, manga: Boolean, dark: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val fillTarget = when {
+    val pill = when {
         !selected -> Color.Transparent
         manga -> colors.onSurface
-        else -> colors.secondaryContainer
+        dark -> Color.White.copy(alpha = 0.14f)
+        else -> Color.Black.copy(alpha = 0.07f)
     }
-    val tintTarget = when {
-        !selected -> colors.onSurfaceVariant
-        manga -> colors.surfaceContainer
-        else -> colors.onSecondaryContainer
+    val on = when {
+        manga && selected -> colors.surfaceContainer
+        manga -> colors.onSurface
+        selected -> colors.onSurface
+        else -> colors.onSurfaceVariant.copy(alpha = 0.75f)
     }
-    val fill by animateColorAsState(fillTarget, label = "dock-fill")
-    val tint by animateColorAsState(if (manga && !selected) colors.onSurface else tintTarget, label = "dock-tint")
+    val fill by animateColorAsState(pill, label = "dock-pill")
+    val tint by animateColorAsState(on, label = "dock-tint")
     val label = stringResource(t.label)
-    Row(
-        Modifier.height(46.dp).widthIn(min = 52.dp).clip(CircleShape).background(fill)
+    Column(
+        modifier.fillMaxHeight().clip(RoundedCornerShape(26.dp)).background(fill)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab)
-            .focusHighlight(CircleShape)
+            .focusHighlight(RoundedCornerShape(26.dp))
             .semantics { contentDescription = label }
-            .padding(horizontal = 14.dp)
             .testTag("nav:${t.name}"),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(t.icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-        AnimatedVisibility(
-            visible = selected && expanded,
-            enter = expandHorizontally(spring(dampingRatio = 0.8f, stiffness = 500f)) + fadeIn(tween(120)),
-            exit = shrinkHorizontally(spring(dampingRatio = 0.9f, stiffness = 600f)) + fadeOut(tween(90)),
-        ) {
-            if (manga) {
-                Text(label.uppercase(), fontFamily = Manga.Lettering, fontSize = 16.sp, letterSpacing = 1.sp, maxLines = 1, color = tint,
-                    modifier = Modifier.padding(start = 8.dp))
-            } else {
-                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, color = tint, modifier = Modifier.padding(start = 8.dp))
-            }
-        }
+        if (manga) Text(label.uppercase(), fontFamily = Manga.Lettering, fontSize = 13.sp, letterSpacing = 0.6.sp, maxLines = 1, color = tint)
+        else Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1, color = tint)
     }
 }
+
+private fun Color.luminance(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
 
 /**
  * What indexing is doing, floating above the dock on every tab while it runs: files found, a
@@ -187,7 +171,7 @@ fun IndexingPill(status: IndexingStatus, onClick: () -> Unit, modifier: Modifier
         val colors = MaterialTheme.colorScheme
         val shape = RoundedCornerShape(18.dp)
         val spin = rememberInfiniteTransition(label = "indexing-spin")
-        val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(1_200, easing = LinearEasing), RepeatMode.Restart), label = "angle")
+        val angle = spin.animateFloat(0f, 360f, infiniteRepeatable(tween(1_200, easing = LinearEasing), RepeatMode.Restart), label = "angle")
         val number = remember { NumberFormat.getIntegerInstance() }
         val surfaceModifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 520.dp).fillMaxWidth()
             .let { if (manga) it.padding(end = 3.dp, bottom = 3.dp).inkPanel(shape, shadow = 3.dp, border = 2.dp) else it }
@@ -196,7 +180,7 @@ fun IndexingPill(status: IndexingStatus, onClick: () -> Unit, modifier: Modifier
             contentColor = if (manga) colors.onSurface else colors.inverseOnSurface, shadowElevation = if (manga) 0.dp else 6.dp, modifier = surfaceModifier) {
             Column {
                 Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp).rotate(angle))
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = angle.value })
                     Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                         val title = pluralStringResource(R.plurals.indexing_pill_found, status.found, number.format(status.found))
                         if (manga) Text(title.uppercase(), fontFamily = Manga.Lettering, fontSize = 15.sp, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

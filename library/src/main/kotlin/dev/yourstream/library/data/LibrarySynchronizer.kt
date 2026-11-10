@@ -136,9 +136,10 @@ class LibrarySynchronizer @Inject constructor(
         val titleConfidence = fieldConfidence(row.fieldConfidence, "title") ?: row.confidence ?: 0f
         if (title == null || key == null || titleConfidence < MIN_TITLE_CONFIDENCE) {
             // Never show a machine-made name (hash, Telegram id) as a title.
-            val name = title?.takeUnless(MediaFilenameParser::isMachineName)
-                ?: row.fileName.takeUnless { it.isBlank() || MediaFilenameParser.isMachineName(it) }
-                ?: UNTITLED
+            // Nor a list of tags ("Tel + Hin 450MB.mkv", "Tel.mkv").
+            fun named(n: String) = n.isNotBlank() && !MediaFilenameParser.isMachineName(n) &&
+                !MediaFilenameParser.isTagsOnly(n.substringBeforeLast('.').replace(Regex("[._]+"), " "), otherLanguages = 1)
+            val name = title?.takeIf(::named) ?: row.fileName.takeIf(::named) ?: UNTITLED
             return ensureItem(LibraryKind.VIDEO, "video:${row.mediaId}", name, key ?: LibraryQueryBuilder.normalize(name), null, titleConfidence, batch) to null
         }
 

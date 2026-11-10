@@ -33,6 +33,30 @@ class TmdbProviderTest {
     }
 
     @Test
+    fun aBlockedDomainFallsBackToTmdbsSecondDomain() = runTest {
+        val engine = MockEngine { req ->
+            requests += req
+            if (req.url.host == "api.themoviedb.org") throw java.io.IOException("Unable to resolve host \"api.themoviedb.org\"")
+            respond("""{"success":true,"status_code":1,"results":[{"id":603,"title":"The Matrix","release_date":"1999-03-30"}]}""", HttpStatusCode.OK, json)
+        }
+        val p = TmdbProvider(HttpClients.create(engine), TmdbConfig(apiKey = "k123"))
+        assertEquals(AppResult.Ok(Unit), p.check(TmdbConfig(apiKey = "k123")))
+        assertEquals(listOf("api.themoviedb.org", "api.tmdb.org"), requests.map { it.url.host })
+        requests.clear()
+        p.search(MetadataQuery("The Matrix", 1999, MetadataType.MOVIE))
+        assertEquals("api.tmdb.org", requests.first().url.host, "the domain that worked is asked first")
+        assertEquals("/3/search/movie", requests.first().url.encodedPath)
+    }
+
+    @Test
+    fun aRejectedKeyIsNotRetriedElsewhere() = runTest {
+        val p = provider { HttpStatusCode.Unauthorized to """{"status_code":7,"status_message":"Invalid API key"}""" }
+        val r = p.check(TmdbConfig(apiKey = "bad"))
+        assertTrue(r is AppResult.Err && r.error is dev.yourstream.core.common.AppError.NotConfigured)
+        assertEquals(1, requests.size)
+    }
+
+    @Test
     fun searchMapsResultsAndSendsTitleYearKey() = runTest {
         val p = provider {
             HttpStatusCode.OK to """{"page":1,"results":[

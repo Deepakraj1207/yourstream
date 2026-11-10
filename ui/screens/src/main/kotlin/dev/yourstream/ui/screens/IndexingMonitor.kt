@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.transform
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,7 +57,14 @@ class IndexingMonitor(private val index: MediaIndexRepository, private val now: 
         .scan(Speed()) { speed, s -> speed.next(s, now()) }
         .map { it.status }
         .distinctUntilChanged()
+        // Pages are written many times a second: the status line moves at most once a second.
+        .conflate()
+        .transform { emit(it); kotlinx.coroutines.delay(THROTTLE_MS) }
         .catch { emit(IndexingStatus()) }
+
+    private companion object {
+        const val THROTTLE_MS = 1_000L
+    }
 
     /** Messages read per second, smoothed, and the time left from it (pure; tested). */
     data class Speed(val status: IndexingStatus = IndexingStatus(), val at: Long = 0, val perSecond: Float = 0f) {

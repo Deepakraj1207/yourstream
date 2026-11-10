@@ -29,6 +29,7 @@ dependencies {
     // Artwork (TMDB / Cinemeta poster URLs from matched metadata), memory + disk cached.
     api(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(projects.core.network)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

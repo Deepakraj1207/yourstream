@@ -178,7 +178,8 @@ fun SettingsScreen(
     ScreenScaffold(stringResource(R.string.nav_settings)) {
         LazyColumn(
             Modifier.testTag("settings").widthIn(max = 760.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = LocalDimens.current.gutter, vertical = 8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = LocalDimens.current.gutter, end = LocalDimens.current.gutter, top = 8.dp,
+                bottom = 8.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
         ) {
             item { Profile(state, onAccount) }

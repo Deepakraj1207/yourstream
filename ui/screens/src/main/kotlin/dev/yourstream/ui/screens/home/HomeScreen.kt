@@ -108,7 +108,7 @@ private fun HomeContent(
         val actions = tileActions({ onAction(HomeAction.Tile(it)) }, onOpen)
         LazyColumn(
             Modifier.fillMaxSize().testTag("home"),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 32.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
             verticalArrangement = Arrangement.spacedBy(LocalDimens.current.rowGap),
         ) {
             item(key = "setup") { SetupPanel(blocking, setupAction) }
@@ -124,7 +124,7 @@ private fun HomeContent(
     val d = LocalDimens.current
     LazyColumn(
         Modifier.fillMaxSize().testTag("home"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
@@ -140,10 +140,6 @@ private fun HomeContent(
             item(key = "for-you") {
                 Column(Modifier.testTag("for-you")) {
                     MediaRow(stringResource(R.string.home_for_you), f.tiles, card, { onOpen(it.open) }, actions = actions)
-                    f.basis?.let { b ->
-                        Text(stringResource(R.string.home_for_you_basis, b), style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter, vertical = 4.dp))
-                    }
                 }
             }
         }

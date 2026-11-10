@@ -442,5 +442,6 @@
     <string name="tmdb_remove">Remove my key</string>
     <string name="tmdb_saved">Saved. Titles without posters are being matched again now.</string>
     <string name="tmdb_privacy">Stored only on this device. Used only for requests to TMDB.</string>
-    <string name="tmdb_unreachable">TMDB can\'t be reached from this network. Some providers (Jio among them) block it. Try again on another network or Wi-Fi. Meanwhile titles are matched with Cinemeta, and posters load through an image proxy.</string>
+    <string name="tmdb_unreachable">TMDB could not be reached, even through secure DNS and its second address. If this continues, turn on Settings → Integrations → Secure DNS, or try Wi-Fi. Meanwhile titles are matched with Cinemeta and posters load through an image proxy.</string>
+    <string name="tmdb_error_detail">Details: %1$s</string>
 </resources>

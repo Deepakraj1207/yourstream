@@ -59,3 +59,9 @@ fun rememberWindowLayout(): WindowLayout {
     val tv = remember(context) { WindowLayout.isTelevision(context) }
     return remember(config.screenWidthDp, tv) { WindowLayout.of(config.screenWidthDp, tv) }
 }
+
+/**
+ * Space the floating navigation dock covers at the bottom of the screen: scrolling lists add it
+ * to their bottom padding so their last row can scroll clear of the dock (0 where there is none).
+ */
+val LocalBottomClearance = androidx.compose.runtime.compositionLocalOf { 0.dp }

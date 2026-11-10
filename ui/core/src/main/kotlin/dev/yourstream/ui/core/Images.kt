@@ -35,6 +35,9 @@ fun appImageLoader(context: Context, thumbnails: ThumbnailSource? = null): Image
             chain.proceed(chain.request().newBuilder().header("User-Agent", USER_AGENT).header("Accept", "image/avif,image/webp,image/*,*/*;q=0.8").build())
         }
         .addInterceptor(ImageRouting())
+        // Inside the routing: a blocked DNS answer is retried with secure DNS before any proxy.
+        .addInterceptor(dev.yourstream.core.network.SecureDns.Retry())
+        .dns(dev.yourstream.core.network.SecureDns.dns)
         .build()
     return ImageLoader.Builder(context)
         .components {

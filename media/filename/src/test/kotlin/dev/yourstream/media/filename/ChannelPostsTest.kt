@@ -47,6 +47,9 @@ class ChannelPostsTest {
         assertTrue(MediaFilenameParser.isTagsOnly("Tel", fromCaption = true))
         assertTrue(MediaFilenameParser.isTagsOnly("TR Movies"))
         assertTrue(MediaFilenameParser.isTagsOnly("Tamil Dubbed"))
+        assertTrue(MediaFilenameParser.isTagsOnly("Tel + Hin 450MB"))
+        assertTrue(MediaFilenameParser.isTagsOnly("Tel", otherLanguages = 1))
+        assertFalse(MediaFilenameParser.isTagsOnly("Bumblebee 720p"))
     }
 
     @Test

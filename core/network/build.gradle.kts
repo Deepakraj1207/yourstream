@@ -22,6 +22,8 @@ dependencies {
     api(libs.ktor.serialization.json)
     api(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.okhttp)
+    // DNS over HTTPS when the network's DNS blocks a host (SecureDns).
+    api(libs.okhttp.dnsoverhttps)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)

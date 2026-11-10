@@ -40,7 +40,8 @@ class LibrarySyncTest {
             val result = sync.sync()
             assertEquals(10, result.filesProcessed)
 
-            val all = media.search(LibraryQuery()).all()
+            val all = media.search(LibraryQuery(includeUntitled = true)).all()
+            assertEquals(3, media.search(LibraryQuery()).all().size, "the untitled video without a poster is not browsed")
             // A→Z; the generic VID_ file is a standalone video titled from the chat ("Chat").
             assertEquals(
                 listOf("Chat" to LibraryKind.VIDEO, "Doraemon" to LibraryKind.SERIES, "Movie Name" to LibraryKind.MOVIE, "Shinchan" to LibraryKind.SERIES),

@@ -29,7 +29,8 @@ public object MediaFilenameParser {
     /** Bump when results change, so stored metadata can be recomputed. */
     /** 3: random file names (hashes, UUIDs, Telegram ids) count as generic; their tokens never become titles. */
     /** 4: language tags ("Tel+Hin") and channel brands ("TR Movies") are not titles; the post above the file is. */
-    public const val VERSION: Int = 4
+    /** 5: sizes and resolutions next to tags ("Tel + Hin 450MB") keep them tags. */
+    public const val VERSION: Int = 5
 
     private val GENERIC_NAME = Regex(
         "^(video|vid|file|movie|document|doc|telegram|tg|img|mov|clip|media|untitled|new|downloaded|download|v|output|record(ing)?|screen\\s?recording)?" +
@@ -142,8 +143,11 @@ public object MediaFilenameParser {
             val language = Vocabulary.languageOf(w) != null
             return (language && (w.length > 3 || shortTrusted)) || w in Vocabulary.CHANNEL_WORDS
         }
-        return words.any(::tag) && words.all { w -> tag(w) || (w.length <= 2 && w.all(Char::isLetter)) || w.all(Char::isDigit) }
+        return words.any(::tag) && words.all { w -> tag(w) || (w.length <= 2 && w.all(Char::isLetter)) || w.all(Char::isDigit) || TECH_TOKEN.matches(w) }
     }
+
+    /** "450mb", "1.2gb" (as "1", "2gb"), "720p", "5ch": sizes and formats, neutral next to tags. */
+    private val TECH_TOKEN = Regex("\\d+(mb|gb|kb|p|k|fps|bit|ch)")
 
     /** "Vikram a7F3k9Qz2LmP8xY1" → "Vikram": random tokens are dropped when real words remain. */
     private fun stripRandomTokens(a: Analysis): Analysis {

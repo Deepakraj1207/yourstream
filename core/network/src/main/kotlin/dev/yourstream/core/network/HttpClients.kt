@@ -36,6 +36,9 @@ object HttpClients {
         okhttp3.OkHttpClient.Builder()
             .connectionPool(okhttp3.ConnectionPool(5, 2, java.util.concurrent.TimeUnit.MINUTES))
             .retryOnConnectionFailure(true)
+            // Hosts the network's DNS blocks (TMDB on some ISPs) are resolved over HTTPS.
+            .dns(SecureDns.dns)
+            .addInterceptor(SecureDns.Retry())
             .build()
     }
 
