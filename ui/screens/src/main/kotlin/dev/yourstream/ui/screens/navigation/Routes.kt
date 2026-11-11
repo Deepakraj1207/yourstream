@@ -62,6 +62,8 @@ import kotlinx.serialization.Serializable
     val sources: String = "",
     val fileName: String? = null,
 ) : Route
+/** A Settings category page ([page]: a SettingsPage name). */
+@Serializable data class SettingsPageRoute(val page: String) : Route
 /** Settings → TMDB key. */
 @Serializable data object TmdbRoute : Route
 /** Catalog add-ons: built-in ones and those added by link. */

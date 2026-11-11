@@ -83,6 +83,9 @@ val DOCK_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.SEARCH, TopLevel.
 val DOCK_HEIGHT = 68.dp
 val DOCK_BOTTOM_GAP = 10.dp
 
+/** The dock's height with or without the names under the icons (Settings → Appearance). */
+fun dockHeight(labels: Boolean) = if (labels) DOCK_HEIGHT else 58.dp
+
 /**
  * The phone's navigation, like Nuvio's: a frosted-glass pill floating over the content (no bar
  * around it), each tab an icon with its name underneath, the current one on a soft light pill.
@@ -93,6 +96,7 @@ val DOCK_BOTTOM_GAP = 10.dp
 @Composable
 fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier) {
     val manga = LocalMangaStyle.current
+    val labels = dev.yourstream.ui.screens.settings.LocalAppSettings.current.dockLabels
     val colors = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
     val shape = RoundedCornerShape(34.dp)
@@ -103,7 +107,7 @@ fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = 
     val sheen = Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.07f else 0.35f), Color.Transparent))
     Row(
         modifier.navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = DOCK_BOTTOM_GAP).widthIn(max = 520.dp).fillMaxWidth()
-            .height(DOCK_HEIGHT)
+            .height(dockHeight(labels))
             .shadow(if (manga) 0.dp else 18.dp, shape, ambientColor = Color.Black.copy(alpha = 0.5f), spotColor = Color.Black.copy(alpha = 0.5f))
             .clip(shape).background(tint).background(sheen)
             .border(if (manga) 2.dp else 1.dp, edge, shape)
@@ -113,7 +117,7 @@ fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DOCK_TABS.forEach { t ->
-            DockTab(t, selected = t == current, manga = manga, dark = dark, modifier = Modifier.weight(1f)) {
+            DockTab(t, selected = t == current, manga = manga, dark = dark, labels = labels, modifier = Modifier.weight(1f)) {
                 if (t != current) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onSelect(t)
             }
@@ -122,7 +126,7 @@ fun Dock(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = 
 }
 
 @Composable
-private fun DockTab(t: TopLevel, selected: Boolean, manga: Boolean, dark: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun DockTab(t: TopLevel, selected: Boolean, manga: Boolean, dark: Boolean, labels: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val pill = when {
         !selected -> Color.Transparent
@@ -148,9 +152,11 @@ private fun DockTab(t: TopLevel, selected: Boolean, manga: Boolean, dark: Boolea
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(t.icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-        if (manga) Text(label.uppercase(), fontFamily = Manga.Lettering, fontSize = 13.sp, letterSpacing = 0.6.sp, maxLines = 1, color = tint)
-        else Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1, color = tint)
+        Icon(t.icon, contentDescription = null, tint = tint, modifier = Modifier.size(if (labels) 24.dp else 26.dp))
+        if (labels) {
+            if (manga) Text(label.uppercase(), fontFamily = Manga.Lettering, fontSize = 13.sp, letterSpacing = 0.6.sp, maxLines = 1, color = tint)
+            else Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1, color = tint)
+        }
     }
 }
 

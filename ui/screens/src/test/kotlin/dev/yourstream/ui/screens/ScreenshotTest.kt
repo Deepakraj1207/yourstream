@@ -67,7 +67,7 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
         compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } } }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
@@ -187,9 +187,25 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneSettings() = shot("phone-settings", WindowLayout.COMPACT, TopLevel.SETTINGS) {
-        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.5.1", {}, {}, {},
-            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.5.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+        SettingsScreen(settingsHost("0.10.0"))
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsPlayback() = shot("phone-settings-playback", WindowLayout.COMPACT, null, dark = true, manga = true) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.PLAYBACK, settingsHost("0.10.0"), {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsLayout() = shot("phone-settings-layout", WindowLayout.COMPACT, null, dark = false, manga = false) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT, settingsHost("0.10.0"), {})
+    }
+
+    private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
+        SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}),
+        updateLine = "Version $version · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {}, onReset = {},
+        securedHosts = listOf("api.themoviedb.org"),
+    )
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeManga() = shot("phone-home-manga", WindowLayout.COMPACT, TopLevel.HOME, dark = false, manga = true) { home() }
@@ -212,8 +228,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneSettingsManga() = shot("phone-settings-manga", WindowLayout.COMPACT, TopLevel.SETTINGS, dark = false, manga = true) {
-        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.6.1", {}, {}, {},
-            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.6.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+        SettingsScreen(settingsHost("0.10.0"))
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -241,7 +256,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
     fun tvSettings() = shot("tv-settings", WindowLayout.TV, TopLevel.SETTINGS) {
-        SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "0.1.0", {}, {}, {})
+        SettingsScreen(settingsHost("0.10.0"))
     }
 
     // ---- Player (full screen: no shell). A gradient stands in for the video frame.

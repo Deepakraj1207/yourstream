@@ -17,6 +17,19 @@ enum class ThemeMode { SYSTEM, DARK, LIGHT }
 /** The app's look: manga / comic-store (default) or the plain classic style. */
 enum class UiStyle { MANGA, CLASSIC }
 
+/** Poster card size in rows and grids (Settings → Layout), as a factor of the layout's own width. */
+enum class PosterSize(val scale: Float) { SMALL(0.85f), MEDIUM(1f), LARGE(1.2f) }
+
+/** Which rows Home shows (Settings → Layout). All on by default. */
+data class HomeRowsShown(
+    val hero: Boolean = true,
+    val continueWatching: Boolean = true,
+    val forYou: Boolean = true,
+    val recentlyAdded: Boolean = true,
+    val series: Boolean = true,
+    val catalogs: Boolean = true,
+)
+
 /** App-wide choices from Settings (stored on the device). */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
@@ -41,6 +54,16 @@ data class AppSettings(
     val torrentStreaming: Boolean = true,
     /** Resolve every host through DNS over HTTPS (blocked hosts use it automatically anyway). */
     val secureDns: Boolean = false,
+    /** Dark theme on pure black (OLED screens): backgrounds and cards' surroundings turn #000. */
+    val amoledBlack: Boolean = false,
+    /** The phone's dock shows each tab's name under its icon. */
+    val dockLabels: Boolean = true,
+    val posterSize: PosterSize = PosterSize.MEDIUM,
+    val homeRows: HomeRowsShown = HomeRowsShown(),
+    /** Add-on and torrent streams: how far ahead the player buffers (within its memory limit). */
+    val streamBufferSeconds: Int = 120,
+    /** Audio: the app's FFmpeg decoders before the device's own (for films that play without sound). */
+    val appAudioDecodersFirst: Boolean = false,
 ) {
     val seekMs: Long get() = seekSeconds * 1000L
 
@@ -48,6 +71,7 @@ data class AppSettings(
         val SEEK_OPTIONS = listOf(5, 10, 15, 30)
         val HOLD_SPEEDS = listOf(1.5f, 2f, 3f)
         val SUBTITLE_SCALES = listOf(0.8f, 1f, 1.25f, 1.5f, 1.8f)
+        val BUFFER_OPTIONS = listOf(30, 60, 120, 300)
     }
 }
 
@@ -57,8 +81,17 @@ val LocalAppSettings = staticCompositionLocalOf { AppSettings() }
 @Singleton
 class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
     private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-    private val _settings = MutableStateFlow(load().also { dev.yourstream.core.network.SecureDns.always = it.secureDns })
+    private val _settings = MutableStateFlow(load().also(::apply))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    /** Settings that live below the UI (network, decoders) take effect right away. */
+    private fun apply(s: AppSettings) {
+        dev.yourstream.core.network.SecureDns.always = s.secureDns
+        dev.yourstream.playback.media3.PlayerDecoders.appAudioFirst = s.appAudioDecodersFirst
+    }
+
+    /** Settings → Advanced → Reset: every choice back to its default. */
+    fun reset() = update { AppSettings() }
 
     fun update(change: (AppSettings) -> AppSettings) {
         val s = change(_settings.value)
@@ -75,8 +108,19 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("subtitle_box", s.subtitleBox)
             .putBoolean("torrents", s.torrentStreaming)
             .putBoolean("secure_dns", s.secureDns)
+            .putBoolean("amoled", s.amoledBlack)
+            .putBoolean("dock_labels", s.dockLabels)
+            .putString("poster_size", s.posterSize.name)
+            .putBoolean("home_hero", s.homeRows.hero)
+            .putBoolean("home_continue", s.homeRows.continueWatching)
+            .putBoolean("home_for_you", s.homeRows.forYou)
+            .putBoolean("home_recent", s.homeRows.recentlyAdded)
+            .putBoolean("home_series", s.homeRows.series)
+            .putBoolean("home_catalogs", s.homeRows.catalogs)
+            .putInt("stream_buffer", s.streamBufferSeconds)
+            .putBoolean("ffmpeg_first", s.appAudioDecodersFirst)
             .apply()
-        dev.yourstream.core.network.SecureDns.always = s.secureDns
+        apply(s)
         _settings.value = s
     }
 
@@ -93,6 +137,19 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         subtitleBox = prefs.getBoolean("subtitle_box", false),
         torrentStreaming = prefs.getBoolean("torrents", true),
         secureDns = prefs.getBoolean("secure_dns", false),
+        amoledBlack = prefs.getBoolean("amoled", false),
+        dockLabels = prefs.getBoolean("dock_labels", true),
+        posterSize = runCatching { PosterSize.valueOf(prefs.getString("poster_size", null)!!) }.getOrDefault(PosterSize.MEDIUM),
+        homeRows = HomeRowsShown(
+            hero = prefs.getBoolean("home_hero", true),
+            continueWatching = prefs.getBoolean("home_continue", true),
+            forYou = prefs.getBoolean("home_for_you", true),
+            recentlyAdded = prefs.getBoolean("home_recent", true),
+            series = prefs.getBoolean("home_series", true),
+            catalogs = prefs.getBoolean("home_catalogs", true),
+        ),
+        streamBufferSeconds = prefs.getInt("stream_buffer", 120).takeIf { it in AppSettings.BUFFER_OPTIONS } ?: 120,
+        appAudioDecodersFirst = prefs.getBoolean("ffmpeg_first", false),
     )
 }
 
@@ -100,4 +157,5 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
 class AppPreferencesViewModel @Inject constructor(private val store: AppPreferences) : ViewModel() {
     val settings: StateFlow<AppSettings> = store.settings
     fun update(change: (AppSettings) -> AppSettings) = store.update(change)
+    fun reset() = store.reset()
 }

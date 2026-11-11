@@ -65,7 +65,10 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
         dev.yourstream.ui.screens.settings.ThemeMode.LIGHT -> false
     }
     androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
-    YourStreamTheme(layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA) {
+    YourStreamTheme(
+        layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA,
+        amoled = settings.amoledBlack, posterScale = settings.posterSize.scale,
+    ) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
             val navigator = remember(nav) { AppNavigator(nav) }
@@ -109,7 +112,7 @@ fun AdaptiveShell(
             // The dock floats over the content on the four main tabs (like Nuvio's); other pages
             // (details, players, settings pages) use the whole screen.
             val showDock = current != null
-            val clearance = if (showDock) DOCK_HEIGHT + DOCK_BOTTOM_GAP + 8.dp else 0.dp
+            val clearance = if (showDock) dockHeight(dev.yourstream.ui.screens.settings.LocalAppSettings.current.dockLabels) + DOCK_BOTTOM_GAP + 8.dp else 0.dp
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
                 androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalBottomClearance provides clearance) {
                     // Status bar padding applied (and consumed) here, as the old scaffold did: Home has no

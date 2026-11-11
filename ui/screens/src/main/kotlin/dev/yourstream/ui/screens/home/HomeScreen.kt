@@ -92,13 +92,16 @@ private fun HomeContent(
     onReview: () -> Unit,
 ) {
     val blocking = state.blocking
+    // Settings → Layout → Home rows.
+    val shown = dev.yourstream.ui.screens.settings.LocalAppSettings.current.homeRows
+    val catalogs = if (shown.catalogs) state.catalogs else emptyList()
     if (blocking != null) {
         val setupAction = when (blocking) {
             EmptyKind.NOT_SIGNED_IN -> onSignIn
             EmptyKind.NO_SOURCES -> onChooseSources
             else -> null
         }
-        if (state.catalogs.isEmpty()) {
+        if (catalogs.isEmpty()) {
             EmptyState(blocking, Modifier.testTag("home"), onAction = setupAction)
             return
         }
@@ -112,7 +115,7 @@ private fun HomeContent(
             verticalArrangement = Arrangement.spacedBy(LocalDimens.current.rowGap),
         ) {
             item(key = "setup") { SetupPanel(blocking, setupAction) }
-            state.catalogs.forEach { c ->
+            catalogs.forEach { c ->
                 item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
             }
         }
@@ -128,25 +131,25 @@ private fun HomeContent(
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
-        item(key = "hero") {
+        if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
                 is UiState.Content -> HeroBanner(heroModel(h.value), { onOpen(h.value.primary) }, { onOpen(h.value.secondary) }, primaryFocus = heroFocus)
                 else -> Unit
             }
         }
-        continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
-        (state.forYou as? UiState.Content)?.value?.let { f ->
+        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
+        (state.forYou as? UiState.Content)?.value?.takeIf { shown.forYou }?.let { f ->
             item(key = "for-you") {
                 Column(Modifier.testTag("for-you")) {
                     MediaRow(stringResource(R.string.home_for_you), f.tiles, card, { onOpen(it.open) }, actions = actions)
                 }
             }
         }
-        paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
-        paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
+        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
+        if (shown.series) paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
         // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
-        state.catalogs.forEach { c ->
+        catalogs.forEach { c ->
             item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
         }
     }

@@ -130,7 +130,9 @@ data class StreamPlayerState(
  */
 @OptIn(UnstableApi::class)
 @HiltViewModel
-class StreamPlayerViewModel @Inject constructor(saved: SavedStateHandle, web: WebStreams, private val torrents: TorrentEngine) : ViewModel() {
+class StreamPlayerViewModel @Inject constructor(
+    saved: SavedStateHandle, web: WebStreams, private val torrents: TorrentEngine, prefs: dev.yourstream.ui.screens.settings.AppPreferences,
+) : ViewModel() {
     val route = saved.toRoute<StreamPlayerRoute>()
     private val headers: Map<String, String> = runCatching {
         (Json.parseToJsonElement(route.headers) as JsonObject).mapNotNull { (k, v) -> (v as? JsonPrimitive)?.content?.let { k to it } }.toMap()
@@ -139,6 +141,7 @@ class StreamPlayerViewModel @Inject constructor(saved: SavedStateHandle, web: We
 
     val player: ExoPlayer = web.player(
         DefaultMediaSourceFactory(if (isTorrent) TorrentDataSource.Factory(torrents::source) else web.dataSourceFactory(headers)),
+        web.loadControl(prefs.settings.value.streamBufferSeconds * 1000),
     )
 
     private val _state = MutableStateFlow(StreamPlayerState(torrent = if (isTorrent) TorrentStats() else null))

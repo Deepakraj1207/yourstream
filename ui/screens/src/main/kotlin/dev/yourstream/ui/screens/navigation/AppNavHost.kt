@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import dev.yourstream.ui.screens.browse.LibraryRoute as LibraryScreenRoute
 import dev.yourstream.ui.screens.browse.MoviesRoute as MoviesScreenRoute
 import dev.yourstream.ui.screens.browse.SeriesRoute as SeriesScreenRoute
@@ -129,11 +130,14 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
+        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb)
         page<SettingsRoute> {
-            SettingsScreenRoute(
-                appVersion, navigator::account, navigator::sources, navigator::languages,
-                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb),
-            )
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, onPage = navigator::settingsPage)
+        }
+        page<SettingsPageRoute> { entry ->
+            val name = entry.toRoute<SettingsPageRoute>().page
+            val settingsPage = dev.yourstream.ui.screens.settings.SettingsPage.entries.firstOrNull { it.name == name } ?: dev.yourstream.ui.screens.settings.SettingsPage.APPEARANCE
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage, onBack = back)
         }
         page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         page<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }

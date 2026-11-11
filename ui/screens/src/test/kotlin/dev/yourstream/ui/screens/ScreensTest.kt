@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollTo
@@ -42,6 +43,9 @@ import dev.yourstream.ui.screens.search.SearchResults
 import dev.yourstream.ui.screens.search.SearchScreen
 import dev.yourstream.ui.screens.search.SearchUiState
 import dev.yourstream.ui.screens.settings.SettingsScreen
+import dev.yourstream.ui.screens.settings.SettingsHost
+import dev.yourstream.ui.screens.settings.SettingsPage
+import dev.yourstream.ui.screens.settings.SettingsPageScreen
 import dev.yourstream.ui.screens.settings.SettingsUiState
 import dev.yourstream.ui.core.StateTags
 import androidx.paging.LoadState
@@ -149,22 +153,40 @@ class ScreensTest {
     }
 
     @Test
-    fun settingsGroupsAndVersion() {
-        var sources = 0
-        set { SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", {}, { sources++ }, {}) }
-        compose.onNodeWithText("Asha").assertExists()
+    fun settingsHubListsCategoriesAndOpensThem() {
+        val opened = mutableListOf<SettingsPage>()
+        var account = 0
+        set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, "Tamil, English"), "1.2.0", onAccount = { account++ }), { opened += it }) }
+        compose.onNodeWithText("Asha").performClick()
+        assertEquals(1, account)
         compose.onNodeWithText("Telegram account").assertExists()
-        compose.onNodeWithText("3 chats selected").performClick()
-        assertEquals(1, sources)
-        compose.onNodeWithTag("settings").performScrollToNode(hasText("Version 1.2.0"))
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("settings-page:PLAYBACK"))
+        compose.onNodeWithTag("settings-page:PLAYBACK").performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("settings-page:ABOUT"))
         compose.onNodeWithText("Version 1.2.0").assertExists()
+        compose.onNodeWithTag("settings-page:ABOUT").performClick()
+        assertEquals(listOf(SettingsPage.PLAYBACK, SettingsPage.ABOUT), opened)
         compose.onNodeWithText("Developer tools").assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsSearchFindsAndChangesASettingInPlace() {
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it })) }
+        compose.onNodeWithTag("settings-search").performTextInput("amoled")
+        compose.onNodeWithTag("pref-amoled").performClick()
+        assertEquals(true, prefs.amoledBlack)
+        compose.onNodeWithTag("pref-theme").assertDoesNotExist()
+        compose.onNodeWithTag("settings-search").performTextClearance()
+        compose.onNodeWithTag("settings-search").performTextInput("zzqx")
+        compose.onNodeWithTag("settings-no-match").assertExists()
     }
 
     @Test
     fun settingsChangePlayerPreferences() {
         var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
-        set { SettingsScreen(SettingsUiState("Asha", true, 3, ""), "1.2.0", {}, {}, {}, prefs = prefs, onPrefs = { prefs = it }) }
+        var languages = 0
+        set { SettingsPageScreen(SettingsPage.PLAYBACK, SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it }, onLanguages = { languages++ }), {}) }
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-autoplay"))
         compose.onNodeWithTag("pref-autoplay").performClick()
         assertEquals(false, prefs.autoplayNext)
@@ -172,10 +194,49 @@ class ScreensTest {
         compose.onNodeWithTag("pref-seek").performClick()
         compose.onNodeWithTag("choice:30 seconds").performClick()
         assertEquals(30, prefs.seekSeconds)
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-theme"))
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("settings-languages"))
+        compose.onNodeWithTag("settings-languages").performClick()
+        assertEquals(1, languages)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-buffer"))
+        compose.onNodeWithTag("pref-buffer").performClick()
+        compose.onNodeWithTag("choice:5 minutes").performClick()
+        assertEquals(300, prefs.streamBufferSeconds)
+    }
+
+    @Test
+    fun settingsAppearanceLayoutAndReset() {
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        var resets = 0
+        val host = { SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it }, onReset = { resets++ }) }
+        var page by androidx.compose.runtime.mutableStateOf(SettingsPage.APPEARANCE)
+        set { SettingsPageScreen(page, host(), {}) }
         compose.onNodeWithTag("pref-theme").performClick()
         compose.onNodeWithTag("choice:Dark").performClick()
         assertEquals(dev.yourstream.ui.screens.settings.ThemeMode.DARK, prefs.theme)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
+        compose.onNodeWithTag("pref-dock-labels").performClick()
+        assertEquals(false, prefs.dockLabels)
+        page = SettingsPage.LAYOUT
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-home-hero"))
+        compose.onNodeWithTag("pref-home-hero").performClick()
+        assertEquals(false, prefs.homeRows.hero)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-poster-size"))
+        compose.onNodeWithTag("pref-poster-size").performClick()
+        compose.onNodeWithTag("choice:Large").performClick()
+        assertEquals(dev.yourstream.ui.screens.settings.PosterSize.LARGE, prefs.posterSize)
+        page = SettingsPage.ADVANCED
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reset"))
+        compose.onNodeWithTag("pref-reset").performClick()
+        compose.onNodeWithTag("reset-confirm").performClick()
+        assertEquals(1, resets)
+    }
+
+    @Test
+    fun settingsContentPageOpensSources() {
+        var sources = 0
+        set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), onSources = { sources++ }), {}) }
+        compose.onNodeWithText("3 chats selected").performClick()
+        assertEquals(1, sources)
     }
 
     @Test

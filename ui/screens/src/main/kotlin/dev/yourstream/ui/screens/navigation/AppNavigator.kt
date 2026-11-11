@@ -52,6 +52,7 @@ class AppNavigator(private val nav: NavHostController) {
     fun review() = nav.navigate(MatchReviewRoute) { launchSingleTop = true }
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
+    fun settingsPage(page: dev.yourstream.ui.screens.settings.SettingsPage) = nav.navigate(SettingsPageRoute(page.name)) { launchSingleTop = true }
     fun tmdb() = nav.navigate(TmdbRoute) { launchSingleTop = true }
     fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
