@@ -44,3 +44,10 @@ cp secrets.properties.example secrets.properties   # then fill in your api_id / 
 
 Development happens in two stages: **Stage 1** builds all functionality behind plain debug
 screens; **Stage 2** builds the final UI/UX.
+
+## License
+
+YourStream is free software under the [GNU General Public License v3.0](LICENSE). It bundles
+components under their own licenses (listed in the app under Settings → About → Open-source
+licenses), among them the FFmpeg audio decoder for Media3 (Jellyfin build, GPL-3.0), which is why
+the app as a whole is GPL-3.0.

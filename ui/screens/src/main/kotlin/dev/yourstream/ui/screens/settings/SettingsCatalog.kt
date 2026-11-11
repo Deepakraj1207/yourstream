@@ -87,6 +87,7 @@ private fun entry(
 internal data class License(val name: String, val what: String, val license: String)
 
 internal val LICENSES = listOf(
+    License("YourStream", "This app; its source code is on GitHub", "GNU GPL 3.0"),
     License("TDLib", "Telegram's client library", "Boost Software License 1.0"),
     License("tdl-coroutines", "Kotlin bindings for TDLib", "Apache License 2.0"),
     License("AndroidX, Jetpack Compose, Media3", "Interface, navigation, database, player", "Apache License 2.0"),
