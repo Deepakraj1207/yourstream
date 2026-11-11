@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -122,7 +124,16 @@ sealed interface AccountStep {
     data object Unsupported : AccountStep
 }
 
-data class AccountUiState(val step: AccountStep = AccountStep.Starting, val busy: Boolean = false, val error: UiError? = null)
+data class AccountUiState(
+    val step: AccountStep = AccountStep.Starting,
+    val busy: Boolean = false,
+    /** The last request's failure, shown in plain words ([authErrorText]). */
+    val error: dev.yourstream.core.common.AppError? = null,
+    /** The session ended without the user signing out (another device, expiry): said on the sign-in screen. */
+    val signedOutNotice: Boolean = false,
+    /** Account data is being removed from the device after signing out. */
+    val removingData: Boolean = false,
+)
 
 sealed interface AccountAction {
     data class Submit(val text: String) : AccountAction
@@ -131,24 +142,29 @@ sealed interface AccountAction {
     /** Back to the phone number from the code or QR step (Telegram accepts a new number there). */
     data object ChangeNumber : AccountAction
     data object LogOut : AccountAction
+    data object DismissNotice : AccountAction
 }
 
 @HiltViewModel
 class AccountViewModel @Inject constructor(
     private val auth: TelegramAuthManager,
     users: TelegramUserRepository,
+    private val account: AccountSession,
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
-    private val error = MutableStateFlow<UiError?>(null)
+    private val error = MutableStateFlow<dev.yourstream.core.common.AppError?>(null)
     private val editingPhone = MutableStateFlow(false)
 
-    val state: StateFlow<AccountUiState> = combine(auth.state, users.currentUser, busy, error, editingPhone) { a, u, b, e, edit ->
+    private val session = combine(account.notice, account.wiping) { n, w -> n to w }
+
+    val state: StateFlow<AccountUiState> = combine(auth.state, users.currentUser, combine(busy, error, ::Pair), editingPhone, session) { a, u, (b, e), edit, (notice, wiping) ->
         val step = step(a, u?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ") })
-        AccountUiState(if (edit && step.acceptsNewNumber()) AccountStep.Phone else step, b, e)
+        AccountUiState(if (edit && step.acceptsNewNumber()) AccountStep.Phone else step, b, e, notice, wiping)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountUiState())
 
     fun onAction(action: AccountAction) {
         if (action == AccountAction.ChangeNumber) { error.value = null; editingPhone.value = true; return }
+        if (action == AccountAction.DismissNotice) { account.dismissNotice(); return }
         viewModelScope.launch {
             busy.value = true; error.value = null
             val result = when (action) {
@@ -162,10 +178,10 @@ class AccountViewModel @Inject constructor(
                 }
                 AccountAction.Resend -> auth.resendCode()
                 AccountAction.UseQr -> auth.requestQrCodeLogin()
-                AccountAction.LogOut -> auth.logOut()
-                AccountAction.ChangeNumber -> AppResult.Ok(Unit)
+                AccountAction.LogOut -> account.signOut()
+                AccountAction.ChangeNumber, AccountAction.DismissNotice -> AppResult.Ok(Unit)
             }
-            if (result is AppResult.Err) error.value = result.error.toUiError()
+            if (result is AppResult.Err) error.value = result.error
             else if (action is AccountAction.Submit || action == AccountAction.UseQr) editingPhone.value = false
             busy.value = false
         }
@@ -203,7 +219,14 @@ fun AccountRoute(onBack: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
 @Composable
 fun AccountScreen(state: AccountUiState, onAction: (AccountAction) -> Unit, onBack: () -> Unit) {
     when (val step = state.step) {
-        AccountStep.Starting -> ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) { LoadingState() }
+        AccountStep.Starting -> ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) {
+            if (state.removingData) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text(stringResource(R.string.account_removing_data), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("account-removing"))
+                }
+            } else LoadingState()
+        }
         is AccountStep.NotConfigured -> ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) {
             ErrorState(UiError(ErrorKind.TELEGRAM, stringResource(R.string.account_not_configured), retryable = false))
         }
@@ -213,8 +236,21 @@ fun AccountScreen(state: AccountUiState, onAction: (AccountAction) -> Unit, onBa
         is AccountStep.SignedIn -> ScreenScaffold(stringResource(R.string.account_signed_in_title), onBack = onBack) {
             Column(Modifier.padding(24.dp).widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.settings_signed_in_as, step.name.orEmpty()), style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("signed-in"))
-                OutlinedPill(stringResource(R.string.account_log_out), enabled = !state.busy) { onAction(AccountAction.LogOut) }
+                Text(stringResource(R.string.account_sign_out_explained), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                var confirm by remember { mutableStateOf(false) }
+                OutlinedPill(stringResource(R.string.account_log_out), enabled = !state.busy, tag = "account-sign-out") { confirm = true }
                 ErrorLine(state)
+                if (confirm) androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.account_sign_out_title)) },
+                    text = { Text(stringResource(R.string.account_sign_out_text)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = { confirm = false; onAction(AccountAction.LogOut) }, modifier = Modifier.testTag("account-sign-out-confirm")) {
+                            Text(stringResource(R.string.account_log_out), color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_cancel)) } },
+                )
             }
         }
         else -> SignInFrame(onBack) {
@@ -289,6 +325,7 @@ private fun PhoneStep(state: AccountUiState, onAction: (AccountAction) -> Unit) 
     val valid = dial.isNotEmpty() && number.count(Char::isDigit) >= 5
     val submit = { if (valid && !state.busy) onAction(AccountAction.Submit(Countries.international(dial, number))) }
 
+    if (state.signedOutNotice) SignedOutNotice { onAction(AccountAction.DismissNotice) }
     StepTitle(stringResource(R.string.account_phone_title), stringResource(R.string.account_phone_intro))
     Surface(
         onClick = { picking = true }, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
@@ -444,7 +481,44 @@ private fun CountryPicker(onDismiss: () -> Unit, onPick: (Country) -> Unit) {
 
 @Composable
 private fun ErrorLine(state: AccountUiState) {
-    state.error?.let { Text(it.detail ?: stringResource(R.string.ui_error_generic), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("account-error")) }
+    state.error?.let { Text(authErrorText(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("account-error")) }
+}
+
+/** Why the library is gone: the session ended without the user signing out. */
+@Composable
+private fun SignedOutNotice(onDismiss: () -> Unit) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().testTag("account-signed-out-notice")) {
+        Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.account_signed_out_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.account_signed_out_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_close)) }
+        }
+    }
+}
+
+/**
+ * A sign-in failure in plain words: what happened and what to do. Telegram's own wording is
+ * already friendly for known cases ([TelegramErrorMapper]); waits, connection problems and
+ * unknown errors are phrased here.
+ */
+@Composable
+internal fun authErrorText(e: dev.yourstream.core.common.AppError): String = when (e) {
+    is dev.yourstream.core.common.AppError.RateLimited ->
+        if (e.retryAfterSeconds <= 0) stringResource(R.string.account_error_wait_unknown)
+        else stringResource(R.string.account_error_wait, waitLabel(e.retryAfterSeconds))
+    is dev.yourstream.core.common.AppError.Network, is dev.yourstream.core.common.AppError.Timeout -> stringResource(R.string.account_error_offline)
+    is dev.yourstream.core.common.AppError.Telegram -> stringResource(R.string.account_error_unexpected, e.rawMessage.ifBlank { e.code.toString() })
+    is dev.yourstream.core.common.AppError.Unknown -> stringResource(R.string.account_error_unexpected, e.message)
+    else -> e.message
+}
+
+@Composable
+private fun waitLabel(seconds: Int): String = when {
+    seconds < 90 -> pluralStringResource(R.plurals.account_wait_seconds, seconds, seconds)
+    seconds < 3_600 -> ((seconds + 59) / 60).let { pluralStringResource(R.plurals.account_wait_minutes, it, it) }
+    else -> ((seconds + 3599) / 3600).let { pluralStringResource(R.plurals.account_wait_hours, it, it) }
 }
 
 private val PillHeight = 56.dp
@@ -465,8 +539,8 @@ private fun TonalPill(text: String, enabled: Boolean, tag: String, onClick: () -
 }
 
 @Composable
-private fun OutlinedPill(text: String, enabled: Boolean, onClick: () -> Unit) {
-    androidx.compose.material3.OutlinedButton(onClick = onClick, enabled = enabled, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(PillHeight)) {
+private fun OutlinedPill(text: String, enabled: Boolean, tag: String, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick = onClick, enabled = enabled, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(PillHeight).testTag(tag)) {
         Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
     }
 }

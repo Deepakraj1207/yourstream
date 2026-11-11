@@ -35,6 +35,7 @@ class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImag
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var database: dagger.Lazy<OpenedDatabase>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
+    @Inject lateinit var accountSession: dagger.Lazy<dev.yourstream.ui.screens.settings.AccountSession>
 
     private lateinit var diagnostics: AppDiagnostics
 
@@ -80,6 +81,8 @@ class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImag
                 if (r is AppResult.Err) journal.warn(DiagnosticCategory.TELEGRAM, "Telegram not started: ${r.error.message}. The local library stays available.")
             }
             step("telegram monitor") { monitorTelegram() }
+            // Signed out → no account data on the device (wipes after sign-out and leftovers).
+            step("account session") { accountSession.get().start(appScope) }
             // Live index updates + periodic background sync (WorkManager: survives process death).
             step("indexer") { indexer.start(appScope) }
             // External metadata: periodic retries/refresh; matching also follows index changes.

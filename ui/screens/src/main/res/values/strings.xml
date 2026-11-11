@@ -513,4 +513,26 @@
     <string name="torrent_consent_title">Turn on torrent streaming?</string>
     <string name="torrent_consent_text">A torrent downloads from, and uploads to, other people\'s devices while you watch. They can see your IP address, and it uses data like any stream. Only play what you have the right to watch.</string>
     <string name="torrent_consent_enable">Turn on</string>
+    <string name="account_sign_out_explained">Signing out removes your library, watch history and cached files from this device. Your Telegram chats are not touched.</string>
+    <string name="account_sign_out_title">Sign out of Telegram?</string>
+    <string name="account_sign_out_text">Your library, watch history and cached files are removed from this device. Settings, languages and add-ons stay. To get it back, sign in and choose your chats again.</string>
+    <string name="account_removing_data">Signing out and removing your library from this device…</string>
+    <string name="account_signed_out_title">You were signed out</string>
+    <string name="account_signed_out_text">Your Telegram session ended: it was closed from another device, expired or the account changed. Your library was removed from this device. Sign in and choose your chats to rebuild it.</string>
+    <string name="account_error_offline">Can\'t reach Telegram. Check your internet connection and try again.</string>
+    <string name="account_error_wait">Too many attempts. Telegram asks you to wait %1$s before trying again.</string>
+    <string name="account_error_wait_unknown">Too many attempts. Wait a while before trying again.</string>
+    <string name="account_error_unexpected">Telegram couldn\'t do that. Try again in a moment. (Details: %1$s)</string>
+    <plurals name="account_wait_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <plurals name="account_wait_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="account_wait_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
 </resources>

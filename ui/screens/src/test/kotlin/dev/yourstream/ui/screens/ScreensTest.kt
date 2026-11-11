@@ -9,6 +9,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithContentDescription
+import dev.yourstream.core.common.AppError
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -77,6 +79,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class ScreensTest {
@@ -249,6 +252,41 @@ class ScreensTest {
         compose.onNodeWithTag("pref-torrents").performClick()
         compose.onNodeWithTag("torrent-consent-enable").assertDoesNotExist()
         assertEquals(false, prefs.torrentStreaming)
+    }
+
+    @Test
+    fun signingOutAsksFirstAndSaysWhatIsRemoved() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.settings.AccountAction>()
+        set { dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.SignedIn("Asha")), { actions += it }, {}) }
+        compose.onNodeWithTag("account-sign-out").performClick()
+        assertTrue(actions.isEmpty(), "one tap does not sign out")
+        compose.onNodeWithText("Sign out of Telegram?").assertExists()
+        compose.onNodeWithTag("account-sign-out-confirm").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.settings.AccountAction>(dev.yourstream.ui.screens.settings.AccountAction.LogOut), actions)
+    }
+
+    @Test
+    fun aSessionEndedElsewhereIsExplainedOnTheSignInScreen() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.settings.AccountAction>()
+        set {
+            dev.yourstream.ui.screens.settings.AccountScreen(
+                dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Phone, signedOutNotice = true), { actions += it }, {},
+            )
+        }
+        compose.onNodeWithText("You were signed out").assertExists()
+        compose.onNodeWithContentDescription("Close").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.settings.AccountAction>(dev.yourstream.ui.screens.settings.AccountAction.DismissNotice), actions)
+    }
+
+    @Test
+    fun signInErrorsAreInPlainWords() {
+        var error by androidx.compose.runtime.mutableStateOf<AppError>(AppError.RateLimited(3_600))
+        set { dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Phone, error = error), {}, {}) }
+        compose.onNodeWithTag("account-error").assertTextEquals("Too many attempts. Telegram asks you to wait 1 hour before trying again.")
+        error = AppError.Network("Request aborted")
+        compose.onNodeWithTag("account-error").assertTextEquals("Can't reach Telegram. Check your internet connection and try again.")
+        error = AppError.Telegram(400, "SOMETHING_NEW")
+        compose.onNodeWithTag("account-error").assertTextEquals("Telegram couldn't do that. Try again in a moment. (Details: SOMETHING_NEW)")
     }
 
     @Test
