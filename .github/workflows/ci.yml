@@ -41,6 +41,27 @@ jobs:
       - name: Tests, lint, debug APK
         run: ./gradlew --continue test :app:lintDebug :app:assembleDebug
 
+      # Failures readable in the log itself: each failing test with its message, and (for the
+      # intermittent Hilt "missing binding" error) what the playback module generated and compiled.
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "== Failing tests"
+          for f in $(find . -path '*/build/test-results/*' -name '*.xml'); do
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).getroot().iter('testcase'):
+              for bad in list(case.findall('failure')) + list(case.findall('error')):
+                  print(f"{case.get('classname')} > {case.get('name')}: {(bad.get('message') or '')[:400]}")
+          PY
+          done
+          echo "== playback:media3 generated Hilt metadata"
+          find playback/media3/build/generated -path '*hilt_aggregated_deps*' 2>/dev/null || true
+          echo "== playback:media3 compiled hilt_aggregated_deps classes"
+          find playback/media3/build -path '*hilt_aggregated_deps*' -name '*.class' 2>/dev/null || true
+          echo "== playback:media3 generated sources count"
+          find playback/media3/build/generated -name '*.java' 2>/dev/null | wc -l
+
       - name: Reports
         if: failure()
         uses: actions/upload-artifact@v4
