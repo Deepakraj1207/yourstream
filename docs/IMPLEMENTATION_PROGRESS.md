@@ -77,6 +77,16 @@ proven, so nothing was changed for it. Mitigations in place: the release build r
 `--rerun-tasks`, and CI now reports any recurrence with its log. Reopen with the CI log if it
 happens again.
 
+**Update (Phase 2): it recurred in CI.** Push run 3 on `a91d9e8` failed (the same Hilt missing
+bindings from `playback/media3/PlaybackModule.kt`, and failing `:playback:media3` unit tests);
+its re-run failed the same way; the pull-request run of the same code passed, as did both runs
+of the next commit. All four runs restored the same 117 task outputs from the build cache, so the
+cache contents are not the difference. Tried and not reproduced locally: a cold build with
+the cache filled by the previous commit (passed, 17 s). The failing test names were only in an
+artifact this session cannot download, so CI now prints them (and the module's generated Hilt
+metadata and compiled classes) in a "Failure summary" step. **Status: open, intermittent;
+next failure gives the evidence.**
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first
@@ -132,7 +142,9 @@ nothing) · `ScreensTest` (confirmation dialog, signed-out notice, plain-languag
 `ViewModelTest` updated for the new constructor and structured error.
 
 **Tests run:** `./gradlew --continue test :app:lintDebug :app:assembleDebug`: pass; lint
-0 errors, 14 warnings (unchanged).
+0 errors, 14 warnings (unchanged). GitHub CI: the pull-request run of `a91d9e8` passed; the push
+run failed twice with the intermittent Hilt/KSP problem (Phase 1, monitored risk), not with a
+test of this phase; both runs of the next commit (`66a088d`) passed.
 
 **Known limitations / remaining work:**
 * **Not run against real Telegram.** TDLib's behaviour on sign-out (LoggingOut → Closed →
