@@ -232,6 +232,26 @@ class ScreensTest {
     }
 
     @Test
+    fun torrentStreamingIsOffByDefaultAndAsksBeforeTurningOn() {
+        assertEquals(false, dev.yourstream.ui.screens.settings.AppSettings().torrentStreaming)
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsPageScreen(SettingsPage.PLAYBACK, SettingsHost(SettingsUiState("Asha", true, 3, ""), prefs = prefs, onPrefs = { prefs = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-torrents"))
+        // Cancel: stays off.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-cancel").performClick()
+        assertEquals(false, prefs.torrentStreaming)
+        // Agree: on.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-enable").performClick()
+        assertEquals(true, prefs.torrentStreaming)
+        // Turning off never asks.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-enable").assertDoesNotExist()
+        assertEquals(false, prefs.torrentStreaming)
+    }
+
+    @Test
     fun settingsContentPageOpensSources() {
         var sources = 0
         set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), onSources = { sources++ }), {}) }

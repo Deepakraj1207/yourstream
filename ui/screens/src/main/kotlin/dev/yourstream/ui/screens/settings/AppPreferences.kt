@@ -50,8 +50,11 @@ data class AppSettings(
     val subtitleScale: Float = 1f,
     /** Subtitles on a dark box (else white text with a black outline). */
     val subtitleBox: Boolean = false,
-    /** Torrent results from stream add-ons play with the built-in torrent engine. */
-    val torrentStreaming: Boolean = true,
+    /**
+     * Torrent results from stream add-ons play with the built-in torrent engine. Off until the
+     * user agrees (peers see the device's IP address): [TorrentConsentDialog].
+     */
+    val torrentStreaming: Boolean = false,
     /** Resolve every host through DNS over HTTPS (blocked hosts use it automatically anyway). */
     val secureDns: Boolean = false,
     /** Dark theme on pure black (OLED screens): backgrounds and cards' surroundings turn #000. */
@@ -135,7 +138,8 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         pictureInPicture = prefs.getBoolean("pip", true),
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
-        torrentStreaming = prefs.getBoolean("torrents", true),
+        // Off unless the user turned it on (before 0.11 it defaulted to on without asking).
+        torrentStreaming = prefs.getBoolean("torrents", false),
         secureDns = prefs.getBoolean("secure_dns", false),
         amoledBlack = prefs.getBoolean("amoled", false),
         dockLabels = prefs.getBoolean("dock_labels", true),

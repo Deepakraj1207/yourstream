@@ -324,7 +324,7 @@
         <item quantity="one">%1$d catalog</item>
         <item quantity="other">%1$d catalogs</item>
     </plurals>
-    <string name="addons_what_works">Catalogs, details and streams work, torrent streams included (Settings → Streaming).</string>
+    <string name="addons_what_works">Catalogs, details and streams work; torrent streams after you turn them on (Settings → Playback → Streaming).</string>
     <string name="action_add_to_library">Add to library</string>
     <string name="action_remove_from_library">Remove from library</string>
     <string name="player_rotate">Rotate screen</string>
@@ -356,7 +356,7 @@
     <string name="addon_no_streams">No streams found for this title.</string>
     <string name="addon_stream_external">Opens in another app</string>
     <string name="addon_stream_torrent">Torrent · plays while it downloads</string>
-    <string name="addon_stream_torrent_off">Torrent: turned off in Settings → Streaming</string>
+    <string name="addon_stream_torrent_off">Torrent · tap to turn on torrent streaming</string>
     <string name="addon_stream_unsupported">Can\'t be played here</string>
     <string name="stream_tracks">Audio and subtitles</string>
     <string name="stream_audio">Audio</string>
@@ -510,4 +510,7 @@
     <string name="settings_reset_action">Reset</string>
     <string name="settings_reset_done">Settings reset</string>
     <string name="action_cancel">Cancel</string>
+    <string name="torrent_consent_title">Turn on torrent streaming?</string>
+    <string name="torrent_consent_text">A torrent downloads from, and uploads to, other people\'s devices while you watch. They can see your IP address, and it uses data like any stream. Only play what you have the right to watch.</string>
+    <string name="torrent_consent_enable">Turn on</string>
 </resources>

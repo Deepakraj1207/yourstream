@@ -325,6 +325,7 @@ private fun SettingsDialogs(dialog: SettingsDialog, host: SettingsHost, onClose:
             { onPrefs(prefs.copy(posterSize = it)) }, onClose)
         SettingsDialog.BUFFER -> Choose(stringResource(R.string.settings_buffer), AppSettings.BUFFER_OPTIONS.map { it to bufferLabel(it) }, prefs.streamBufferSeconds,
             { onPrefs(prefs.copy(streamBufferSeconds = it)) }, onClose)
+        SettingsDialog.TORRENT_CONSENT -> TorrentConsentDialog(onEnable = { onPrefs(prefs.copy(torrentStreaming = true)) }, onClose = onClose)
         SettingsDialog.RESET -> androidx.compose.material3.AlertDialog(
             onDismissRequest = onClose,
             title = { Text(stringResource(R.string.settings_reset_confirm_title)) },
@@ -421,4 +422,24 @@ internal fun SettingsGroup(title: String) {
         Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).semantics { heading() })
     }
+}
+
+
+/**
+ * Asked before torrent streaming is turned on (Settings, or tapping a torrent result while it is
+ * off): what it does and that other people can see the device's IP address.
+ */
+@Composable
+fun TorrentConsentDialog(onEnable: () -> Unit, onClose: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(stringResource(R.string.torrent_consent_title)) },
+        text = { Text(stringResource(R.string.torrent_consent_text)) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onEnable(); onClose() }, modifier = Modifier.testTag("torrent-consent-enable")) {
+                Text(stringResource(R.string.torrent_consent_enable))
+            }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onClose, modifier = Modifier.testTag("torrent-consent-cancel")) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

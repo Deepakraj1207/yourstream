@@ -54,7 +54,7 @@ enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int,
 }
 
 /** Choices that open a dialog. */
-enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, POSTER, BUFFER, RESET }
+enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, POSTER, BUFFER, RESET, TORRENT_CONSENT }
 
 /** What a setting's row works with: the settings bundle, and the dialogs it may open. */
 class SettingsRows internal constructor(val host: SettingsHost, internal val open: (SettingsDialog) -> Unit) {
@@ -214,7 +214,8 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     })
     add(entry("torrents", pl, R.string.settings_group_streaming, R.string.settings_torrents, "p2p bittorrent magnet peers") {
         SettingToggle(stringResource(R.string.settings_torrents), stringResource(R.string.settings_torrents_detail), AppIcons.Update, prefs.torrentStreaming, "pref-torrents") {
-            change(prefs.copy(torrentStreaming = it))
+            // Turning on asks first (IP address visible to peers); turning off never does.
+            if (it) open(SettingsDialog.TORRENT_CONSENT) else change(prefs.copy(torrentStreaming = false))
         }
     })
 
