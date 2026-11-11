@@ -52,7 +52,7 @@ class LiveIndexUpdater @Inject constructor(
     private suspend fun apply(event: TelegramMessageEvent, chat: dev.yourstream.media.indexer.store.ChatRecord) {
         when (event) {
             is TelegramMessageEvent.NewMediaMessage -> {
-                val item = normalizer.normalize(event.message, chat.title, albumCaptionFor(event.message)) ?: return
+                val item = withContext(normalizer.normalize(event.message, chat.title, albumCaptionFor(event.message)) ?: return, event.message, chat.title)
                 val result = store.upsert(listOf(item))
                 if (result.added > 0) logger.d(TAG, "live: new media in chat ${event.chatId}")
             }
@@ -63,7 +63,10 @@ class LiveIndexUpdater @Inject constructor(
             is TelegramMessageEvent.MessageChanged -> {
                 val lookup = messages.lookupMessages(event.chatId, listOf(event.messageId))
                 val found = (lookup as? AppResult.Ok)?.value?.firstOrNull() ?: return
-                val item = (found as? MessageLookup.Found)?.let { normalizer.normalize(it.message, chat.title, albumCaptionFor(it.message)) }
+                val item = (found as? MessageLookup.Found)?.let {
+                    val stored = store.contextCaptions(event.chatId, listOf(event.messageId))[event.messageId]
+                    normalizer.normalize(it.message, chat.title, albumCaptionFor(it.message), stored)
+                }
                 if (item != null) store.upsert(listOf(item)) else store.markDeleted(event.chatId, listOf(event.messageId))
             }
         }
@@ -72,6 +75,20 @@ class LiveIndexUpdater @Inject constructor(
     /** Download progress is frequent; only settled states are written. */
     suspend fun handleFile(file: TelegramFile) {
         if (file.isDownloadingCompleted || !file.isDownloadingActive) store.updateDownload(file)
+    }
+
+    /**
+     * A new file without a title of its own takes it from the post above it (posted a moment
+     * before, usually): see ContextFinder.
+     */
+    private suspend fun withContext(item: dev.yourstream.media.parser.NormalizedMedia, m: dev.yourstream.telegram.api.model.TelegramMediaMessage, chatTitle: String?): dev.yourstream.media.parser.NormalizedMedia {
+        if (!item.needsContext) return item
+        val finder = dev.yourstream.media.indexer.engine.ContextFinder({ chat, from -> messages.history(chat, from, 30) })
+        return when (val post = finder.find(m.chatId, m.messageId, m.date)) {
+            null -> item
+            "" -> item.copy(contextCaption = "")
+            else -> normalizer.normalize(m, chatTitle, albumCaptionFor(m), post) ?: item
+        }
     }
 
     /** A new album file without a caption takes the caption another file of its album carries. */

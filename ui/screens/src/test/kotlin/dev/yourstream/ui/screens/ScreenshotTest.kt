@@ -67,8 +67,8 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel, dark: Boolean = true, manga: Boolean = false, content: @Composable () -> Unit) {
-        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}) { content() } } } }
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
+        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } } }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -132,15 +132,22 @@ class ScreenshotTest {
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS) {
-        dev.yourstream.ui.screens.settings.AddonsScreen(
-            dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indiastreams", "IndiaStreams", null, true, true), 9, true),
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false)),
-                dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:x", "Cinemeta Catalogs", "https://v3-cinemeta.strem.io/manifest.json", false, true), 6, true),
-            ), added = "Cinemeta Catalogs"), {}, {},
-        )
+    fun phoneAddons() = shot("phone-addons", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {})
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneAddonsPlugins() = shot("phone-addons-plugins", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
+        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {}, initialTab = dev.yourstream.ui.screens.settings.AddonsTab.PLUGINS)
+    }
+
+    private fun addonsState() = dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false), 12, true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true),
+        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:nuvio.example.com", "Example Nuvio Add-on", "https://nuvio.example.com/manifest.json", false, true,
+            dev.yourstream.catalog.sync.AddonSource.NUVIO), 0, true, streams = true),
+    ), added = "Example Streams")
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneDetails() = shot("phone-details", WindowLayout.COMPACT, TopLevel.LIBRARY) {
@@ -171,21 +178,45 @@ class ScreenshotTest {
                 streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
-                    dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Torrent", null, null, "abc"),
+                    dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Breaking.Bad.S01E02.2160p.mkv · 6.1 GB · 👤 120", null, null, "aabbccddeeff00112233445566778899aabbccdd"),
                 ))),
             ),
-            {}, {}, {}, {},
+            {}, {}, {}, onStream = {},
         )
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneSettings() = shot("phone-settings", WindowLayout.COMPACT, TopLevel.SETTINGS) {
-        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.5.1", {}, {}, {},
-            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.5.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+        SettingsScreen(settingsHost("0.10.0"))
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsPlayback() = shot("phone-settings-playback", WindowLayout.COMPACT, null, dark = true, manga = true) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.PLAYBACK, settingsHost("0.10.0"), {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsLayout() = shot("phone-settings-layout", WindowLayout.COMPACT, null, dark = false, manga = false) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT, settingsHost("0.10.0"), {})
+    }
+
+    private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
+        SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}),
+        updateLine = "Version $version · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {}, onReset = {},
+        securedHosts = listOf("api.themoviedb.org"),
+    )
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeManga() = shot("phone-home-manga", WindowLayout.COMPACT, TopLevel.HOME, dark = false, manga = true) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeMangaIndexing() = shot("phone-home-manga-indexing", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true,
+        indexing = IndexingStatus(chats = 2, queued = 1, found = 12_340, scanned = 24_000, total = 98_000, perSecond = 140f, etaSeconds = 530)) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneLibraryClassicIndexing() = shot("phone-library-classic-indexing", WindowLayout.COMPACT, TopLevel.LIBRARY, dark = true,
+        indexing = IndexingStatus(chats = 1, found = 870, scanned = 1_200, total = 0)) { home() }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeMangaInk() = shot("phone-home-manga-ink", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true) { home() }
@@ -197,8 +228,19 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneSettingsManga() = shot("phone-settings-manga", WindowLayout.COMPACT, TopLevel.SETTINGS, dark = false, manga = true) {
-        SettingsScreen(SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), "0.6.1", {}, {}, {},
-            dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}), updateLine = "Version 0.6.1 · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {})
+        SettingsScreen(settingsHost("0.10.0"))
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeSignedOutManga() = shot("phone-home-signed-out", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = true) {
+        val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
+        val popular = dev.yourstream.ui.screens.home.CatalogRow("cat:pop", "Popular", movies)
+        val series = dev.yourstream.ui.screens.home.CatalogRow("cat:series", "Popular series", this.series)
+        HomeScreen(
+            HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 0,
+                catalogs = listOf(popular, series)),
+            HomeRows(none, none), {}, {}, {}, {}, {},
+        )
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -214,7 +256,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w960dp-h540dp-xhdpi")
     fun tvSettings() = shot("tv-settings", WindowLayout.TV, TopLevel.SETTINGS) {
-        SettingsScreen(SettingsUiState("Asha", true, 3, "Tamil, English"), "0.1.0", {}, {}, {})
+        SettingsScreen(settingsHost("0.10.0"))
     }
 
     // ---- Player (full screen: no shell). A gradient stands in for the video frame.

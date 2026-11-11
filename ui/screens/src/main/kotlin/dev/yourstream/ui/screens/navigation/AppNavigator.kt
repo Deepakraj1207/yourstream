@@ -1,6 +1,7 @@
 package dev.yourstream.ui.screens.navigation
 
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 
 /**
@@ -8,8 +9,16 @@ import androidx.navigation.NavHostController
  * place and screens remain testable (they receive lambdas from their route composable).
  */
 class AppNavigator(private val nav: NavHostController) {
-    /** Switch top-level destination: one copy each, scroll/filters kept (save/restore state). */
+    /**
+     * Switch top-level destination: one copy each. A tab always opens at its main page (whose
+     * scroll and filters are kept): sub-pages of the tab being left (a settings section, a title's
+     * page) are closed first, and choosing the current tab again returns to its main page.
+     */
     fun top(destination: TopLevel) {
+        val stack = nav.currentBackStack.value
+        val currentTab = stack.lastOrNull { e -> TopLevel.entries.any { t -> e.destination.hasRoute(t.route::class) } }
+        if (currentTab != null && nav.currentBackStackEntry?.id != currentTab.id) nav.popBackStack(currentTab.destination.id, inclusive = false)
+        if (currentTab != null && currentTab.destination.hasRoute(destination.route::class)) return
         nav.navigate(destination.route) {
             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
@@ -43,6 +52,8 @@ class AppNavigator(private val nav: NavHostController) {
     fun review() = nav.navigate(MatchReviewRoute) { launchSingleTop = true }
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
+    fun settingsPage(page: dev.yourstream.ui.screens.settings.SettingsPage) = nav.navigate(SettingsPageRoute(page.name)) { launchSingleTop = true }
+    fun tmdb() = nav.navigate(TmdbRoute) { launchSingleTop = true }
     fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
     fun back(): Boolean = nav.popBackStack()

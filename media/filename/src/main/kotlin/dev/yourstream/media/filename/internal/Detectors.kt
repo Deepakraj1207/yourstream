@@ -334,6 +334,7 @@ internal object Detectors {
     private val NATIVE = Regex("$B(${Vocabulary.NATIVE_NAMES.joinToString("|")})$E")
     private val GROUPED = rx("$B([\\p{L}]{2,10})((?:\\s?[+&/,-]\\s?[\\p{L}]{2,10}){1,8})$E")
     /** "Tam.Tel.Hin" (dots become spaces): runs of ≥ 2 distinct abbreviations, never at the start (that is the title). */
+    private val TECH_TAIL = Regex("(?i)\\b\\d+(\\.\\d+)?\\s?(mb|gb|kb|p|k|fps|bit)\\b|\\b(hd|hq|esubs?|x26[45]|hevc|aac|mkv|mp4)\\b")
     private val SPACED_SHORT = rx("$B((?:${Vocabulary.SHORT_NAMES.joinToString("|")})(?:\\s(?:${Vocabulary.SHORT_NAMES.joinToString("|")})){1,7})$E")
     private val SHORT_WITH_CONTEXT = rx("$B(${Vocabulary.SHORT_NAMES.joinToString("|")})(?=\\s(?:dub|dubbed|audio|aud|version|ver)$E)")
 
@@ -354,7 +355,9 @@ internal object Detectors {
             }
         }
         scan.allFree(SPACED_SHORT).forEach { m ->
-            if (m.range.first == 0) return@forEach
+            // At the start such a run is usually the title, unless nothing title-like follows it
+            // ("Tel Hin 450MB", "Tam Tel Hin 720p").
+            if (m.range.first == 0 && scan.text.substring(m.range.last + 1).replace(TECH_TAIL, " ").count(Char::isLetter) > 3) return@forEach
             val words = m.value.split(' ').filter { it.isNotEmpty() }
             val entries = words.map { Vocabulary.languageOf(it) }
             if (entries.any { it == null } || entries.map { it!!.language }.distinct().size != entries.size) return@forEach

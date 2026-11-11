@@ -54,7 +54,7 @@ fun interface PlayerFactory {
 @OptIn(UnstableApi::class)
 object DefaultPlayerFactory : PlayerFactory {
     override fun create(context: Context, mediaSourceFactory: MediaSource.Factory, loadControl: LoadControl): ExoPlayer =
-        ExoPlayer.Builder(context)
+        ExoPlayer.Builder(context, playerRenderers(context))
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setSeekBackIncrementMs(10_000)

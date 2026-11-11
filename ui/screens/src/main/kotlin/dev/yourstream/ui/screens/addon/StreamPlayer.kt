@@ -1,6 +1,5 @@
 package dev.yourstream.ui.screens.addon
 
-import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
@@ -68,12 +67,19 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.yourstream.playback.media3.WebStreams
+import dev.yourstream.playback.torrent.TorrentDataSource
+import dev.yourstream.playback.torrent.TorrentEngine
+import dev.yourstream.playback.torrent.TorrentException
+import dev.yourstream.playback.torrent.TorrentPhase
+import dev.yourstream.playback.torrent.TorrentRequest
+import dev.yourstream.playback.torrent.TorrentStats
+import dev.yourstream.playback.torrent.TorrentStream
+import dev.yourstream.playback.torrent.TorrentUri
 import dev.yourstream.ui.core.AppIcons
 import dev.yourstream.ui.screens.R
 import dev.yourstream.ui.screens.navigation.StreamPlayerRoute
@@ -87,10 +93,12 @@ import dev.yourstream.ui.screens.player.VideoFit
 import dev.yourstream.ui.screens.player.label
 import dev.yourstream.ui.screens.player.playerGestures
 import dev.yourstream.ui.screens.timeLabel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -111,42 +119,74 @@ data class StreamPlayerState(
     val error: String? = null,
     val audio: List<StreamTrack> = emptyList(),
     val subtitles: List<StreamTrack> = emptyList(),
+    /** Torrent streams: peers, speed, what is ready (null for web streams). */
+    val torrent: TorrentStats? = null,
 )
 
-/** Plays one add-on stream (progressive HTTP, HLS or DASH) with the request headers it needs. */
+/**
+ * Plays one add-on stream: a web stream (progressive HTTP, HLS or DASH, with the request
+ * headers it needs, through [WebStreams]) or a torrent (through the [TorrentEngine], read while
+ * it downloads).
+ */
 @OptIn(UnstableApi::class)
 @HiltViewModel
-class StreamPlayerViewModel @Inject constructor(saved: SavedStateHandle, @ApplicationContext context: Context) : ViewModel() {
+class StreamPlayerViewModel @Inject constructor(
+    saved: SavedStateHandle, web: WebStreams, private val torrents: TorrentEngine, prefs: dev.yourstream.ui.screens.settings.AppPreferences,
+) : ViewModel() {
     val route = saved.toRoute<StreamPlayerRoute>()
     private val headers: Map<String, String> = runCatching {
         (Json.parseToJsonElement(route.headers) as JsonObject).mapNotNull { (k, v) -> (v as? JsonPrimitive)?.content?.let { k to it } }.toMap()
     }.getOrDefault(emptyMap())
+    val isTorrent: Boolean = route.infoHash != null
 
-    val player: ExoPlayer = ExoPlayer.Builder(context)
-        .setMediaSourceFactory(
-            DefaultMediaSourceFactory(
-                DefaultHttpDataSource.Factory()
-                    .setUserAgent(headers["User-Agent"] ?: "Mozilla/5.0 (Linux; Android) YourStream")
-                    .setDefaultRequestProperties(headers - "User-Agent")
-                    .setAllowCrossProtocolRedirects(true)
-                    .setConnectTimeoutMs(20_000).setReadTimeoutMs(20_000),
-            ),
-        )
-        .setSeekBackIncrementMs(10_000).setSeekForwardIncrementMs(10_000)
-        .build()
+    val player: ExoPlayer = web.player(
+        DefaultMediaSourceFactory(if (isTorrent) TorrentDataSource.Factory(torrents::source) else web.dataSourceFactory(headers)),
+        web.loadControl(prefs.settings.value.streamBufferSeconds * 1000),
+    )
 
-    private val _state = MutableStateFlow(StreamPlayerState())
+    private val _state = MutableStateFlow(StreamPlayerState(torrent = if (isTorrent) TorrentStats() else null))
     val state: StateFlow<StreamPlayerState> = _state.asStateFlow()
+    private var torrent: TorrentStream? = null
 
     init {
         player.addListener(object : Player.Listener {
             override fun onEvents(p: Player, events: Player.Events) = publish()
-            override fun onPlayerError(error: PlaybackException) { _state.value = _state.value.copy(error = error.errorCodeName.removePrefix("ERROR_CODE_").lowercase().replace('_', ' ')) }
+            override fun onPlayerError(error: PlaybackException) { _state.update { it.copy(error = describe(error)) } }
         })
-        player.setMediaItem(MediaItem.fromUri(route.url))
-        player.prepare()
-        player.playWhenReady = true
+        if (isTorrent) startTorrent() else {
+            player.setMediaItem(MediaItem.fromUri(route.url))
+            player.prepare()
+            player.playWhenReady = true
+        }
         viewModelScope.launch { while (isActive) { publish(); delay(500) } }
+    }
+
+    /** Peers send the file list, then the player starts reading the file while it downloads. */
+    private fun startTorrent() = viewModelScope.launch {
+        _state.update { it.copy(error = null, torrent = TorrentStats()) }
+        try {
+            val request = TorrentRequest(route.infoHash!!, route.fileIdx.takeIf { it >= 0 }, route.sources.lines().filter { it.isNotBlank() }, route.fileName)
+            val s = torrents.open(request) { st -> _state.update { it.copy(torrent = st) } }
+            torrent = s
+            launch { s.stats.collect { st -> _state.update { it.copy(torrent = st) } } }
+            player.setMediaItem(MediaItem.fromUri(TorrentUri.of(s.key, s.fileName)))
+            player.prepare()
+            player.playWhenReady = true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            _state.update { it.copy(error = e.message ?: "the torrent could not be started") }
+        }
+    }
+
+    /** A torrent problem in its own words; otherwise Media3's error code, readable. */
+    private fun describe(error: PlaybackException): String {
+        var c: Throwable? = error
+        while (c != null) {
+            if (c is TorrentException) return c.message ?: "torrent error"
+            c = c.cause
+        }
+        return error.errorCodeName.removePrefix("ERROR_CODE_").lowercase().replace('_', ' ')
     }
 
     private fun publish() {
@@ -182,7 +222,12 @@ class StreamPlayerViewModel @Inject constructor(saved: SavedStateHandle, @Applic
     fun seekBy(ms: Long) = player.seekTo((player.currentPosition + ms).coerceIn(0, player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE))
     fun seekTo(ms: Long) = player.seekTo(ms)
     fun setSpeed(speed: Float) = player.setPlaybackSpeed(speed)
-    fun retry() { _state.value = _state.value.copy(error = null); player.prepare(); player.play() }
+    fun retry() {
+        if (isTorrent && torrent == null) { startTorrent(); return }
+        _state.update { it.copy(error = null) }
+        player.prepare()
+        player.play()
+    }
 
     fun select(track: StreamTrack?, type: Int) {
         val params = player.trackSelectionParameters.buildUpon()
@@ -195,7 +240,10 @@ class StreamPlayerViewModel @Inject constructor(saved: SavedStateHandle, @Applic
         player.trackSelectionParameters = params.build()
     }
 
-    override fun onCleared() = player.release()
+    override fun onCleared() {
+        player.release()
+        torrent?.let(torrents::close)
+    }
 }
 
 private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
@@ -245,7 +293,13 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                 brightnessLabel = brightness, volumeLabel = volume,
             ),
         )
-        if (state.buffering && state.error == null) CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White)
+        val t = state.torrent
+        val preparing = t != null && (t.phase == TorrentPhase.STARTING || t.phase == TorrentPhase.METADATA)
+        if ((state.buffering || preparing) && state.error == null) {
+            CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White)
+            // Torrents: say what is happening while the first pieces arrive.
+            if (t != null) TorrentStatus(t, Modifier.align(Alignment.Center).padding(top = 140.dp))
+        }
 
         AnimatedVisibility(controls && state.error == null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150)), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
@@ -293,6 +347,10 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                         Text(timeLabel(scrub?.let { (it * duration).toLong() } ?: state.positionMs), color = Color.White, style = MaterialTheme.typography.labelLarge)
                         Text(" / " + timeLabel(state.durationMs), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.weight(1f))
+                        state.torrent?.let { st ->
+                            Text(torrentLine(st), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1, modifier = Modifier.padding(end = 12.dp).testTag("stream-torrent-line"))
+                        }
                         Surface(
                             shape = MaterialTheme.shapes.small, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
                             modifier = Modifier.clickable {
@@ -364,4 +422,37 @@ private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
         Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         if (selected) Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary)
     }
+}
+
+/** "Finding peers…", then "23 peers · 2.4 MB/s · 12% downloaded". */
+@Composable
+private fun TorrentStatus(t: TorrentStats, modifier: Modifier) {
+    val line = when (t.phase) {
+        TorrentPhase.STARTING -> stringResource(R.string.stream_torrent_starting)
+        TorrentPhase.METADATA -> listOf(stringResource(R.string.stream_torrent_metadata), peersLabel(t.peers)).joinToString(" · ")
+        else -> torrentLine(t)
+    }
+    Surface(shape = MaterialTheme.shapes.medium, color = Color.Black.copy(alpha = 0.6f), contentColor = Color.White, modifier = modifier.testTag("stream-torrent-status")) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            t.fileName?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 420.dp)) }
+            Text(line, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun torrentLine(t: TorrentStats): String = listOfNotNull(
+    peersLabel(t.peers),
+    rateLabel(t.downloadBps),
+    if (t.phase == TorrentPhase.COMPLETE) stringResource(R.string.stream_torrent_complete)
+    else (t.progress * 100).toInt().takeIf { it > 0 }?.let { stringResource(R.string.stream_torrent_done, it) },
+).joinToString(" · ")
+
+@Composable
+private fun peersLabel(n: Int) = androidx.compose.ui.res.pluralStringResource(R.plurals.stream_torrent_peers, n, n)
+
+/** 2_400_000 → "2.4 MB/s", 900_000 → "879 KB/s". */
+internal fun rateLabel(bytesPerSecond: Long): String = when {
+    bytesPerSecond >= 1_000_000 -> "%.1f MB/s".format(bytesPerSecond / 1_048_576.0)
+    else -> "${bytesPerSecond / 1024} KB/s"
 }

@@ -6,8 +6,9 @@ import kotlinx.serialization.Serializable
  * Catalog metadata ≠ media source ≠ playback.
  *
  * A catalog says "these titles exist / are trending in Tamil". Nothing here can be played:
- * there is deliberately no URL/stream/file field on any model. Whether the user can watch a
- * title is answered only by their own library (Telegram files), via LibraryAvailability.
+ * there is deliberately no URL/stream/file field on these models. Ways to watch come from the
+ * user's own library (Telegram files, via LibraryAvailability) or, when the user opens a title,
+ * from the stream add-ons they installed ([AddonStream]).
  */
 
 @Serializable
@@ -125,14 +126,19 @@ data class CatalogProviderInfo(
     val version: String?,
     val description: String?,
     val catalogs: List<CatalogDescriptor>,
-    /** "catalog", "meta" (never used: "stream", "subtitles"). */
+    /** "catalog", "meta", "stream" ("subtitles" is not used). */
     val resources: List<String>,
     /** Id prefixes the meta resource answers for ("tt", "tmdb:"). */
     val metaIdPrefixes: List<String>,
     /** Which mirror answered. */
     val baseUrl: String,
+    /** Types the stream resource answers for ("movie", "series"); empty = any. */
+    val streamTypes: List<String> = emptyList(),
+    /** Id prefixes the stream resource answers for ("tt", "kitsu"); empty = any. */
+    val streamIdPrefixes: List<String> = emptyList(),
 ) {
     val supportsMeta: Boolean get() = "meta" in resources
+    val supportsStreams: Boolean get() = "stream" in resources
     val languages: List<String> get() = catalogs.flatMap { it.languages }.distinct()
     val genres: List<String> get() = catalogs.flatMap { it.genres }.distinct()
 }

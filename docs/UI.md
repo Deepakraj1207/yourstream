@@ -105,6 +105,31 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Sources | `SourcesRoute` | Settings; Home "Choose chats" |
 | Audio & subtitles | `LanguagesRoute` | Settings |
 
+### Phone dock and indexing status
+
+Phones navigate with a floating dock like Nuvio's: a frosted-glass pill (Home, Search, Library,
+Settings) floating over the content on the four main tabs only, each tab an icon with its name
+underneath (Settings → Appearance can hide the names), the current one on a soft pill. Glass is a
+translucent tint, a sheen and a hairline edge, with no backdrop blur, so it costs nothing per
+frame. Lists keep `LocalBottomClearance` free under their last item. Manga style: paper and ink,
+names in comic lettering. A light haptic tick on change.
+
+### Settings
+
+Laid out like Nuvio's: a search field, the Telegram account as a profile card, then sections
+(You, Look, Watch, Services, System) of category pages (`SettingsPageRoute`): Appearance (style,
+theme, AMOLED black, dock names), Layout (Home rows, poster size), Content & discovery (add-ons,
+Telegram sources, library status), Playback (player, controls, up next, audio and subtitles,
+decoders, stream buffer, torrents), Integrations (TMDB, secure DNS), Advanced (image cache,
+reset) and About (version, updates, source, open-source licenses). Every row is declared once in
+`SettingsCatalog.kt`; the hub, the pages and the search results all render from that list, so a
+search result is the working row itself.
+
+While chats are indexed, `IndexingPill` floats at the bottom of every tab and layout: files
+found, a progress bar from Telegram's estimate of the chats' size (summed over the video,
+document and audio walks), the time left and messages per second (`IndexingMonitor.Speed`,
+smoothed), chats running and waiting. Tap: Library status.
+
 ## Screen contracts
 
 | Screen | UiState | Actions | Domain sources |

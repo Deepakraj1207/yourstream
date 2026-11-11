@@ -26,6 +26,12 @@ junit = "4.13.2"
 turbine = "1.2.1"
 # Media3 (Apache-2.0): ExoPlayer engine + test utilities (Robolectric playback with shadow codecs).
 media3 = "1.11.1"
+# FFmpeg audio decoders for Media3 (Jellyfin's build of the Media3 extension; Apache-2.0 + LGPL
+# FFmpeg): AC-3, E-AC-3, DTS, TrueHD… on devices without those decoders. Binary-compatible with
+# Media3 1.11 (every Media3 member it uses exists; it implements every abstract method).
+media3Ffmpeg = "1.9.0+1"
+# libtorrent 2.0 for Java/Android (MIT): torrent streams from stream add-ons.
+libtorrent4j = "2.1.0-39"
 # UI (Stage 2)
 navigation = "2.10.2"
 tvMaterial = "1.1.0"
@@ -91,6 +97,16 @@ androidx-media3-dash = { group = "androidx.media3", name = "media3-exoplayer-das
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 androidx-media3-test-utils = { group = "androidx.media3", name = "media3-test-utils", version.ref = "media3" }
 androidx-media3-test-utils-robolectric = { group = "androidx.media3", name = "media3-test-utils-robolectric", version.ref = "media3" }
+okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", version = "5.5.1" }
+okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverhttps", version = "5.5.1" }
+androidx-media3-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
+media3-ffmpeg = { group = "org.jellyfin.media3", name = "media3-ffmpeg-decoder", version.ref = "media3Ffmpeg" }
+libtorrent4j = { group = "org.libtorrent4j", name = "libtorrent4j", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm64", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm", version.ref = "libtorrent4j" }
+libtorrent4j-android-amd64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-x86_64", version.ref = "libtorrent4j" }
+libtorrent4j-android-x86 = { group = "org.libtorrent4j", name = "libtorrent4j-android-x86", version.ref = "libtorrent4j" }
+libtorrent4j-linux = { group = "org.libtorrent4j", name = "libtorrent4j-linux", version.ref = "libtorrent4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

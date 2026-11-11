@@ -255,7 +255,8 @@ fun <T> MediaGrid(
     val d = LocalDimens.current
     LazyVerticalGrid(
         columns = GridCells.Adaptive(cardWidth(style)), modifier = modifier.testTag("grid").focusRestorer(),
-        contentPadding = PaddingValues(d.gutter), horizontalArrangement = Arrangement.spacedBy(d.cardGap), verticalArrangement = Arrangement.spacedBy(d.rowGap),
+        contentPadding = PaddingValues(start = d.gutter, top = d.gutter, end = d.gutter, bottom = d.gutter + LocalBottomClearance.current),
+        horizontalArrangement = Arrangement.spacedBy(d.cardGap), verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         header?.let { h -> item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { h() } }
         items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, style = style, actions = actions(item)) }
@@ -277,7 +278,8 @@ fun <T : Any> PagedMediaGrid(
     val d = LocalDimens.current
     LazyVerticalGrid(
         columns = GridCells.Adaptive(cardWidth(style)), modifier = modifier.testTag("grid").focusRestorer(),
-        contentPadding = PaddingValues(d.gutter), horizontalArrangement = Arrangement.spacedBy(d.cardGap), verticalArrangement = Arrangement.spacedBy(d.rowGap),
+        contentPadding = PaddingValues(start = d.gutter, top = d.gutter, end = d.gutter, bottom = d.gutter + LocalBottomClearance.current),
+        horizontalArrangement = Arrangement.spacedBy(d.cardGap), verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         header?.let { h -> item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { h() } }
         items(items.itemCount, key = items.itemKey { card(it).key }) { i ->

@@ -45,6 +45,21 @@ public data class TelegramMediaMessage(
     val media: TelegramMediaFile,
 )
 
+/**
+ * One message of a chat's history, as context for the files around it: the text of a text post,
+ * or a photo's caption. Channels often post the title (with the poster) and then the files.
+ */
+public data class ChatPost(
+    val messageId: Long,
+    /** Epoch seconds. */
+    val date: Long,
+    val albumId: Long,
+    /** Text of a text post, or the caption of any other message ("" when there is none). */
+    val text: String,
+    /** A video, document or audio file (another file of the same post group). */
+    val hasFile: Boolean,
+)
+
 /** One page of a media search, newest first. */
 public data class MediaMessagePage(
     val messages: List<TelegramMediaMessage>,

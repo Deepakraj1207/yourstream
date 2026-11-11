@@ -42,6 +42,9 @@ object LibraryQueryBuilder {
             where += "library_item_fts MATCH ?"; args += match
         }
         if (!q.includeHidden) where += "i.hidden = 0"
+        if (!q.includeUntitled && q.text.isBlank() && dev.yourstream.library.api.LibraryKind.VIDEO !in q.kinds) {
+            where += "NOT (i.kind = 'VIDEO' AND im.poster_url IS NULL)"
+        }
         if (!q.includeUnavailable) where += "i.available_count > 0"
         if (q.kinds.isNotEmpty() && q.kinds.size < LibraryKind.entries.size) {
             where += "i.kind IN (${q.kinds.joinToString(",") { "?" }})"; args.addAll(q.kinds.map { it.name })

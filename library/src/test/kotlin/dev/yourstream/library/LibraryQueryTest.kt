@@ -107,7 +107,8 @@ class LibraryQueryTest {
             (1..260).forEach { file("Movie %03d.%d.720p.mkv".format(it, 1950 + it % 7)) }
             sync.sync()
             for (sort in LibrarySort.entries) {
-                val source = env.db.libraryDao().itemsPaged(LibraryQueryBuilder.list(LibraryQuery(sort = sort)).query())
+                // "Movie 001" is a generic name: untitled items, asked for explicitly here (paging is what is tested).
+                val source = env.db.libraryDao().itemsPaged(LibraryQueryBuilder.list(LibraryQuery(sort = sort, includeUntitled = true)).query())
                 val seen = mutableListOf<Long>()
                 var key: Int? = null
                 var pages = 0
@@ -122,7 +123,8 @@ class LibraryQueryTest {
                 assertEquals(260, seen.toSet().size, "$sort: no repeats across page boundaries")
                 assertTrue(pages >= 10, "$sort: really paged ($pages pages)")
             }
-            assertEquals(260, media.count(LibraryQuery()).first())
+            assertEquals(260, media.count(LibraryQuery(includeUntitled = true)).first())
+            assertEquals(0, media.count(LibraryQuery()).first(), "untitled and without posters: not browsed")
         }
     }
 

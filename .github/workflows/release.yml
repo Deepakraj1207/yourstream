@@ -84,10 +84,17 @@ jobs:
           export VERSION_NAME="${VERSION_NAME#v}"
           # A release is built from scratch: no outputs reused from the shared build cache.
           # Hilt/KSP occasionally misses a module on a cold build; one full retry fixes it.
+          export SPLIT_APKS=true
           ./gradlew --no-daemon --no-build-cache assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks assembleRelease
-          mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/YourStream-${TAG}.apk"
-          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          # The universal APK (any device; what earlier versions' updater downloads) and one per
+          # CPU type (what the in-app updater picks: a much smaller download).
+          mkdir -p dist dist-abi
+          cp app/build/outputs/apk/release/app-universal-release.apk "dist/YourStream-${TAG}.apk"
+          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+            cp "app/build/outputs/apk/release/app-${abi}-release.apk" "dist-abi/YourStream-${TAG}-${abi}.apk"
+          done
+          (cd dist && sha256sum *.apk; cd ../dist-abi && sha256sum *.apk) > dist/SHA256SUMS.txt
+          ls -la dist dist-abi
 
       - name: Check that the Telegram credentials are built in
         run: |
@@ -101,8 +108,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The universal APK goes up first: updaters before 0.8 take the first .apk they see.
           gh release create "$TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "YourStream $TAG" \
             --notes-file .github/release-notes.md \
             --generate-notes
+          gh release upload "$TAG" dist-abi/*

@@ -99,7 +99,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         WatchDismissalEntity::class,
         UserLibraryEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -123,6 +123,8 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 9, to = 10),
         // v11: index for album captions (media chat_id + album_id). Adds an index only.
         AutoMigration(from = 10, to = 11),
+        // v12: media.context_caption (title from the post above a file). Adds a nullable column only.
+        AutoMigration(from = 11, to = 12),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {

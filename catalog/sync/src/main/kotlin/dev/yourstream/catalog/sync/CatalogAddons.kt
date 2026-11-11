@@ -36,7 +36,10 @@ interface CatalogProviderFactory {
     fun custom(manifestUrl: String, name: String): CatalogProvider
 }
 
-/** One catalog add-on as the Add-ons screen shows it. */
+/** Where an add-on came from, for the Add-ons page's sections (all speak the Stremio protocol). */
+enum class AddonSource { BUILT_IN, STREMIO, NUVIO }
+
+/** One add-on as the Add-ons screen shows it. */
 data class CatalogAddon(
     val id: String,
     val name: String,
@@ -44,12 +47,13 @@ data class CatalogAddon(
     val manifestUrl: String?,
     val builtIn: Boolean,
     val enabled: Boolean,
+    val source: AddonSource = if (builtIn) AddonSource.BUILT_IN else AddonSource.STREMIO,
 )
 
 /**
- * The user's catalog add-ons: built-in ones (switchable) plus Stremio catalog add-ons added by
- * manifest URL. Stored on the device; the [CatalogManager] is rebuilt when the set changes.
- * Only catalog and meta resources are ever used, never streams.
+ * The user's add-ons: built-in ones (switchable) plus Stremio and Nuvio add-ons added by their
+ * link. Stored on the device; the [CatalogManager] is rebuilt when the set changes. Catalog and
+ * meta resources feed Home and Search; the stream resource is asked only when a title is opened.
  */
 @Singleton
 class CatalogAddons @Inject constructor(
@@ -84,8 +88,10 @@ class CatalogAddons @Inject constructor(
      * Adds a Stremio catalog add-on from what the user pasted (`https://…`, `stremio://…`, with or
      * without `/manifest.json`). The manifest is fetched first: it must answer and list catalogs.
      */
-    suspend fun add(input: String): AppResult<CatalogAddon> {
-        val url = normalize(input) ?: return AppResult.Err(AppError.InvalidInput("ADDON_URL", "Paste the add-on's https:// or stremio:// link."))
+    suspend fun add(input: String, source: AddonSource = AddonSource.STREMIO): AppResult<CatalogAddon> {
+        val url = normalize(input) ?: return AppResult.Err(AppError.InvalidInput("ADDON_URL",
+            if (input.trim().startsWith("http://", ignoreCase = true)) "Use the add-on's https:// link (plain http:// works only for add-ons on your own network)."
+            else "Paste the add-on's https:// or stremio:// link."))
         _addons.value.firstOrNull { it.manifestUrl == url }?.let { return AppResult.Err(AppError.InvalidInput("ADDON_DUPLICATE", "${it.name} is already added.")) }
         val probe = runCatching { factory.custom(url, "Add-on") }.getOrElse {
             return AppResult.Err(AppError.InvalidInput("ADDON_URL", "That is not an add-on link."))
@@ -97,7 +103,8 @@ class CatalogAddons @Inject constructor(
         if (info.catalogs.isEmpty() && "stream" !in info.resources && "meta" !in info.resources) {
             return AppResult.Err(AppError.InvalidInput("ADDON_UNSUPPORTED", "${info.name} offers no catalogs, details or streams."))
         }
-        val addon = CatalogAddon(probe.id.value, info.name.ifBlank { url }, url, builtIn = false, enabled = true)
+        val addon = CatalogAddon(probe.id.value, info.name.ifBlank { url }, url, builtIn = false, enabled = true,
+            source = if (source == AddonSource.BUILT_IN) AddonSource.STREMIO else source)
         synchronized(this) {
             customProviders.remove(url)
             update(_addons.value.filterNot { it.id == addon.id } + addon)
@@ -152,7 +159,9 @@ class CatalogAddons @Inject constructor(
 
     private fun update(list: List<CatalogAddon>) {
         val disabled = list.filter { it.builtIn && !it.enabled }.map { it.id }.toSet()
-        val custom = list.filter { !it.builtIn }.joinToString("\n") { listOf(it.manifestUrl, it.name, if (it.enabled) "1" else "0").joinToString(SEP) }
+        val custom = list.filter { !it.builtIn }.joinToString("\n") {
+            listOf(it.manifestUrl, it.name, if (it.enabled) "1" else "0", it.source.name.lowercase()).joinToString(SEP)
+        }
         prefs.edit().putStringSet(KEY_DISABLED, disabled).putString(KEY_CUSTOM, custom).apply()
         _addons.value = list
     }
@@ -165,7 +174,8 @@ class CatalogAddons @Inject constructor(
             val url = parts.getOrNull(0)?.let(::normalize) ?: return@mapNotNull null
             val p = runCatching { factory.custom(url, parts.getOrNull(1) ?: url) }.getOrNull() ?: return@mapNotNull null
             customProviders[url] = p
-            CatalogAddon(p.id.value, parts.getOrNull(1) ?: url, url, builtIn = false, enabled = parts.getOrNull(2) != "0")
+            val source = if (parts.getOrNull(3) == "nuvio") AddonSource.NUVIO else AddonSource.STREMIO
+            CatalogAddon(p.id.value, parts.getOrNull(1) ?: url, url, builtIn = false, enabled = parts.getOrNull(2) != "0", source = source)
         }
         return builtIn + custom
     }
@@ -176,21 +186,25 @@ class CatalogAddons @Inject constructor(
         private const val SEP = "\t"
         const val CINEMETA = "https://v3-cinemeta.strem.io/manifest.json"
 
-        /** "stremio://host/x" or "https://host/x/" → "https://host/x/manifest.json"; null if not a web link (pure; tested). */
+        /**
+         * "stremio://host/x" or "https://host/x/" → "https://host/x/manifest.json"; null if not a
+         * web link. Plain http:// only for add-ons on the user's own network (pure; tested).
+         */
         fun normalize(input: String): String? {
             var s = input.trim().replace(Regex("\\s+"), "")
             if (s.isEmpty()) return null
             s = when {
                 s.startsWith("stremio://", ignoreCase = true) -> "https://" + s.substring("stremio://".length)
-                s.startsWith("https://", ignoreCase = true) -> s
-                s.startsWith("http://", ignoreCase = true) -> return null
+                s.startsWith("https://", ignoreCase = true) -> "https://" + s.substring("https://".length)
+                s.startsWith("http://", ignoreCase = true) -> "http://" + s.substring("http://".length)
                 s.contains("://") -> return null
                 else -> "https://$s"
             }
             s = s.substringBefore('#').trimEnd('/')
             if (!s.endsWith("/manifest.json")) s += "/manifest.json"
-            val host = s.removePrefix("https://").substringBefore('/')
-            if (host.isEmpty() || !host.contains('.')) return null
+            if (s.startsWith("http://") && !dev.yourstream.catalog.api.AddonLinks.isLocalHttp(s)) return null
+            val host = s.substringAfter("://").substringBefore('/').substringAfterLast('@')
+            if (host.isEmpty() || !(host.contains('.') || host.startsWith("localhost") || host.startsWith("["))) return null
             return s
         }
     }

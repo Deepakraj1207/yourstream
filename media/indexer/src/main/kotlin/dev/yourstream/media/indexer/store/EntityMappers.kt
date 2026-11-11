@@ -66,6 +66,7 @@ internal fun NormalizedMedia.toEntity(
     indexedAt = indexedAt,
     updatedAt = now,
     lastSeenAt = now,
+    contextCaption = contextCaption,
 )
 
 internal fun ParsedMedia.toEntity(mediaId: Long) = ParsedMediaEntity(

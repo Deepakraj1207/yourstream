@@ -120,23 +120,30 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
     private val _state = MutableStateFlow(CatalogTitleUiState(route.title, route.year, route.poster, series = type == CatalogType.SERIES))
     val state: StateFlow<CatalogTitleUiState> = _state.asStateFlow()
 
-    /** What stream add-ons are asked for: the IMDb id (what they key on), else the add-on's own id. */
-    private val streamId = item.ref.imdbId ?: item.ref.id
+    /** The IMDb id once known (from the route, or from the details): what most stream add-ons key on. */
+    private var imdb: String? = item.ref.imdbId
 
     init { load() }
 
     fun onAction(a: CatalogTitleAction) {
         when (a) {
             is CatalogTitleAction.SelectSeason -> _state.update { it.copy(season = a.season) }
-            is CatalogTitleAction.SelectEpisode -> { _state.update { it.copy(episode = a.video) }; loadStreams(CatalogType.SERIES, a.video.id) }
+            is CatalogTitleAction.SelectEpisode -> { _state.update { it.copy(episode = a.video) }; loadStreams(CatalogType.SERIES, episodeIds(a.video)) }
             CatalogTitleAction.Retry -> load()
         }
     }
+
+    /** An episode as add-ons know it: its own id ("kitsu:1:5", "tt…:1:2"), and the IMDb form when that differs. */
+    private fun episodeIds(v: CatalogVideo): List<String> = listOfNotNull(
+        v.id,
+        imdb?.let { i -> if (v.season != null && v.episode != null) "$i:${v.season}:${v.episode}" else null },
+    ).distinct()
 
     private fun load() = viewModelScope.launch {
         _state.update { it.copy(loadingMeta = true) }
         val presence = runCatching { addons.manager().withLibraryPresence(listOf(item)).firstOrNull()?.second }.getOrNull()
         val meta = runCatching { addons.metadata(item) }.getOrNull()
+        imdb = imdb ?: meta?.ref?.imdbId
         val seasons = meta?.videos.orEmpty().mapNotNull { it.season }.distinct().sortedWith(compareBy { if (it == 0) Int.MAX_VALUE else it })
         _state.update {
             it.copy(
@@ -145,31 +152,49 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
                 seasons = seasons, season = it.season ?: seasons.firstOrNull(),
             )
         }
-        if (type == CatalogType.MOVIE) loadStreams(CatalogType.MOVIE, streamId)
+        if (type == CatalogType.MOVIE) loadStreams(CatalogType.MOVIE, listOfNotNull(imdb, item.ref.id).distinct())
     }
 
-    private fun loadStreams(t: CatalogType, id: String) = viewModelScope.launch {
+    /**
+     * Asks every enabled stream add-on at once, each with the first id form it declares it
+     * handles (an anime add-on gets "kitsu:…", most others the IMDb id); add-ons that handle
+     * none of them are not asked at all.
+     */
+    private fun loadStreams(t: CatalogType, ids: List<String>) = viewModelScope.launch {
         _state.update { it.copy(loadingStreams = true, streams = emptyList(), noStreamAddons = false) }
         val providers = addons.streamProviders()
         if (providers.isEmpty()) { _state.update { it.copy(loadingStreams = false, noStreamAddons = true) }; return@launch }
         val groups = coroutineScope {
             providers.map { p ->
                 async {
+                    val id = ids.firstOrNull { runCatching { p.handles(t, it) }.getOrDefault(false) } ?: return@async null
                     when (val r = runCatching { p.streams(t, id) }.getOrElse { AppResult.Err(dev.yourstream.core.common.AppError.Network()) }) {
                         is AppResult.Ok -> StreamGroup(p.displayName, r.value)
                         is AppResult.Err -> StreamGroup(p.displayName, emptyList(), r.error.message)
                     }
                 }
-            }.awaitAll()
+            }.awaitAll().filterNotNull()
         }
-        // Playable streams first; add-ons with nothing at the end.
-        _state.update { it.copy(loadingStreams = false, streams = groups.sortedBy { g -> if (g.streams.any { s -> s.playable }) 0 else 1 }) }
+        // Add-ons with direct (HTTP) streams first, then torrents; add-ons with nothing at the end.
+        _state.update {
+            it.copy(loadingStreams = false, streams = groups.sortedBy { g ->
+                when {
+                    g.streams.any { s -> s.playable } -> 0
+                    g.streams.any { s -> s.isTorrent } -> 1
+                    else -> 2
+                }
+            })
+        }
     }
 
     fun playTarget(s: AddonStream): OpenTarget.Stream? {
-        val url = s.url?.takeIf { s.playable } ?: return null
         val st = _state.value
         val subtitle = st.episode?.let { e -> listOfNotNull(e.season?.let { "S%02dE%02d".format(it, e.episode ?: 0) }, e.title).joinToString(" · ") }
+        if (s.isTorrent) {
+            return OpenTarget.Stream(StreamPlayerRoute("", st.title, subtitle, infoHash = s.infoHash, fileIdx = s.fileIdx ?: -1,
+                sources = s.sources.joinToString("\n"), fileName = s.fileName))
+        }
+        val url = s.url?.takeIf { s.playable } ?: return null
         val headers = JsonObject(s.headers.mapValues { JsonPrimitive(it.value) }).toString()
         return OpenTarget.Stream(StreamPlayerRoute(url, st.title, subtitle, headers))
     }
@@ -179,8 +204,10 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
 fun CatalogTitleDestination(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm: CatalogTitleViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    CatalogTitleScreen(state, vm::onAction, onBack, onOpenLibrary = { onOpen(OpenTarget.Details(it)) }) { s ->
-        vm.playTarget(s)?.let(onOpen) ?: s.externalUrl?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+    val torrents = dev.yourstream.ui.screens.settings.LocalAppSettings.current.torrentStreaming
+    CatalogTitleScreen(state, vm::onAction, onBack, onOpenLibrary = { onOpen(OpenTarget.Details(it)) }, torrents = torrents) { s ->
+        vm.playTarget(s)?.takeIf { torrents || !s.isTorrent }?.let(onOpen)
+            ?: s.externalUrl?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
     }
 }
 
@@ -190,6 +217,7 @@ fun CatalogTitleScreen(
     onAction: (CatalogTitleAction) -> Unit,
     onBack: () -> Unit,
     onOpenLibrary: (Long) -> Unit,
+    torrents: Boolean = true,
     onStream: (AddonStream) -> Unit,
 ) {
     val d = LocalDimens.current
@@ -206,12 +234,12 @@ fun CatalogTitleScreen(
                     }
                     items(state.episodes, key = { "ep:" + it.id }) { e ->
                         EpisodeRow(e, selected = e.id == state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(e)) }
-                        if (e.id == state.episode?.id) Streams(state, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
+                        if (e.id == state.episode?.id) Streams(state, torrents, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
                     }
                 }
             } else {
                 item { SectionTitle(stringResource(R.string.addon_streams)) }
-                item { Streams(state, onStream, Modifier.padding(horizontal = d.gutter)) }
+                item { Streams(state, torrents, onStream, Modifier.padding(horizontal = d.gutter)) }
             }
         }
     }
@@ -261,7 +289,7 @@ private fun EpisodeRow(e: CatalogVideo, selected: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun Streams(state: CatalogTitleUiState, onStream: (AddonStream) -> Unit, modifier: Modifier) {
+private fun Streams(state: CatalogTitleUiState, torrents: Boolean, onStream: (AddonStream) -> Unit, modifier: Modifier) {
     Column(modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
             state.loadingStreams -> Loading()
@@ -269,15 +297,15 @@ private fun Streams(state: CatalogTitleUiState, onStream: (AddonStream) -> Unit,
             state.streams.all { it.streams.isEmpty() } -> Note(stringResource(R.string.addon_no_streams))
             else -> state.streams.filter { it.streams.isNotEmpty() }.forEach { g ->
                 Text(g.addon, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
-                g.streams.forEach { s -> StreamRow(s, onStream) }
+                g.streams.forEach { s -> StreamRow(s, torrents, onStream) }
             }
         }
     }
 }
 
 @Composable
-private fun StreamRow(s: AddonStream, onStream: (AddonStream) -> Unit) {
-    val usable = s.playable || s.externalUrl != null
+private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream) -> Unit) {
+    val usable = s.playable || s.externalUrl != null || (s.isTorrent && torrents)
     Surface(
         shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth().focusHighlight().clickable(enabled = usable) { onStream(s) }.testTag("stream"),
@@ -288,11 +316,13 @@ private fun StreamRow(s: AddonStream, onStream: (AddonStream) -> Unit) {
                 s.description?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis) }
                 when {
                     s.playable -> Unit
+                    s.isTorrent && torrents -> Text(stringResource(R.string.addon_stream_torrent), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+                    s.isTorrent -> Text(stringResource(R.string.addon_stream_torrent_off), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                     s.externalUrl != null -> Text(stringResource(R.string.addon_stream_external), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else -> Text(stringResource(R.string.addon_stream_torrent), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    else -> Text(stringResource(R.string.addon_stream_unsupported), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-            if (s.playable) Icon(Icons.Filled.PlayArrow, stringResource(R.string.action_play))
+            if (s.playable || (s.isTorrent && torrents)) Icon(Icons.Filled.PlayArrow, stringResource(R.string.action_play))
         }
     }
 }

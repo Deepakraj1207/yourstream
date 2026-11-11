@@ -30,6 +30,8 @@ enum class IndexPhase {
     BACKFILL,
     /** Re-checking known messages. */
     VERIFY,
+    /** Reading the posts above files that have no title of their own. */
+    TITLES,
 }
 
 data class IndexProgress(

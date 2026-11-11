@@ -111,8 +111,6 @@ class HomeViewModel @Inject constructor(
 
     private val count: Flow<Int?> = media.count(LibraryQuery()).map<Int, Int?> { it }.catch { emit(null) }
 
-    /** Indexing progress for the status bar. */
-    private val indexing: Flow<IndexingStatus> = indexingMonitor.status
 
     /** Rows from the user's catalog add-ons (Settings → Add-ons); reloaded when they change. */
     private val catalogs: Flow<List<CatalogRow>> = homeCatalogs.rows().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
@@ -133,13 +131,14 @@ class HomeViewModel @Inject constructor(
 
     private val review: Flow<Int> = reviewQueue.count()
 
-    private val extras = combine(forYou, review, indexing, catalogs) { f, r, i, c -> Extras(f, r, i, c) }
+    // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
+    private val extras = combine(forYou, review, catalogs) { f, r, c -> Extras(f, r, c) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val indexing: IndexingStatus, val catalogs: List<CatalogRow>)
+    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val catalogs: List<CatalogRow>)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
         // Lowest-priority banner: only when nothing more urgent is shown.
-        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, e.indexing, e.catalogs)
+        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, IndexingStatus(), e.catalogs)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -153,7 +152,8 @@ class HomeViewModel @Inject constructor(
     companion object {
         const val FOR_YOU = 20
         /** While indexing adds titles every moment, recommendations are recomputed at most this often. */
-        const val RECOMMEND_DEBOUNCE_MS = 5_000L
+        /** Recommendations wait for the library to be quiet (not recomputed every sync while indexing). */
+        const val RECOMMEND_DEBOUNCE_MS = 30_000L
 
         fun heroOf(e: ContinueEntry, poster: String?) = HeroItem(
             HeroItem.Kind.CONTINUE, "hero:${e.target.itemId}:${e.target.episodeKey}", e.title,

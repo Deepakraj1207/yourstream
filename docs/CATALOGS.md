@@ -2,7 +2,8 @@
 
 Catalogs answer one question: **"which titles exist / are interesting?"** (trending, new OTT
 releases, Tamil movies, Hindi-dubbed…). They are optional and replaceable. They never answer
-"where can I watch it?": that is only ever the user's own Telegram library.
+"where can I watch it?" themselves: that is the user's own Telegram library, or the stream
+add-ons the user installed, asked only when a title is opened (see [STREAMS.md](STREAMS.md)).
 
 ```
 Catalog metadata  ≠  Media source  ≠  Playback
@@ -11,8 +12,9 @@ Catalog metadata  ≠  Media source  ≠  Playback
 ```
 
 - No catalog model has a URL, stream or file field (`CatalogItem`, `CatalogMetadata`,
-  `CatalogPage`). The generic Stremio client has no `stream` method and never requests the
-  `stream`/`subtitles` resources, even when an add-on declares them.
+  `CatalogPage`). Streams are a separate interface (`StreamProvider`, `AddonStream`), asked
+  only for the opened title and only from add-ons that declare the `stream` resource for that
+  type and id prefix. The `subtitles` resource is not used.
 - A catalog title becomes watchable only when `LibraryAvailability` finds the same title in the
   library (IMDb id → TMDB id → normalized title + kind + year). That links to library items,
   which link to Telegram files. The library never depends on catalogs; with zero providers
@@ -214,9 +216,9 @@ returns `NotFound` and the partial listing is shown.
 
 ## 6. Limitations
 
-- **Catalogs are information only.** Nothing from a catalog can be played, downloaded or
-  redistributed by this app. The `stream` resource the Indian Regional Catalog declares is
-  ignored by design; YourStream requests only its catalog and meta resources.
+- **Catalogs are information only.** Nothing from a catalog listing is played, downloaded or
+  redistributed by this app. Built-in add-ons are used for catalogs and details only; streams
+  come only from add-ons the user adds themselves (see [STREAMS.md](STREAMS.md)).
 - **Terms.** Neither add-on publishes formal terms of use or a licence for its data. We use only
   their public, documented add-on endpoints, at a low request rate, with heavy caching and
   attribution shown next to their results. Posters and descriptions belong to their owners

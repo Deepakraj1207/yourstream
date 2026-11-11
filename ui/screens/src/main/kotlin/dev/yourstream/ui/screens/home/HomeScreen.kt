@@ -75,7 +75,7 @@ fun HomeScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         // Pinned above the rows: what indexing is doing (the rows below update live).
-        if (state.indexing.active) IndexingBar(state.indexing)
+        // Indexing progress floats above the navigation on every tab (IndexingPill).
         HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
     }
 }
@@ -92,12 +92,33 @@ private fun HomeContent(
     onReview: () -> Unit,
 ) {
     val blocking = state.blocking
+    // Settings → Layout → Home rows.
+    val shown = dev.yourstream.ui.screens.settings.LocalAppSettings.current.homeRows
+    val catalogs = if (shown.catalogs) state.catalogs else emptyList()
     if (blocking != null) {
-        EmptyState(blocking, Modifier.testTag("home"), onAction = when (blocking) {
+        val setupAction = when (blocking) {
             EmptyKind.NOT_SIGNED_IN -> onSignIn
             EmptyKind.NO_SOURCES -> onChooseSources
             else -> null
-        })
+        }
+        if (catalogs.isEmpty()) {
+            EmptyState(blocking, Modifier.testTag("home"), onAction = setupAction)
+            return
+        }
+        // Nothing of your own yet: the add-on catalogs are still there to browse, under a short
+        // panel that says what to do next (sign in, choose chats).
+        val card = tileCard()
+        val actions = tileActions({ onAction(HomeAction.Tile(it)) }, onOpen)
+        LazyColumn(
+            Modifier.fillMaxSize().testTag("home"),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
+            verticalArrangement = Arrangement.spacedBy(LocalDimens.current.rowGap),
+        ) {
+            item(key = "setup") { SetupPanel(blocking, setupAction) }
+            catalogs.forEach { c ->
+                item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
+            }
+        }
         return
     }
     val actions = tileActions({ onAction(HomeAction.Tile(it)) }, onOpen)
@@ -106,33 +127,29 @@ private fun HomeContent(
     val d = LocalDimens.current
     LazyColumn(
         Modifier.fillMaxSize().testTag("home"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
-        item(key = "hero") {
+        if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
                 is UiState.Content -> HeroBanner(heroModel(h.value), { onOpen(h.value.primary) }, { onOpen(h.value.secondary) }, primaryFocus = heroFocus)
                 else -> Unit
             }
         }
-        continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
-        (state.forYou as? UiState.Content)?.value?.let { f ->
+        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
+        (state.forYou as? UiState.Content)?.value?.takeIf { shown.forYou }?.let { f ->
             item(key = "for-you") {
                 Column(Modifier.testTag("for-you")) {
                     MediaRow(stringResource(R.string.home_for_you), f.tiles, card, { onOpen(it.open) }, actions = actions)
-                    f.basis?.let { b ->
-                        Text(stringResource(R.string.home_for_you_basis, b), style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter, vertical = 4.dp))
-                    }
                 }
             }
         }
-        paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
-        paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
+        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
+        if (shown.series) paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
         // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
-        state.catalogs.forEach { c ->
+        catalogs.forEach { c ->
             item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
         }
     }
@@ -199,39 +216,29 @@ private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, o
 }
 
 /** "Indexing 2 chats · 134 files found" with progress. Status only. */
+/** "Sign in to watch your own videos" above the catalogs, while the library is still empty. */
 @Composable
-private fun IndexingBar(status: dev.yourstream.ui.screens.IndexingStatus) {
+private fun SetupPanel(kind: EmptyKind, action: (() -> Unit)?) {
     val d = LocalDimens.current
+    val (title, message, button) = when (kind) {
+        EmptyKind.NOT_SIGNED_IN -> Triple(R.string.home_setup_sign_in_title, R.string.home_setup_sign_in_message, R.string.home_setup_sign_in)
+        EmptyKind.NO_SOURCES -> Triple(R.string.home_setup_sources_title, R.string.home_setup_sources_message, R.string.home_setup_sources)
+        else -> Triple(R.string.home_setup_indexing_title, R.string.home_setup_indexing_message, null)
+    }
     androidx.compose.material3.Surface(
-        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
         shape = androidx.compose.material3.MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter, vertical = 8.dp).inkPanel(androidx.compose.material3.MaterialTheme.shapes.large).testTag("indexing-bar"),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = d.gutter).padding(end = 4.dp, bottom = 4.dp)
+            .inkPanel(androidx.compose.material3.MaterialTheme.shapes.large).testTag("home-setup"),
     ) {
-        Column {
-            androidx.compose.foundation.layout.Row(
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    val chats = status.chats + status.queued
-                    Text(
-                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_chats, chats, chats),
-                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1,
-                    )
-                    Text(
-                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_indexing_found, status.found, status.found),
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-                        modifier = Modifier.testTag("indexing-detail"),
-                    )
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(title), style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+            Text(stringResource(message), style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            if (button != null && action != null) {
+                androidx.compose.material3.Button(onClick = action, modifier = Modifier.padding(top = 4.dp).focusHighlight().testTag("home-setup-action")) {
+                    Text(stringResource(button))
                 }
-            }
-            val fraction = status.fraction
-            if (fraction != null) {
-                androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(3.dp), drawStopIndicator = {}, gapSize = 0.dp)
-            } else {
-                androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp))
             }
         }
     }

@@ -238,6 +238,10 @@ class TdlibTelegramClient @Inject constructor(
             )
         }
 
+    override suspend fun getChatHistory(chatId: Long, fromMessageId: Long, limit: Int): AppResult<List<dev.yourstream.telegram.api.model.ChatPost>> =
+        request("getChatHistory", LOAD_TIMEOUT) { getChatHistory(chatId, fromMessageId, 0, limit, false) }
+            .mapValue { found -> found.messages.filterNotNull().map(TdMappers::chatPost).sortedByDescending { it.messageId } }
+
     override suspend fun getMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>> =
         request("getMessages", LOAD_TIMEOUT) { getMessages(chatId, messageIds.toLongArray()) }.mapValue { result ->
             messageIds.mapIndexed { index, id ->

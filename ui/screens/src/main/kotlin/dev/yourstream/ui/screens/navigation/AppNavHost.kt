@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import dev.yourstream.ui.screens.browse.LibraryRoute as LibraryScreenRoute
 import dev.yourstream.ui.screens.browse.MoviesRoute as MoviesScreenRoute
 import dev.yourstream.ui.screens.browse.SeriesRoute as SeriesScreenRoute
@@ -129,11 +130,14 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
+        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb)
         page<SettingsRoute> {
-            SettingsScreenRoute(
-                appVersion, navigator::account, navigator::sources, navigator::languages,
-                SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons),
-            )
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, onPage = navigator::settingsPage)
+        }
+        page<SettingsPageRoute> { entry ->
+            val name = entry.toRoute<SettingsPageRoute>().page
+            val settingsPage = dev.yourstream.ui.screens.settings.SettingsPage.entries.firstOrNull { it.name == name } ?: dev.yourstream.ui.screens.settings.SettingsPage.APPEARANCE
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage, onBack = back)
         }
         page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         page<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
@@ -147,6 +151,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<StatsRoute> { StatsDestination(back) }
         page<CatalogTitleRoute> { dev.yourstream.ui.screens.addon.CatalogTitleDestination(navigator::open, back) }
         page<StreamPlayerRoute> { dev.yourstream.ui.screens.addon.StreamPlayerDestination(back) }
+        page<TmdbRoute> { dev.yourstream.ui.screens.settings.TmdbDestination(back) }
         page<AddonsRoute> { dev.yourstream.ui.screens.settings.AddonsDestination(back) }
         page<ProgressSyncRoute> { ProgressSyncDestination(back) }
     }

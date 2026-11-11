@@ -25,7 +25,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import kotlinx.serialization.KSerializer
 
-/** TMDB credentials. Supplied at build time (see docs/METADATA.md); never committed. */
+/** TMDB credentials: built in (CI secret) or entered by the user in Settings → TMDB. */
 data class TmdbConfig(
     /** v3 API key (sent as ?api_key=). */
     val apiKey: String = "",
@@ -35,6 +35,17 @@ data class TmdbConfig(
     val imageBaseUrl: String = "https://image.tmdb.org/t/p",
 ) {
     val isConfigured: Boolean get() = apiKey.isNotBlank() || readToken.isNotBlank()
+
+    /** The same settings with [key] as the credential: a v4 read token ("eyJ…") or a v3 API key. */
+    fun withKey(key: String): TmdbConfig = key.trim().let { k -> if (isReadToken(k)) copy(apiKey = "", readToken = k) else copy(apiKey = k, readToken = "") }
+
+    companion object {
+        /** v4 read access tokens are JWTs; v3 API keys are 32 hex characters. */
+        fun isReadToken(key: String) = key.startsWith("eyJ") && key.count { it == '.' } == 2
+
+        /** Plausible key format (pure; the TMDB check decides). */
+        fun looksValid(key: String): Boolean = key.trim().let { k -> isReadToken(k) || Regex("[0-9a-fA-F]{32}").matches(k) }
+    }
     override fun toString() = "TmdbConfig(apiKey=${if (apiKey.isBlank()) "missing" else "set"}, readToken=${if (readToken.isBlank()) "missing" else "set"})"
 }
 
@@ -44,9 +55,44 @@ data class TmdbConfig(
  */
 class TmdbProvider(
     private val client: HttpClient,
-    private val config: TmdbConfig,
+    /** Read on every request, so a key entered in Settings applies at once. */
+    private val configSource: () -> TmdbConfig,
     clock: Clock = Clock.System,
 ) : MetadataProvider {
+    constructor(client: HttpClient, config: TmdbConfig, clock: Clock = Clock.System) : this(client, { config }, clock)
+
+    private val config: TmdbConfig get() = configSource()
+
+    /** Asks TMDB whether [candidate]'s key is accepted (GET /authentication). */
+    suspend fun check(candidate: TmdbConfig): AppResult<Unit> =
+        when (val r = withHosts(candidate) { base -> client.getJson(base + "/authentication", kotlinx.serialization.json.JsonElement.serializer()) { auth(candidate) } }) {
+            is AppResult.Ok -> AppResult.Ok(Unit)
+            is AppResult.Err -> r
+        }
+
+    /** The base that answered last: requests go there first. */
+    @Volatile private var activeBase: String? = null
+
+    /**
+     * TMDB answers on two domains. Some networks block api.themoviedb.org by name; on network
+     * trouble the request is repeated on api.tmdb.org (and the one that worked is used first).
+     */
+    private suspend fun <T> withHosts(c: TmdbConfig, call: suspend (String) -> AppResult<T>): AppResult<T> {
+        val bases = listOfNotNull(activeBase, c.baseUrl, ALT_BASE_URL).distinct()
+        var last: AppResult<T>? = null
+        for (base in bases) {
+            val r = call(base)
+            if (r is AppResult.Ok) { activeBase = base; return r }
+            last = r
+            val e = (r as AppResult.Err).error
+            if (!(e is AppError.Network || e is AppError.Timeout || e is AppError.Unknown || (e is AppError.Remote && e.isServerError))) return r
+        }
+        return last!!
+    }
+
+    private fun HttpRequestBuilder.auth(c: TmdbConfig) {
+        if (c.readToken.isNotBlank()) header("Authorization", "Bearer ${c.readToken}") else parameter("api_key", c.apiKey)
+    }
 
     override val id = ID
     override val displayName = "TMDB"
@@ -58,10 +104,12 @@ class TmdbProvider(
     private suspend fun <T> get(path: String, serializer: KSerializer<T>, block: HttpRequestBuilder.() -> Unit = {}): AppResult<T> {
         if (!isConfigured) return AppResult.Err(AppError.NotConfigured("TMDB API key missing"))
         limiter.acquire()
-        return client.getJson(config.baseUrl + path, serializer) {
-            if (config.readToken.isNotBlank()) header("Authorization", "Bearer ${config.readToken}")
-            else parameter("api_key", config.apiKey)
-            block()
+        val c = config
+        return withHosts(c) { base ->
+            client.getJson(base + path, serializer) {
+                auth(c)
+                block()
+            }
         }
     }
 
@@ -175,6 +223,8 @@ class TmdbProvider(
     private fun year(date: String?) = date?.take(4)?.toIntOrNull()
 
     companion object {
+        /** TMDB's second API domain (same API), for networks that block the first by name. */
+        const val ALT_BASE_URL = "https://api.tmdb.org/3"
         val ID = ProviderId("tmdb")
         private const val MAX_RESULTS = 10
         private const val MAX_CAST = 15

@@ -1,10 +1,13 @@
 package dev.yourstream.ui.screens.navigation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
@@ -62,7 +65,10 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
         dev.yourstream.ui.screens.settings.ThemeMode.LIGHT -> false
     }
     androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
-    YourStreamTheme(layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA) {
+    YourStreamTheme(
+        layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA,
+        amoled = settings.amoledBlack, posterScale = settings.posterSize.scale,
+    ) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
             val navigator = remember(nav) { AppNavigator(nav) }
@@ -71,8 +77,10 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
             val current = TopLevel.entries.firstOrNull { t -> destination?.hierarchy?.any { it.hasRoute(t.route::class) } == true }
             val fullScreen = destination?.hasRoute(PlayerRoute::class) == true || destination?.hasRoute(StreamPlayerRoute::class) == true
             val graph = remember(nav) { movableContentOf { m: Modifier -> AppNavHost(nav, navigator, appVersion, m) } }
+            val shell: ShellViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
+            val indexing by shell.indexing.collectAsStateWithLifecycle()
             if (fullScreen) graph(Modifier.fillMaxSize())
-            else AdaptiveShell(layout, current, navigator::top) { graph(it) }
+            else AdaptiveShell(layout, current, navigator::top, indexing, navigator::libraryStatus) { graph(it) }
             // A newer version on the Releases page: offered once per session (not over the player).
             if (!fullScreen && !androidx.compose.ui.platform.LocalInspectionMode.current) dev.yourstream.ui.screens.update.UpdatePrompt()
         }
@@ -80,25 +88,51 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
     }
 }
 
-/** Navigation chrome per layout: bottom bar (phone), rail (tablet), drawer (large), TV drawer. */
+/**
+ * Navigation chrome per layout: floating dock (phone), rail (tablet), drawer (large), TV drawer.
+ * While indexing runs, its status floats at the bottom of every tab ([IndexingPill]).
+ */
 @Composable
-fun AdaptiveShell(layout: WindowLayout, current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @Composable (Modifier) -> Unit) {
+fun AdaptiveShell(
+    layout: WindowLayout,
+    current: TopLevel?,
+    onSelect: (TopLevel) -> Unit,
+    indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
+    onIndexing: () -> Unit = {},
+    content: @Composable (Modifier) -> Unit,
+) {
+    val withStatus: @Composable (Modifier) -> Unit = { m ->
+        androidx.compose.foundation.layout.Box(m) {
+            content(Modifier.fillMaxSize())
+            IndexingPill(indexing, onIndexing, Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 8.dp))
+        }
+    }
     when (layout) {
-        WindowLayout.COMPACT -> Scaffold(
-            bottomBar = {
-                if (dev.yourstream.ui.core.LocalMangaStyle.current) MangaNavBar(current, onSelect)
-                else NavigationBar(Modifier.testTag("nav:bar")) {
-                    TopLevel.entries.filter { it.compact }.forEach { t ->
-                        NavigationBarItem(
-                            selected = t == current, onClick = { onSelect(t) },
-                            icon = { Icon(t.icon, contentDescription = null) }, label = { Text(stringResource(t.label)) },
-                            modifier = Modifier.testTag("nav:${t.name}"),
-                        )
+        WindowLayout.COMPACT -> {
+            // The dock floats over the content on the four main tabs (like Nuvio's); other pages
+            // (details, players, settings pages) use the whole screen.
+            val showDock = current != null
+            val clearance = if (showDock) dockHeight(dev.yourstream.ui.screens.settings.LocalAppSettings.current.dockLabels) + DOCK_BOTTOM_GAP + 8.dp else 0.dp
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalBottomClearance provides clearance) {
+                    // Status bar padding applied (and consumed) here, as the old scaffold did: Home has no
+                    // top bar of its own, and screens' top bars must not add it a second time.
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.fillMaxSize()
+                            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars)
+                            .navigationBarsPadding(),
+                    ) {
+                        content(Modifier.fillMaxSize())
+                        IndexingPill(indexing, onIndexing, Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = clearance + 8.dp))
                     }
                 }
-            },
-            // Consumed here so screens' top bars do not add the status bar a second time.
-        ) { padding -> content(Modifier.padding(padding).consumeWindowInsets(padding)) }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showDock, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                    enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut(),
+                ) { Dock(current, onSelect) }
+            }
+        }
 
         WindowLayout.MEDIUM -> Row(Modifier.fillMaxSize()) {
             NavigationRail(Modifier.testTag("nav:rail")) {
@@ -110,7 +144,7 @@ fun AdaptiveShell(layout: WindowLayout, current: TopLevel?, onSelect: (TopLevel)
                     )
                 }
             }
-            content(Modifier.weight(1f))
+            withStatus(Modifier.weight(1f))
         }
 
         WindowLayout.EXPANDED -> PermanentNavigationDrawer(
@@ -125,9 +159,9 @@ fun AdaptiveShell(layout: WindowLayout, current: TopLevel?, onSelect: (TopLevel)
                     }
                 }
             },
-        ) { content(Modifier.fillMaxSize()) }
+        ) { withStatus(Modifier.fillMaxSize()) }
 
-        WindowLayout.TV -> TvShell(current, onSelect, content)
+        WindowLayout.TV -> TvShell(current, onSelect, withStatus)
     }
 }
 
@@ -147,59 +181,4 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
             }
         },
     ) { content(Modifier.fillMaxSize()) }
-}
-
-/** A manga label: a slanted (parallelogram) caption box. */
-private val SlantShape = androidx.compose.foundation.shape.GenericShape { size, _ ->
-    val slant = size.width * 0.09f
-    moveTo(slant, 0f); lineTo(size.width, 0f); lineTo(size.width - slant, size.height); lineTo(0f, size.height); close()
-}
-
-/**
- * The phone's bottom bar in the manga style: a floating comic panel (ink border, hard shadow),
- * labels in comic lettering, and the current tab as a slanted ink caption box that pops in.
- */
-@Composable
-private fun MangaNavBar(current: TopLevel?, onSelect: (TopLevel) -> Unit) {
-    val ink = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-    val paper = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer
-    val panel = androidx.compose.material3.MaterialTheme.shapes.medium
-    androidx.compose.foundation.layout.Box(
-        Modifier.fillMaxWidth().background(androidx.compose.material3.MaterialTheme.colorScheme.background)
-            .navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(end = 4.dp, bottom = 4.dp)
-                .inkPanel(panel, shadow = 4.dp, border = 2.5.dp)
-                .clip(panel).background(paper).padding(horizontal = 4.dp).testTag("nav:bar"),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        ) {
-            TopLevel.entries.filter { it.compact }.forEach { t ->
-                val selected = t == current
-                val pop by androidx.compose.animation.core.animateFloatAsState(
-                    if (selected) 1f else 0f,
-                    androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 500f), label = "tab-pop",
-                )
-                val label = stringResource(t.label)
-                androidx.compose.foundation.layout.Box(
-                    Modifier.weight(1f).fillMaxSize().padding(vertical = 6.dp, horizontal = 2.dp)
-                        .selectable(selected = selected, onClick = { onSelect(t) }, role = androidx.compose.ui.semantics.Role.Tab)
-                        .focusHighlight(SlantShape).testTag("nav:${t.name}"),
-                    contentAlignment = androidx.compose.ui.Alignment.Center,
-                ) {
-                    if (pop > 0.01f) androidx.compose.foundation.layout.Box(
-                        Modifier.fillMaxSize().graphicsLayer { scaleX = 0.7f + 0.3f * pop; scaleY = 0.7f + 0.3f * pop; alpha = pop.coerceIn(0f, 1f) }
-                            .background(ink, SlantShape),
-                    )
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Icon(t.icon, contentDescription = null, tint = if (selected) paper else ink, modifier = Modifier.size(22.dp))
-                        Text(
-                            label.uppercase(), fontFamily = dev.yourstream.ui.core.Manga.Lettering, fontSize = 13.sp, letterSpacing = 1.sp, maxLines = 1,
-                            color = if (selected) paper else ink.copy(alpha = 0.8f),
-                        )
-                    }
-                }
-            }
-        }
-    }
 }

@@ -193,6 +193,8 @@ class UiComponentsTest {
     @Test
     fun titleArtworkIsDerivedFromTheTitle() {
         assertEquals("DK", initials("The Dark Knight"))
+        assertEquals("D", firstLetter("The Dark Knight"))
+        assertEquals("L", firstLetter("Leo"))
         assertEquals("BI", initials("Bheem Island"))
         assertEquals(TitleColors.of("Vikram"), TitleColors.of("vikram"), "stable per title")
         assertEquals("1", initials("10"))

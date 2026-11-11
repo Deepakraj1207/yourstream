@@ -106,21 +106,34 @@ val BrandShapes = Shapes(
     large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(28.dp),
 )
 
+/** A dark scheme on pure black, for OLED screens: the page and its plain surfaces turn #000; cards keep their lift. */
+fun ColorScheme.amoled(): ColorScheme = copy(
+    background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0A0A0A), surfaceContainer = Color(0xFF101010),
+)
+
 /**
  * The app theme. TV is always dark (living rooms; focus reads best on dark surfaces); other
  * layouts follow the system setting. [manga]: the manga / comic-store style ([Manga]): paper and
  * ink palettes, comic lettering, panel shapes; components add ink borders and screentones.
+ * [amoled]: dark schemes on pure black. [posterScale]: poster cards larger or smaller than the
+ * layout's own size (Settings → Layout).
  */
 @Composable
-fun YourStreamTheme(layout: WindowLayout, darkTheme: Boolean = isSystemInDarkTheme(), manga: Boolean = false, content: @Composable () -> Unit) {
+fun YourStreamTheme(
+    layout: WindowLayout, darkTheme: Boolean = isSystemInDarkTheme(), manga: Boolean = false,
+    amoled: Boolean = false, posterScale: Float = 1f, content: @Composable () -> Unit,
+) {
     val dark = layout.isTv || darkTheme
-    val scheme = when {
+    val base = when {
         manga && dark -> Manga.ink
         manga -> Manga.paper
         dark -> Brand.dark
         else -> Brand.light
     }
-    CompositionLocalProvider(LocalWindowLayout provides layout, LocalDimens provides dimensFor(layout), LocalMangaStyle provides manga) {
+    val scheme = if (dark && amoled) base.amoled() else base
+    val dimens = dimensFor(layout).let { d -> if (posterScale == 1f) d else d.copy(posterWidth = d.posterWidth * posterScale) }
+    CompositionLocalProvider(LocalWindowLayout provides layout, LocalDimens provides dimens, LocalMangaStyle provides manga) {
         MaterialTheme(colorScheme = scheme, typography = typographyFor(layout, manga), shapes = if (manga) Manga.shapes else BrandShapes, content = content)
     }
 }

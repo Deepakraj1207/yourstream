@@ -1,5 +1,6 @@
 package dev.yourstream.catalog.stremio
 
+import dev.yourstream.catalog.api.AddonLinks
 import dev.yourstream.catalog.api.CatalogItem
 import dev.yourstream.catalog.api.CatalogProviderId
 import dev.yourstream.catalog.api.CatalogType
@@ -27,19 +28,19 @@ data class StremioAddonDefinition(
     val includeItem: (CatalogItem) -> Boolean = { true },
 ) {
     init {
-        require(manifestUrls.isNotEmpty() && manifestUrls.all { it.startsWith("https://") && it.endsWith("/manifest.json") }) {
-            "manifest URLs must be https://…/manifest.json"
+        require(manifestUrls.isNotEmpty() && manifestUrls.all { (it.startsWith("https://") || AddonLinks.isLocalHttp(it)) && it.endsWith("/manifest.json") }) {
+            "manifest URLs must be https://…/manifest.json (http:// only on the local network)"
         }
     }
 
     val baseUrls: List<String> get() = manifestUrls.map { it.removeSuffix("/manifest.json") }
 
     companion object {
-        /** Any user-supplied add-on (catalog/meta only), e.g. from a settings screen. */
+        /** Any add-on the user added by its link (catalogs, details and streams). */
         fun custom(manifestUrl: String, name: String = "Custom catalog"): StremioAddonDefinition {
             val normalized = manifestUrl.trim().replaceFirst("stremio://", "https://")
             return StremioAddonDefinition(
-                id = CatalogProviderId("custom:" + normalized.removePrefix("https://").removeSuffix("/manifest.json")),
+                id = CatalogProviderId("custom:" + normalized.removePrefix("https://").removePrefix("http://").removeSuffix("/manifest.json")),
                 displayName = name,
                 attribution = "Catalog by $name",
                 manifestUrls = listOf(normalized),

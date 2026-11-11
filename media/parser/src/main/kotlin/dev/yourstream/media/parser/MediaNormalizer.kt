@@ -56,7 +56,12 @@ data class NormalizedMedia(
     /** size + normalised name: identifies re-uploads of the same file (null for tiny files). */
     val fingerprint: String?,
     val parsed: ParsedMedia,
-)
+    /** The post above the file that gave its title (see [ParsedMediaMapper.needsContext]); "" = looked, none. */
+    val contextCaption: String? = null,
+) {
+    /** A video without a title of its own and without a post above it looked up yet. */
+    val needsContext: Boolean get() = contextCaption == null && mediaType == MediaType.VIDEO && ParsedMediaMapper.needsContext(parsed)
+}
 
 /** Media extractor + normaliser: Telegram message → [NormalizedMedia], or null if not indexed. */
 class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
@@ -65,7 +70,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
      * [chatTitle] is a last-resort hint for the title when both file name and caption are
      * generic. The Telegram file name is stored exactly as received, even when empty.
      */
-    fun normalize(message: TelegramMediaMessage, chatTitle: String? = null, albumCaption: String? = null): NormalizedMedia? {
+    fun normalize(message: TelegramMediaMessage, chatTitle: String? = null, albumCaption: String? = null, contextCaption: String? = null): NormalizedMedia? {
         val media = message.media
         // Telegram stores an album's caption on one of its files: the others use it too.
         val caption = message.caption.ifBlank { albumCaption.orEmpty() }
@@ -76,7 +81,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
         if (!policy.accepts(type)) return null
 
         val parts = MediaClassifier.splitName(originalName)
-        val parsed = ParsedMediaMapper.parse(originalName, caption, chatTitle)
+        val parsed = ParsedMediaMapper.parse(originalName, caption, chatTitle, contextCaption)
         val size = if (file.size > 0) file.size else file.expectedSize
 
         return NormalizedMedia(
@@ -117,6 +122,7 @@ class MediaNormalizer(private val policy: IndexingPolicy = IndexingPolicy()) {
             searchTitle = searchTitle(parsed, media.title, media.performer),
             fingerprint = fingerprint(parts.baseName, parts.extension, parts.splitPart, size),
             parsed = parsed,
+            contextCaption = contextCaption,
         )
     }
 

@@ -117,6 +117,11 @@ data class MediaEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     /** Last time a scan or check saw the message alive. */
     @ColumnInfo(name = "last_seen_at") val lastSeenAt: Long,
+    /**
+     * v12: the text of the post above the file (a poster's caption, a text post), read when the
+     * file's own name and caption carry no title. Null: not looked for yet; "": looked, none.
+     */
+    @ColumnInfo(name = "context_caption") val contextCaption: String? = null,
 )
 
 /**

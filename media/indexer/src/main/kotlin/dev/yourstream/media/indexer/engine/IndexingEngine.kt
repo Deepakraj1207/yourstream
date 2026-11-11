@@ -79,6 +79,8 @@ class IndexingEngine @Inject constructor(
         var updated = 0
         var deleted = 0
         var estimatedTotal = -1
+        /** Telegram's estimate per search filter: the filters are walked side by side. */
+        val totals = HashMap<MediaSearchFilter, Int>()
         /** Pages with new/changed files since the library was last told. */
         var pagesSinceNotify = 0
         /** Filters write and count from parallel coroutines. */
@@ -112,6 +114,8 @@ class IndexingEngine @Inject constructor(
             if (mode != IndexMode.VERIFY) {
                 if (config.parallelFilters) coroutineScope { config.filters.map { f -> async { scanFilter(run, f) } }.awaitAll() }
                 else for (filter in config.filters) scanFilter(run, filter)
+                // Files indexed before titles were read from the posts above them (or whose lookup failed).
+                if (config.contextLookups) backfillTitles(run, config.titleBackfillPerRun)
             }
             val verifyDue = mode == IndexMode.VERIFY || chat.verifyCursor > 0 ||
                 clock.nowMillis() - (chat.lastVerifiedAt ?: 0L) >= config.verifyInterval.inWholeMilliseconds
@@ -161,6 +165,7 @@ class IndexingEngine @Inject constructor(
     private suspend fun scanFilter(run: Run, filter: MediaSearchFilter): Unit = coroutineScope {
         run.filter = filter
         var cursor = store.cursor(run.chatId, filter)
+        val context = contextFinder()
 
         // HEAD: newest → previous high-water mark. Only new messages are written. Also runs
         // when a finished backfill found nothing (mark 0), or new media of an empty filter
@@ -175,7 +180,7 @@ class IndexingEngine @Inject constructor(
                 val page = fetchPage(run, filter, from)
                 val fresh = page.messages.filter { it.messageId > boundary }
                 maxSeen = maxOf(maxSeen, page.messages.maxOfOrNull { it.messageId } ?: 0)
-                write(run, page, normalize(page.messages, fresh, run.chatTitle), cursor = null)
+                write(run, filter, page, normalize(run, page.messages, fresh, context), cursor = null)
                 // Stop as soon as the page reaches already indexed territory.
                 if (page.messages.isEmpty() || page.nextFromMessageId == 0L || page.nextFromMessageId <= boundary || fresh.size < page.messages.size) break
                 from = page.nextFromMessageId
@@ -209,14 +214,14 @@ class IndexingEngine @Inject constructor(
                     backfillComplete = done,
                     estimatedTotal = page.totalCount,
                 )
-                write(run, page, normalize(page.messages, page.messages, run.chatTitle), cursor)
+                write(run, filter, page, normalize(run, page.messages, page.messages, context), cursor)
                 if (done) break
                 from = page.nextFromMessageId
             }
         }
     }
 
-    private suspend fun write(run: Run, page: MediaMessagePage, items: List<dev.yourstream.media.parser.NormalizedMedia>, cursor: ScanCursor?) {
+    private suspend fun write(run: Run, filter: MediaSearchFilter, page: MediaMessagePage, items: List<dev.yourstream.media.parser.NormalizedMedia>, cursor: ScanCursor?) {
         val result = if (items.isEmpty() && cursor != null) {
             store.saveCursor(cursor); null
         } else if (items.isNotEmpty() || cursor != null) {
@@ -225,7 +230,8 @@ class IndexingEngine @Inject constructor(
         val notify = run.lock.withLock {
             run.pages++
             run.seen += page.messages.size
-            run.estimatedTotal = page.totalCount
+            if (page.totalCount >= 0) run.totals[filter] = page.totalCount
+            run.estimatedTotal = if (run.totals.isEmpty()) -1 else run.totals.values.sum()
             result?.let { run.added += it.added; run.updated += it.updated }
             run.publish()
             if (result != null && result.added + result.updated > 0) run.pagesSinceNotify++
@@ -235,11 +241,58 @@ class IndexingEngine @Inject constructor(
         if (notify) listeners.forEach { it.onIndexChanged() }
     }
 
-    /** Normalises [which] of a page; files of an album without a caption get the album's caption. */
-    private fun normalize(page: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>, which: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>, chatTitle: String?) =
-        page.filter { it.albumId != 0L && it.caption.isNotBlank() }.associate { it.albumId to it.caption }.let { albums ->
-            which.mapNotNull { normalizer.normalize(it, chatTitle, albums[it.albumId]) }
+    /**
+     * Normalises [which] of a page. Files of an album without a caption get the album's caption;
+     * files without a title of their own get the post above them ([ContextFinder]): the one
+     * stored from an earlier run, else read from the chat now.
+     */
+    private suspend fun normalize(
+        run: Run,
+        page: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>,
+        which: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>,
+        context: ContextFinder,
+    ): List<dev.yourstream.media.parser.NormalizedMedia> {
+        if (which.isEmpty()) return emptyList()
+        val albums = page.filter { it.albumId != 0L && it.caption.isNotBlank() }.associate { it.albumId to it.caption }
+        val stored = store.contextCaptions(run.chatId, which.map { it.messageId })
+        return which.mapNotNull { m ->
+            val first = normalizer.normalize(m, run.chatTitle, albums[m.albumId], stored[m.messageId]) ?: return@mapNotNull null
+            if (!config.contextLookups || !first.needsContext) return@mapNotNull first
+            when (val post = context.find(run.chatId, m.messageId, m.date)) {
+                null -> first // the chat could not be read now: looked up again on a later run
+                "" -> first.copy(contextCaption = "")
+                else -> normalizer.normalize(m, run.chatTitle, albums[m.albumId], post) ?: first
+            }
         }
+    }
+
+    private fun contextFinder() = ContextFinder({ chat, from -> messages.history(chat, from, config.pageSize) })
+
+    /**
+     * Files already in the index without a title of their own whose post above was never looked
+     * up (indexed by an older version, or the lookup failed): looked up now, newest first, up to
+     * [max] per run. Their titles change in place; the library regroups them when the run ends.
+     */
+    private suspend fun backfillTitles(run: Run, max: Int) {
+        val finder = contextFinder()
+        var before = Long.MAX_VALUE
+        var done = 0
+        while (done < max) {
+            run.checkBudget()
+            val files = store.untitledWithoutContext(run.chatId, before, minOf(100, max - done))
+            if (files.isEmpty()) return
+            run.phase = IndexPhase.TITLES
+            run.filter = null
+            for (f in files) {
+                val post = finder.find(run.chatId, f.messageId, f.messageDate) ?: return
+                store.applyContext(f, post)
+                run.lock.withLock { if (post.isNotEmpty()) run.updated++ }
+            }
+            before = files.last().messageId
+            done += files.size
+            run.lock.withLock { run.publish() }
+        }
+    }
 
     private suspend fun fetchPage(run: Run, filter: MediaSearchFilter, from: Long): MediaMessagePage =
         withRetry("searchMedia") { messages.searchMedia(run.chatId, filter, from, config.pageSize) }
@@ -269,7 +322,8 @@ class IndexingEngine @Inject constructor(
                 val a = f.message.albumId
                 if (a != 0L && f.message.caption.isBlank() && a !in albums) store.albumCaption(run.chatId, a)?.let { albums[a] = it }
             }
-            val normalized = alive.associate { it.messageId to normalizer.normalize(it.message, run.chatTitle, albums[it.message.albumId]) }
+            val stored = store.contextCaptions(run.chatId, alive.map { it.messageId })
+            val normalized = alive.associate { it.messageId to normalizer.normalize(it.message, run.chatTitle, albums[it.message.albumId], stored[it.messageId]) }
             val written = store.upsert(normalized.values.filterNotNull())
             val removedByPolicy = normalized.filterValues { it == null }.keys.toList()
             val removed = store.markDeleted(run.chatId, gone + removedByPolicy)

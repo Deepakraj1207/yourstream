@@ -135,4 +135,9 @@ public data class ParseHints(
     val caption: String? = null,
     /** Chat/channel title; last-resort title source ("Doraemon Tamil Episodes"). */
     val chatTitle: String? = null,
+    /**
+     * The text of the post above the file in its chat (a poster's caption, a text post), used
+     * when the file's own name and caption carry no title ("Tel+Hin 450MB").
+     */
+    val context: String? = null,
 )

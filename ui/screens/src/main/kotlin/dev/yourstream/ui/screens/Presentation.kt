@@ -151,7 +151,9 @@ object Presentation {
     )
 
     /** The matched poster, else the title's own Telegram thumbnail. */
-    fun artwork(s: LibraryItemSummary): String? = s.posterUrl ?: s.thumbnailRef?.let(dev.yourstream.ui.core.TelegramThumbs::url)
+    /** The poster, then the video's Telegram thumbnail as fallback (one source per line; see Artwork). */
+    fun artwork(s: LibraryItemSummary): String? =
+        listOfNotNull(s.posterUrl?.takeIf { it.isNotBlank() }, s.thumbnailRef?.let(dev.yourstream.ui.core.TelegramThumbs::url)).joinToString("\n").ifEmpty { null }
 
     fun isSeries(h: SearchHit) = h.kind == ItemKind.SERIES
 

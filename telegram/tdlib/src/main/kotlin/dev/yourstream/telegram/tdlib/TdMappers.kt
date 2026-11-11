@@ -297,6 +297,22 @@ internal object TdMappers {
     }
 
     /** The file-carrying part of a message, or null for anything that is not video/document/audio. */
+    /** Any message as a [ChatPost]: its text or caption, and whether it carries a file. */
+    fun chatPost(message: Message): dev.yourstream.telegram.api.model.ChatPost {
+        val content = message.content
+        val text = when (content) {
+            is dev.g000sha256.tdl.dto.MessageText -> content.text.text
+            is dev.g000sha256.tdl.dto.MessagePhoto -> content.caption.text
+            is dev.g000sha256.tdl.dto.MessageAnimation -> content.caption.text
+            is MessageVideo -> content.caption.text
+            is MessageDocument -> content.caption.text
+            is dev.g000sha256.tdl.dto.MessageAudio -> content.caption.text
+            else -> ""
+        }
+        val hasFile = content is MessageVideo || content is MessageDocument || content is dev.g000sha256.tdl.dto.MessageAudio
+        return dev.yourstream.telegram.api.model.ChatPost(message.id, message.date.toLong(), message.mediaAlbumId, text, hasFile)
+    }
+
     fun mediaMessage(message: Message): TelegramMediaMessage? {
         val (type, media, caption) = mediaContent(message.content) ?: return null
         return TelegramMediaMessage(

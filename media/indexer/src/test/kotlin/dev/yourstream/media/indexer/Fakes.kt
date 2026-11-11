@@ -69,6 +69,23 @@ class FakeMessageRepository(private val clock: TestClock) : TelegramMessageRepos
         return AppResult.Ok(MediaMessagePage(page, next, chats[chatId].orEmpty().values.count { it.contentType.name == filter.name }))
     }
 
+    /** Text posts and photos with captions (no file): what the files' post above is read from. */
+    val posts = mutableMapOf<Long, MutableMap<Long, dev.yourstream.telegram.api.model.ChatPost>>()
+    val historyCalls = mutableListOf<String>()
+    var historyFails = false
+
+    fun post(chatId: Long, messageId: Long, text: String) {
+        posts.getOrPut(chatId) { mutableMapOf() }[messageId] = dev.yourstream.telegram.api.model.ChatPost(messageId, 1_600_000_000L + messageId, 0, text, hasFile = false)
+    }
+
+    override suspend fun history(chatId: Long, fromMessageId: Long, limit: Int): AppResult<List<dev.yourstream.telegram.api.model.ChatPost>> {
+        historyCalls += "history:$chatId:$fromMessageId"
+        if (historyFails) return AppResult.Err(AppError.Network())
+        val files = chats[chatId].orEmpty().values.map { dev.yourstream.telegram.api.model.ChatPost(it.messageId, it.date, it.albumId, it.caption, hasFile = true) }
+        val all = (files + posts[chatId].orEmpty().values).filter { it.messageId <= fromMessageId }.sortedByDescending { it.messageId }
+        return AppResult.Ok(all.take(limit))
+    }
+
     override suspend fun lookupMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>> {
         calls += "lookup:$chatId:${messageIds.size}"
         errors.removeFirstOrNull()?.let { return AppResult.Err(it) }

@@ -41,6 +41,10 @@ class DefaultTelegramMessageRepository @Inject constructor(
         return client.searchChatMedia(chatId, filter, fromMessageId, limit.coerceIn(1, TelegramMessageRepository.MAX_PAGE_SIZE))
     }
 
+    override suspend fun history(chatId: Long, fromMessageId: Long, limit: Int): AppResult<List<dev.yourstream.telegram.api.model.ChatPost>> =
+        if (fromMessageId <= 0) AppResult.Ok(emptyList())
+        else client.getChatHistory(chatId, fromMessageId, limit.coerceIn(1, TelegramMessageRepository.MAX_PAGE_SIZE))
+
     override suspend fun lookupMessages(chatId: Long, messageIds: List<Long>): AppResult<List<MessageLookup>> {
         if (messageIds.isEmpty()) return AppResult.Ok(emptyList())
         if (messageIds.size > TelegramMessageRepository.MAX_PAGE_SIZE) {

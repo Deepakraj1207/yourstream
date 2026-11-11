@@ -176,13 +176,10 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
         val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
         val tag = json.optString("tag_name").ifBlank { return null }
         val assets = json.optJSONArray("assets") ?: return null
-        for (i in 0 until assets.length()) {
-            val a = assets.getJSONObject(i)
-            if (a.optString("name").endsWith(".apk")) {
-                return Release(tag.removePrefix("v"), json.optString("body"), a.getString("browser_download_url"), a.optLong("size"))
-            }
-        }
-        return null
+        val list = (0 until assets.length()).map { assets.getJSONObject(it) }
+        val i = pickApk(list.map { it.optString("name") }, Build.SUPPORTED_ABIS.toList()) ?: return null
+        val a = list[i]
+        return Release(tag.removePrefix("v"), json.optString("body"), a.getString("browser_download_url"), a.optLong("size"))
     }
 
     /** Opens [url] with every header set before connecting (setting one afterwards throws). */
@@ -200,6 +197,18 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
     }
 
     companion object {
+        private val ABI_SUFFIX = Regex("-(arm64-v8a|armeabi-v7a|x86_64|x86)\\.apk$")
+
+        /**
+         * Which release asset to install: the APK built for the device's preferred CPU type
+         * ("YourStream-v0.8.0-arm64-v8a.apk"), else the universal APK, else any APK (pure; tested).
+         */
+        fun pickApk(names: List<String>, abis: List<String>): Int? {
+            for (abi in abis) names.indexOfFirst { it.endsWith("-$abi.apk") }.takeIf { it >= 0 }?.let { return it }
+            names.indexOfFirst { it.endsWith(".apk") && !ABI_SUFFIX.containsMatchIn(it) }.takeIf { it >= 0 }?.let { return it }
+            return names.indexOfFirst { it.endsWith(".apk") }.takeIf { it >= 0 }
+        }
+
         /** "0.10.0" > "0.9.2"; non-numeric parts are ignored (pure). */
         fun newer(candidate: String, installed: String): Boolean {
             fun parts(v: String) = v.removePrefix("v").split('.', '-').map { p -> p.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }

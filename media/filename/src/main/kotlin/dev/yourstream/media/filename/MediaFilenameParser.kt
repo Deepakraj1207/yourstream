@@ -28,7 +28,9 @@ public object MediaFilenameParser {
 
     /** Bump when results change, so stored metadata can be recomputed. */
     /** 3: random file names (hashes, UUIDs, Telegram ids) count as generic; their tokens never become titles. */
-    public const val VERSION: Int = 3
+    /** 4: language tags ("Tel+Hin") and channel brands ("TR Movies") are not titles; the post above the file is. */
+    /** 5: sizes and resolutions next to tags ("Tel + Hin 450MB") keep them tags. */
+    public const val VERSION: Int = 5
 
     private val GENERIC_NAME = Regex(
         "^(video|vid|file|movie|document|doc|telegram|tg|img|mov|clip|media|untitled|new|downloaded|download|v|output|record(ing)?|screen\\s?recording)?" +
@@ -70,19 +72,42 @@ public object MediaFilenameParser {
             val line = captionLine(hints.caption)
             if (line != null) {
                 val fromCaption = Analyzer.analyze(line, isFileName = false, FieldSource.CAPTION)
-                if (fromCaption.title != null) {
+                if (fromCaption.title != null && !isGeneric(fromCaption)) {
                     warnings += "file name is generic; title taken from the caption"
                     result = merge(primary = fromCaption, fallback = fromName)
+                } else if (fromCaption.title != null) {
+                    // "Tel+Hin 450MB": no title, but its languages and size still describe the file.
+                    result = merge(primary = fromName, fallback = fromCaption.copy(title = null))
+                }
+            }
+        }
+        if (result.title == null || isGeneric(result)) {
+            val line = captionLine(hints.context)
+            val fromContext = line?.let { Analyzer.analyze(it, isFileName = false, FieldSource.CAPTION) }
+            if (fromContext?.title != null && !isGeneric(fromContext)) {
+                warnings += CONTEXT_WARNING
+                val own = result.copy(title = null)
+                result = merge(primary = fromContext, fallback = own).let { m ->
+                    // The post names the title (and maybe the season); the file says which episode.
+                    m.copy(title = m.title?.let { it.copy(confidence = it.confidence * 0.85f) }, episode = own.episode ?: m.episode,
+                        episodeEnd = own.episodeEnd ?: m.episodeEnd, season = own.season ?: m.season, part = own.part ?: m.part)
                 }
             }
         }
         if (result.title == null || isGeneric(result)) {
             chatTitle(hints.chatTitle)?.let { t ->
-                warnings += "title guessed from the chat title"
+                warnings += CHAT_TITLE_WARNING
                 result = result.copy(title = Field(t, 0.35f, hints.chatTitle.orEmpty(), FieldSource.CHAT_TITLE))
             }
         }
-        if (result.title == null) warnings += "no title found"
+        // A language list or channel name with nothing better found is no title ("Tel", "TR Movies").
+        result.title?.let { t ->
+            val words = t.value.split(Regex("[^\\p{L}\\p{N}]+")).count { it.isNotEmpty() }
+            val hasLanguage = t.value.split(Regex("[^\\p{L}\\p{N}]+")).any { Vocabulary.languageOf(it) != null }
+            if (isTagsOnly(t.value, t.source == FieldSource.CAPTION, result.languages.size) && (hasLanguage || words >= 2)) result = result.copy(title = null)
+        }
+        if (result.title == null) warnings += NO_TITLE_WARNING
+        else if (isGeneric(result)) warnings += GENERIC_TITLE_WARNING
         return build(fileName, result, warnings)
     }
 
@@ -91,8 +116,38 @@ public object MediaFilenameParser {
         if (GENERIC_NAME.matches(title)) return true
         if (title.count(Char::isLetter) < 2) return true
         if (RandomNames.isJunkTitle(title)) return true
+        if (isTagsOnly(title, a.title.source == FieldSource.CAPTION, a.languages.size)) return true
         return false
     }
+
+    /** Warnings that say the title is a guess, or missing: the file may take its title from elsewhere. */
+    public const val CONTEXT_WARNING: String = "title taken from the post above the file"
+    public const val CHAT_TITLE_WARNING: String = "title guessed from the chat title"
+    public const val NO_TITLE_WARNING: String = "no title found"
+    /** The title is only the file's machine-made or generic name ("VID 20240101"); shown as untitled. */
+    public const val GENERIC_TITLE_WARNING: String = "title is only the file's generic name"
+
+    /**
+     * Language tags and channel words, not a title: "Tel Hin", "Tamil Dubbed", "TR Movies",
+     * "Dual Audio". At least one word must be a language or channel word, so short real titles
+     * ("Us", "Ran", "Leo") stay titles. Short language codes are ambiguous ("Ben 10", "Ben"), so they
+     * count only next to another language, or as a caption's or a language list's only word
+     * ("Tel" under a file, "Tel" of "Tel+Hin") (pure; tested).
+     */
+    public fun isTagsOnly(title: String, fromCaption: Boolean = false, otherLanguages: Int = 0): Boolean {
+        val words = title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return false
+        val languageWords = words.count { Vocabulary.languageOf(it) != null }
+        val shortTrusted = languageWords >= 2 || (words.size == 1 && languageWords == 1 && (fromCaption || otherLanguages > 0))
+        fun tag(w: String): Boolean {
+            val language = Vocabulary.languageOf(w) != null
+            return (language && (w.length > 3 || shortTrusted)) || w in Vocabulary.CHANNEL_WORDS
+        }
+        return words.any(::tag) && words.all { w -> tag(w) || (w.length <= 2 && w.all(Char::isLetter)) || w.all(Char::isDigit) || TECH_TOKEN.matches(w) }
+    }
+
+    /** "450mb", "1.2gb" (as "1", "2gb"), "720p", "5ch": sizes and formats, neutral next to tags. */
+    private val TECH_TOKEN = Regex("\\d+(mb|gb|kb|p|k|fps|bit|ch)")
 
     /** "Vikram a7F3k9Qz2LmP8xY1" → "Vikram": random tokens are dropped when real words remain. */
     private fun stripRandomTokens(a: Analysis): Analysis {
@@ -111,6 +166,9 @@ public object MediaFilenameParser {
 
     private fun chatTitle(chatTitle: String?): String? {
         if (chatTitle.isNullOrBlank()) return null
+        // "Speedy Links", "TR Movies Tamil", "Dada Linkz": a channel of many titles, not a title.
+        val words = chatTitle.lowercase().split(Regex("[^\\p{L}\\p{N}]+"))
+        if (words.any { it in Vocabulary.CHANNEL_BRAND_WORDS }) return null
         var t = Analyzer.analyze(chatTitle, isFileName = false, FieldSource.CHAT_TITLE).title?.value ?: return null
         t = Vocabulary.CHAT_TITLE_NOISE.replace(t, " ")
         t = t.split(Regex("\\s+")).filter { it.isNotBlank() && Vocabulary.languageOf(it) == null }.joinToString(" ")

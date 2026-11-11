@@ -36,7 +36,7 @@ class MediaReparser @Inject constructor(
             if (rows.isEmpty()) break
             db.withTransaction {
                 for (row in rows) {
-                    val parsed = ParsedMediaMapper.parse(row.fileName, row.caption, row.chatTitle)
+                    val parsed = ParsedMediaMapper.parse(row.fileName, row.caption, row.chatTitle, row.contextCaption)
                     media.upsertParsed(parsed.toEntity(row.id))
                     media.setSearchTitle(row.id, MediaNormalizer.searchTitle(parsed, row.audioTitle, row.audioPerformer))
                 }

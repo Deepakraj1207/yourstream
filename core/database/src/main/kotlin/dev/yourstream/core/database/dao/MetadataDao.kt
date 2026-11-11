@@ -87,6 +87,10 @@ interface MetadataDao {
     )
     fun reviewQueue(): Flow<List<ReviewRow>>
 
+    /** A new metadata source (e.g. a TMDB key): titles without a sure match are tried again now. */
+    @Query("UPDATE metadata_match SET next_attempt_at = :now, attempts = 0 WHERE status IN ('NO_MATCH', 'FAILED', 'NEEDS_REVIEW')")
+    suspend fun retryUnmatched(now: Long)
+
     @Query("SELECT status, COUNT(*) AS count FROM metadata_match GROUP BY status")
     fun statusCounts(): Flow<List<MatchStatusCount>>
 
