@@ -9,7 +9,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | Phase | Status |
 |---|---|
 | 0. Repository audit | COMPLETED |
-| 1. Critical fixes | IN PROGRESS |
+| 1. Critical fixes | COMPLETED (one item moved to monitored risks, see below) |
 | 2. Telegram authentication | NOT STARTED |
 | 3. Media indexing | NOT STARTED |
 | 4. Streaming engine | NOT STARTED |
@@ -36,7 +36,7 @@ vs. plain Material 3) is decided in Phase 6.
 
 ---
 
-## Phase 1 — Critical fixes · IN PROGRESS
+## Phase 1 — Critical fixes · COMPLETED
 
 **Objective:** stop shipping regressions and close the release-blocking risks that need no
 product redesign.
@@ -47,11 +47,11 @@ logcat not redacted; intermittent Hilt/KSP "missing binding" build failures.
 
 | Item | Status | Change |
 |---|---|---|
-| CI on every push / PR | COMPLETED (workflow written; first GitHub run pending) | `.github/workflows/ci.yml`: `test`, `:app:lintDebug`, `:app:assembleDebug`; reports uploaded on failure |
+| CI on every push / PR | COMPLETED (first GitHub run [43063230121](https://github.com/Deepakraj1207/yourstream/actions/runs/43063230121) passed in about 8 min) | `.github/workflows/ci.yml`: `test`, `:app:lintDebug`, `:app:assembleDebug`; reports uploaded on failure |
 | Releases tested and signed with the release key | COMPLETED (takes effect on the next release) | `release.yml`: tests before building; fails without `RELEASE_KEYSTORE_BASE64`; every APK's certificate checked against the pinned SHA-256 (`35249306…07b2`, the key that signed v0.10.0, read from the published APK with `apksigner`) |
 | Torrents off by default, with consent | COMPLETED | `AppSettings.torrentStreaming = false` (stored default too); `TorrentConsentDialog` before turning on, from Settings or from a torrent result; torrent rows stay tappable while off |
 | Logcat redaction | COMPLETED | `AppLogger.forLogcat`: logcat gets redacted text; release builds log no stack traces (type + redacted message instead) |
-| Intermittent Hilt/KSP build failure | IN PROGRESS | see below |
+| Intermittent Hilt/KSP build failure | NOT REPRODUCED — moved to monitored risks | see below |
 
 **Files modified:** `.github/workflows/ci.yml` (new), `.github/workflows/release.yml`,
 `app/src/main/kotlin/dev/yourstream/log/AppLogger.kt`,
@@ -60,12 +60,29 @@ logcat not redacted; intermittent Hilt/KSP "missing binding" build failures.
 `docs/STREAMS.md`; tests: `app/src/test/.../log/LogcatRedactionTest.kt` (new),
 `ui/screens/src/test/.../ScreensTest.kt` (`torrentStreamingIsOffByDefaultAndAsksBeforeTurningOn`).
 
-**Hilt/KSP investigation so far:** every "missing" binding in the failed build came from one
-Hilt module (`playback/media3/PlaybackModule.kt`), in a build that ran right after files in
-that module changed. Reproduction attempts: an incremental build after a comment-only change and
-after adding a new top-level class to the same module — both built correctly. A cold,
-cache-less run of the CI command is the next attempt.
+**Tests run:**
+* `:app:testDebugUnitTest` (new `LogcatRedactionTest`) and `:ui:screens` `ScreensTest`
+  (including the new consent test): pass.
+* Cold, cache-less run of the CI command locally (`./gradlew clean`, then
+  `./gradlew --no-build-cache --continue test :app:lintDebug :app:assembleDebug`): pass, 4 min 57 s.
+* GitHub CI, first run on commit `b12d553`: pass.
 
-**Known limitations:** the effect of the consent dialog and logcat change on a device is not
-verified; the release-workflow changes are verified only by reading (they run on the next
-release).
+**Hilt/KSP build failure — not reproduced, monitored.** Every "missing" binding in the one
+failed build came from a single Hilt module (`playback/media3/PlaybackModule.kt`), in a run that
+followed edits to that module. Four reproduction attempts all built correctly: incremental
+build after a comment-only change; after adding a top-level class; a cold cache-less run of the
+CI command; and an exact replay of the failing sequence (a new top-level `object` and class in
+`playback:media3`, then `./gradlew testDebugUnitTest test --continue`). No root cause is
+proven, so nothing was changed for it. Mitigations in place: the release build retries once with
+`--rerun-tasks`, and CI now reports any recurrence with its log. Reopen with the CI log if it
+happens again.
+
+**Known limitations / remaining work:**
+* Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
+* The release-workflow changes (required key, certificate pin, tests first) run for the first
+  time on the next release.
+* Users who had torrents on implicitly (never touched the switch) find them off after updating
+  and are asked once when they next play a torrent. Intended.
+
+**Next:** Phase 2 — Telegram authentication (clean logout and local data cleanup, account
+switching, session-expired handling, plain-language errors, TDLib database encryption).
