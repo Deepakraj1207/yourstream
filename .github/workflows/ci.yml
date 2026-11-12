@@ -73,6 +73,10 @@ jobs:
           grep -hiE "daemon|OutOfMemory|fallback strategy|Killed|exit code 137|GC overhead" build-*.log 2>/dev/null | sort | uniq -c | head -40 || true
           sudo dmesg 2>/dev/null | grep -iE "out of memory|oom-kill|killed process" | tail -20 || true
           free -m || true
+          echo "== KSP-generated Java files per module (0 for a module with Hilt modules = KSP produced nothing)"
+          for d in $(find . -path '*/build/generated/ksp/debug' -type d); do
+            echo "$d: $(find "$d" -name '*.java' | wc -l)"
+          done
           echo "== Hilt metadata per library jar"
           for jar in $(find . -path '*/build/intermediates/compile_library_classes_jar/debug/*' -name '*.jar'); do
             echo "$jar: $(unzip -l "$jar" 2>/dev/null | grep -c hilt_aggregated_deps)"

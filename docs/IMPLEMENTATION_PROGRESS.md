@@ -133,6 +133,17 @@ mid-build.** Change: CI builds the APK first, then runs tests, then lint (separa
 compilation never competes with test JVMs), and the failure summary now reports daemon/OOM
 messages, the kernel's OOM log and the Hilt metadata count in every library jar.
 
+**Update 6 — the actual fault located.** With the APK built alone (no tests, no lint) a push run
+still failed, so memory is ruled out (6 of 16 GB used, no OOM, no daemon crash). The new summary
+showed the fault directly: the missing bindings (`WatchIntelligence`, `WatchStatistics`) belong
+to `watch:engine`, and **`watch:engine`'s jar contained 0 Hilt metadata classes** (locally: 2).
+So intermittently one library's KSP step produces no Hilt output, and the app's Hilt graph then
+lacks that module — the app-side aggregation was never the problem. The module differs each
+time, which points at KSP tasks running concurrently (KSP2 runs inside the Gradle process).
+**Change:** a Gradle shared build service lets only one `ksp*Kotlin` task run at a time
+(root `build.gradle.kts`); the failure summary now also prints the KSP-generated file count of
+every module. **Status: fix applied; verifying with repeated push runs.**
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first
