@@ -21,6 +21,10 @@ on:
       version:
         description: 'Version tag to create, e.g. v0.2.0'
         required: true
+      minify:
+        description: 'Shrink with R8 (only after a minified build passed docs/RELEASE_R8.md on a device)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -83,6 +87,8 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          # R8 only when chosen in "Run workflow" (tag pushes build without it).
+          MINIFY: ${{ inputs.minify == true && 'true' || 'false' }}
         run: |
           if [ -z "$TELEGRAM_API_ID" ] || [ -z "$TELEGRAM_API_HASH" ]; then
             echo "::error::Set the repository secrets TELEGRAM_API_ID and TELEGRAM_API_HASH (my.telegram.org -> API development tools)"
@@ -92,7 +98,7 @@ jobs:
           # A release is built from scratch: no outputs reused from the shared build cache.
           # Hilt/KSP occasionally misses a module on a cold build; one full retry fixes it.
           export SPLIT_APKS=true
-          ./gradlew --no-daemon --no-build-cache assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks assembleRelease
+          ./gradlew --no-daemon --no-build-cache -Pyourstream.minify=$MINIFY assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks -Pyourstream.minify=$MINIFY assembleRelease
           # The universal APK (any device; what earlier versions' updater downloads) and one per
           # CPU type (what the in-app updater picks: a much smaller download).
           mkdir -p dist dist-abi

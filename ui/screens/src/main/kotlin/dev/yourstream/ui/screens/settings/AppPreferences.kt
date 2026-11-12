@@ -60,8 +60,12 @@ data class AppSettings(
      * user agrees (peers see the device's IP address): [TorrentConsentDialog].
      */
     val torrentStreaming: Boolean = false,
-    /** Resolve every host through DNS over HTTPS (blocked hosts use it automatically anyway). */
+    /** Resolve every host through DNS over HTTPS. */
     val secureDns: Boolean = false,
+    /** Hosts the network's DNS blocks are looked up through DNS over HTTPS (Cloudflare, Google). */
+    val secureDnsFallback: Boolean = true,
+    /** Posters from blocked image hosts are fetched through public image proxies (wsrv.nl, i0.wp.com). */
+    val imageProxies: Boolean = true,
     /** Dark theme on pure black (OLED screens): backgrounds and cards' surroundings turn #000. */
     val amoledBlack: Boolean = false,
     /** The phone's navigation bar shows every tab's name under its icon (else only the selected one's). */
@@ -100,6 +104,8 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
     /** Settings that live below the UI (network, decoders) take effect right away. */
     private fun apply(s: AppSettings) {
         dev.yourstream.core.network.SecureDns.always = s.secureDns
+        dev.yourstream.core.network.SecureDns.fallback = s.secureDnsFallback
+        dev.yourstream.ui.core.ImageRouting.useProxies = s.imageProxies
         dev.yourstream.playback.media3.PlayerDecoders.appAudioFirst = s.appAudioDecodersFirst
     }
 
@@ -122,6 +128,8 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("subtitle_box", s.subtitleBox)
             .putBoolean("torrents", s.torrentStreaming)
             .putBoolean("secure_dns", s.secureDns)
+            .putBoolean("secure_dns_fallback", s.secureDnsFallback)
+            .putBoolean("image_proxies", s.imageProxies)
             .putBoolean("amoled", s.amoledBlack)
             .putBoolean("dock_labels", s.dockLabels)
             .putBoolean("reduce_motion", s.reduceMotion)
@@ -154,6 +162,8 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         // Off unless the user turned it on (before 0.11 it defaulted to on without asking).
         torrentStreaming = prefs.getBoolean("torrents", false),
         secureDns = prefs.getBoolean("secure_dns", false),
+        secureDnsFallback = prefs.getBoolean("secure_dns_fallback", true),
+        imageProxies = prefs.getBoolean("image_proxies", true),
         amoledBlack = prefs.getBoolean("amoled", false),
         dockLabels = prefs.getBoolean("dock_labels", true),
         reduceMotion = prefs.getBoolean("reduce_motion", false),

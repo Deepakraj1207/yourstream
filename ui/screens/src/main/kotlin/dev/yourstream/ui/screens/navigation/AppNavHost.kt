@@ -127,6 +127,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
                 onReview = navigator::review,
             )
         }
+        page<StorageRoute> { dev.yourstream.ui.screens.settings.StorageRoute(onBack = back) }
         page<FirstRunRoute> {
             dev.yourstream.ui.screens.firstrun.FirstRunRoute(
                 onConnectTelegram = navigator::account, onChooseChats = navigator::sources, onDone = navigator::finishFirstRun,
@@ -138,7 +139,7 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
-        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb, navigator::firstRun)
+        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb, navigator::firstRun, navigator::storage)
         page<SettingsRoute> {
             SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, onPage = navigator::settingsPage)
         }

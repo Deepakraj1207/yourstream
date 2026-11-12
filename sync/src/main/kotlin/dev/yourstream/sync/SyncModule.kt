@@ -17,6 +17,9 @@ abstract class SyncModule {
 
     companion object {
         @Provides @Singleton @SyncScope
-        fun scope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        fun scope(logger: dev.yourstream.core.common.Logger): CoroutineScope = CoroutineScope(
+            // A failure in background sync is logged; without a handler it would crash the app.
+            SupervisorJob() + Dispatchers.IO + kotlinx.coroutines.CoroutineExceptionHandler { _, t -> logger.e("ProgressSync", "uncaught", t) },
+        )
     }
 }

@@ -60,6 +60,8 @@ class TelegramPlaybackControllerFactory @Inject constructor(
     private val episodes: EpisodeRepository,
     private val settings: PlaybackSettings,
     private val tracks: TrackSupport,
+    /** Saving progress and releasing files outlive the player screen; failures are logged here, not fatal. */
+    @PlaybackScope private val background: kotlinx.coroutines.CoroutineScope,
 ) {
     fun create(config: PlaybackConfig = PlaybackConfig()) = TelegramPlaybackController(
         context = context,
@@ -74,6 +76,7 @@ class TelegramPlaybackControllerFactory @Inject constructor(
             AdaptivePlayback(AdaptiveStreaming(streamer, governor, monitor, BufferManager(deviceProfile(context), settings.buffer), scope, prefetch), next)
         },
         trackSupport = tracks,
+        backgroundScope = background,
     )
 }
 

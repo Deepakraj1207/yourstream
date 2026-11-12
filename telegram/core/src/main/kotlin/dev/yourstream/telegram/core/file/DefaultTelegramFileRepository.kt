@@ -59,4 +59,6 @@ class DefaultTelegramFileRepository @Inject constructor(
     }
 
     override suspend fun deleteLocalCopy(fileId: Int): AppResult<Unit> = client.deleteFile(fileId)
+
+    override suspend fun deleteAllLocalCopies(): AppResult<Unit> = client.deleteAllLocalFiles()
 }

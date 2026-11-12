@@ -124,7 +124,6 @@ fun SettingsRoute(
     val prefsVm: AppPreferencesViewModel = hiltViewModel()
     val prefs by prefsVm.settings.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val cleared = stringResource(R.string.settings_cache_cleared)
     val resetDone = stringResource(R.string.settings_reset_done)
     val secured = androidx.compose.runtime.remember { dev.yourstream.core.network.SecureDns.securedHosts().sorted() }
     val indexingVm: IndexingSettingsViewModel = hiltViewModel()
@@ -139,13 +138,6 @@ fun SettingsRoute(
                 dev.yourstream.ui.screens.update.UpdateState.Checking -> Unit
                 else -> updates.check()
             }
-        },
-        onClearCache = {
-            runCatching {
-                val loader = coil3.SingletonImageLoader.get(context)
-                loader.memoryCache?.clear(); loader.diskCache?.clear()
-            }
-            android.widget.Toast.makeText(context, cleared, android.widget.Toast.LENGTH_SHORT).show()
         },
         onSourceCode = {
             runCatching {
@@ -175,6 +167,8 @@ data class SettingsLinks(
     val tmdb: (() -> Unit)? = null,
     /** The guided first run, opened again. */
     val setupGuide: (() -> Unit)? = null,
+    /** Settings → Advanced → Storage. */
+    val storage: (() -> Unit)? = null,
 )
 
 /**
@@ -193,7 +187,6 @@ data class SettingsHost(
     /** "Version 0.4.0 · Up to date", "Update to 0.5.0"; null shows the plain version. */
     val updateLine: String? = null,
     val onUpdate: (() -> Unit)? = null,
-    val onClearCache: (() -> Unit)? = null,
     val onSourceCode: (() -> Unit)? = null,
     val onReset: (() -> Unit)? = null,
     /** Hosts resolved through DNS over HTTPS right now (Integrations → Secure DNS). */

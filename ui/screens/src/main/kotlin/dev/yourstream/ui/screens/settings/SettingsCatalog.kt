@@ -242,13 +242,21 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.tmdb_title), stringResource(R.string.settings_tmdb_detail), AppIcons.Movie, tag = "settings-tmdb", onClick = host.links.tmdb)
     })
     add(entry("secure-dns", ig, R.string.settings_group_network, R.string.settings_secure_dns, "dns doh blocked network jio isp tmdb") {
-        val detail = when {
-            prefs.secureDns -> stringResource(R.string.settings_secure_dns_on)
-            host.securedHosts.isNotEmpty() -> stringResource(R.string.settings_secure_dns_auto) + "\n" +
-                stringResource(R.string.settings_secure_dns_now, host.securedHosts.take(3).joinToString(", "))
-            else -> stringResource(R.string.settings_secure_dns_auto)
-        }
+        val detail = if (prefs.secureDns) stringResource(R.string.settings_secure_dns_on) else stringResource(R.string.settings_secure_dns_off)
         SettingToggle(stringResource(R.string.settings_secure_dns), detail, Icons.Filled.Lock, prefs.secureDns, "pref-secure-dns") { change(prefs.copy(secureDns = it)) }
+    })
+    add(entry("secure-dns-fallback", ig, R.string.settings_group_network, R.string.settings_dns_fallback, "dns doh blocked network jio isp tmdb cloudflare google privacy",
+        shown = { !it.prefs.secureDns }) {
+        val detail = stringResource(R.string.settings_dns_fallback_detail) +
+            (if (prefs.secureDnsFallback && host.securedHosts.isNotEmpty()) "\n" + stringResource(R.string.settings_secure_dns_now, host.securedHosts.take(3).joinToString(", ")) else "")
+        SettingToggle(stringResource(R.string.settings_dns_fallback), detail, Icons.Filled.Lock, prefs.secureDnsFallback, "pref-dns-fallback") {
+            change(prefs.copy(secureDnsFallback = it))
+        }
+    })
+    add(entry("image-proxies", ig, R.string.settings_group_network, R.string.settings_image_proxies, "poster image proxy wsrv blocked tmdb privacy") {
+        SettingToggle(stringResource(R.string.settings_image_proxies), stringResource(R.string.settings_image_proxies_detail), Icons.Filled.Lock, prefs.imageProxies, "pref-image-proxies") {
+            change(prefs.copy(imageProxies = it))
+        }
     })
 
     // ---- Services (on the hub): progress sync, after the Integrations page
@@ -260,8 +268,8 @@ internal val SETTINGS: List<SettingEntry> = buildList {
 
     // ---- Advanced
     val ad = SettingsPage.ADVANCED
-    add(entry("clear-cache", ad, R.string.settings_group_maintenance, R.string.settings_clear_cache, "images posters storage space", shown = { it.onClearCache != null }) {
-        SettingRow(stringResource(R.string.settings_clear_cache), stringResource(R.string.settings_clear_cache_detail), Icons.Filled.Delete, onClick = host.onClearCache)
+    add(entry("storage", ad, R.string.settings_group_maintenance, R.string.settings_storage, "storage space cache clear images posters videos downloads torrents", shown = { it.links.storage != null }) {
+        SettingRow(stringResource(R.string.settings_storage), stringResource(R.string.settings_storage_detail), Icons.Filled.Delete, tag = "settings-storage", onClick = host.links.storage)
     })
     add(entry("reset", ad, R.string.settings_group_maintenance, R.string.settings_reset, "defaults restore", shown = { it.onReset != null }) {
         SettingRow(stringResource(R.string.settings_reset), stringResource(R.string.settings_reset_detail), Icons.Filled.Refresh, tag = "pref-reset") { open(SettingsDialog.RESET) }

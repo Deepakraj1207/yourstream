@@ -48,7 +48,11 @@ class TorrentEngine(
 ) {
     @Inject constructor(@ApplicationContext context: Context) : this(File(context.cacheDir, "torrents"))
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Engine work (closing streams, the idle stop) must never take the app down with it: a
+    // failure is printed to the log (this module has no logger) and the engine carries on.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + kotlinx.coroutines.CoroutineExceptionHandler { _, t -> android.util.Log.w("TorrentEngine", "background task failed: ${t.javaClass.simpleName}") },
+    )
     private val lock = Mutex()
     private val streams = ConcurrentHashMap<String, TorrentStream>()
 

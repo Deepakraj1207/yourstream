@@ -390,9 +390,8 @@
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>
-    <string name="settings_clear_cache">Clear image cache</string>
-    <string name="settings_clear_cache_detail">Posters download again when needed</string>
-    <string name="settings_cache_cleared">Image cache cleared</string>
+    <string name="settings_storage">Storage</string>
+    <string name="settings_storage_detail">What the app keeps on this device, and clearing it</string>
     <string name="settings_source">Source code</string>
     <string name="settings_source_detail">github.com/Deepakraj1207/yourstream</string>
     <string name="settings_sign_in_hint">Sign in to Telegram to see your videos</string>
@@ -506,7 +505,11 @@
     </plurals>
     <string name="settings_secure_dns">Secure DNS</string>
     <string name="settings_secure_dns_on">Every connection finds its server through DNS over HTTPS (Cloudflare, then Google)</string>
-    <string name="settings_secure_dns_auto">Off: used on its own for sites your network blocks (like TMDB on some Indian networks)</string>
+    <string name="settings_secure_dns_off">Off: your network\'s own DNS finds servers</string>
+    <string name="settings_dns_fallback">Secure DNS for blocked sites</string>
+    <string name="settings_dns_fallback_detail">When your network\'s DNS blocks a site (like TMDB on some Indian networks), its name is looked up through Cloudflare or Google instead. They see the site\'s name and your IP address. Off: blocked sites stay unreachable.</string>
+    <string name="settings_image_proxies">Image proxies</string>
+    <string name="settings_image_proxies_detail">When your network blocks a poster server, posters are fetched through wsrv.nl or i0.wp.com. They see which posters are loaded and your IP address. Off: blocked posters show the title instead.</string>
     <string name="settings_secure_dns_now">Now used for %1$s</string>
     <string name="settings_reset">Reset settings</string>
     <string name="settings_reset_detail">Every choice here back to its default. Your library, sign-in and add-ons stay.</string>
@@ -634,4 +637,26 @@
     <string name="first_run_playback_swipe">Swipe up or down on the left for brightness, on the right for volume. Press and hold for 2× speed.</string>
     <string name="first_run_playback_tracks">Audio language and subtitles: the buttons in the player\'s controls.</string>
     <string name="first_run_playback_background">Audio keeps playing with the screen off, with controls on the lock screen.</string>
+
+    <!-- Storage -->
+    <string name="storage_title">Storage</string>
+    <string name="storage_measuring">Measuring…</string>
+    <string name="storage_total">YourStream uses %1$s for caches</string>
+    <string name="storage_free">%1$s free on this device</string>
+    <string name="storage_clear">Clear</string>
+    <string name="storage_clearing">Clearing…</string>
+    <string name="storage_cleared">%1$s cleared.</string>
+    <string name="storage_failed">%1$s not cleared: %2$s</string>
+    <string name="storage_telegram">Telegram videos</string>
+    <string name="storage_telegram_detail">Parts of videos you streamed (trimmed above 2 GB), and videos you saved to this device</string>
+    <string name="storage_web">Add-on streams</string>
+    <string name="storage_web_detail">Up to 512 MB, oldest removed first</string>
+    <string name="storage_torrents">Torrents</string>
+    <string name="storage_torrents_detail">Removed a few minutes after a torrent stops playing</string>
+    <string name="storage_images">Posters and thumbnails</string>
+    <string name="storage_images_detail">Up to 300 MB; they download again when needed</string>
+    <string name="storage_note">Clearing never touches your library, watch history or anything in Telegram itself. Nothing is cleared while a video plays.</string>
+    <string name="storage_telegram_confirm_title">Clear Telegram videos?</string>
+    <string name="storage_telegram_confirm">This also removes videos you saved to this device. They stay in Telegram and stream again when you play them.</string>
+    <string name="storage_busy">a video is playing. Stop it and try again.</string>
 </resources>

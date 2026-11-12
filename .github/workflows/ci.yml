@@ -49,6 +49,11 @@ jobs:
       - name: Lint
         run: ./gradlew :app:lintDebug 2>&1 | tee build-lint.log; exit ${PIPESTATUS[0]}
 
+      # The release with R8 must keep building (missing classes, broken keep rules). Whether it
+      # runs is checked on a device: docs/RELEASE_R8.md.
+      - name: Minified release (R8)
+        run: ./gradlew :app:assembleRelease -Pyourstream.minify=true 2>&1 | tee build-r8.log; exit ${PIPESTATUS[0]}
+
       # Failures readable in the log itself: each failing test with its message, and (for the
       # intermittent Hilt "missing binding" error) what the playback module generated and compiled.
       - name: Failure summary

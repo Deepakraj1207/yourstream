@@ -219,8 +219,8 @@ class ScreenshotTest {
 
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
         SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
-        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}),
-        updateLine = "Version $version · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {}, onReset = {},
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}, storage = {}),
+        updateLine = "Version $version · up to date", onUpdate = {}, onSourceCode = {}, onReset = {},
         securedHosts = listOf("api.themoviedb.org"),
     )
 

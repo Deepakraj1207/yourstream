@@ -14,8 +14,8 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 3. Media indexing | NEEDS REAL-DEVICE TESTING |
 | 4. Streaming engine | NEEDS REAL-DEVICE TESTING |
 | 5. Metadata and library | COMPLETED |
-| 6. UI/UX | IN PROGRESS |
-| 7. Performance and security | NOT STARTED |
+| 6. UI/UX | NEEDS REAL-DEVICE TESTING |
+| 7. Performance and security | NEEDS REAL-DEVICE TESTING |
 | 8. Local media | NOT STARTED |
 | 9. Advanced features | NOT STARTED |
 | 10. Release readiness | NOT STARTED |
@@ -406,7 +406,7 @@ dock decision).
 
 ---
 
-## Phase 6 — UI/UX · IN PROGRESS
+## Phase 6 — UI/UX · NEEDS REAL-DEVICE TESTING
 
 **Objective:** simple navigation (Home, Movies, Series, Search, Library, Settings); a guided first
 run that hides API ids, hashes and provider internals; Material 3, dark and light, reusable
@@ -436,7 +436,7 @@ animations", and there was no app-level option.
 | Reduced motion | COMPLETED (JVM-verified) | `ui/core/Motion.kt` `LocalReducedMotion` = system "Remove animations" (observed live) or Settings → Appearance → Reduce motion: cross-fade transitions, still skeletons, no spinner, no focus lift |
 | Touch targets | COMPLETED (JVM-verified) | New check: every clickable node ≥ 48 × 48 dp on Home, Search, Details, Settings, the navigation and the first run. It found the six tabs at 46–47 dp on a 320 dp screen (M3 `NavigationBar`'s 8 dp item gaps); fixed by building the bar from M3's container and items without the gaps (≥ 53 dp) |
 | No glass / excessive gradients | COMPLETED | Glass dock removed; remaining gradients are text scrims over artwork and the title placeholder |
-| Polished Home / Details / Search / Player | NOT STARTED in this phase | Existing screens kept; no further redesign done here (see Known limitations) |
+| Polished Home / Details / Search / Player | Descoped by the user (12 Nov 2026: "proceed" after being asked) | Existing screens kept as they are, with their loading, empty and error states; no redesign |
 
 **Files modified:** `ui/core/.../Motion.kt` (new), `Skeleton.kt`, `Focus.kt`;
 `ui/screens/.../navigation/AppShell.kt`, `IndexingPill.kt` (was `Dock.kt`), `Routes.kt`,
@@ -459,5 +459,65 @@ re-rendered (41) and reviewed: home, library (dark and manga), first-run welcome
 **Known limitations / untested:** the first run, the new bar and reduced motion are verified on
 Robolectric only; no device, TalkBack or TV pass yet. On a 320 dp screen longer tab names in
 other languages may be shortened with an ellipsis (English fits). Home, Details, Search and Player
-were not redesigned in this phase beyond the navigation changes: the brief's "polished screens"
-item stays open, so this phase stays IN PROGRESS until it is scoped and done.
+were not redesigned (descoped by the user).
+
+**CI:** push run 29 and pull-request run 30 passed on `8f602df`.
+
+**Status:** NEEDS REAL-DEVICE TESTING: on a phone, run the first launch end to end (skip, and
+connect → choose chats → indexing), check the bar at the largest display size, TalkBack across
+the tabs and first run, and "Remove animations" on and off.
+
+
+---
+
+## Phase 7 — Performance and security · NEEDS REAL-DEVICE TESTING
+
+**Objective:** close the audit's remaining security and privacy findings, make storage visible and
+clearable, prepare R8, and write `docs/SECURITY_REVIEW.md`.
+
+**Inspected first:** `ImageRouting` and `SecureDns` (who sees what), `TmdbKeys` and the sync
+key's Keystore code, `GitHubAppUpdates` and the release workflow's `SHA256SUMS.txt`, every cache
+directory and its owner (`AppModule`, `WebStreams`, `TorrentEngine`, `appImageLoader`,
+`StreamCache`), the TDLib wrapper's `optimizeStorage`, the release build type, the JNI symbols of
+the three native libraries, every manually created `CoroutineScope`, the manifest, backup rules
+and network security config.
+
+**Already sound (kept):** backups disabled; only the launcher activity exported; media session
+restricted; logcat redaction; release key required; metadata queries carry only title, year,
+type and language; caches were already bounded.
+
+| Item | Status | Change |
+|---|---|---|
+| Image proxies disclosed, can be turned off | COMPLETED (JVM-verified) | Settings → Integrations → Image proxies (on by default, as before): names wsrv.nl and i0.wp.com and what they see; off → no proxy request (test) |
+| Automatic DNS over HTTPS disclosed, can be turned off | COMPLETED (JVM-verified) | Settings → Integrations → Secure DNS for blocked sites (on by default, as before): names Cloudflare and Google; off → no DoH lookup, blocked hosts stay unreachable (test) |
+| Storage screen | NEEDS REAL-DEVICE TESTING | Settings → Advanced → Storage: sizes of Telegram videos, add-on streams, torrents, posters; limits; Clear per cache (Telegram after a confirmation, via TDLib `optimizeStorage`); refused while a video plays. UI and view model tested; sizes and clearing on a device untested |
+| TMDB key encrypted | NEEDS REAL-DEVICE TESTING | AES-256-GCM with a Keystore key; plain keys from older versions migrated on first read; JVM tests use a stand-in cipher (Robolectric has no Keystore) |
+| Updater checks SHA256SUMS.txt | COMPLETED (JVM-verified) | Mismatch, missing entry or missing file → deleted, not installed; parser and hash tested (FIPS test vector) |
+| R8 for releases | NEEDS REAL-DEVICE TESTING | `app/proguard-rules.pro`; `-Pyourstream.minify=true` (off by default); release workflow `minify` checkbox; CI builds a minified release on every push. Minified APK builds; `dexdump` shows the classes the native libraries bind to (TDLib `JsonClient`, libtorrent SWIG callbacks, FFmpeg decoder) kept. Device checklist: `docs/RELEASE_R8.md` |
+| Background work cannot crash the app | COMPLETED (compile-verified) | The Telegram player's progress saves and file releases use the shared logging playback scope (each player had its own scope without a handler); sync and torrent scopes got handlers. No new test |
+| `docs/SECURITY_REVIEW.md` | COMPLETED | Assets, every outbound destination and what it receives, storage, platform surface, findings with status, what is unverified |
+| Dependency vulnerability scanning | NOT STARTED | No scanner configured; suggested: Dependabot alerts in the repository settings |
+
+**Files modified:** `core/network/.../SecureDns.kt`; `ui/core/.../Images.kt`;
+`metadata/sync/.../TmdbKeys.kt`; `app/.../update/GitHubAppUpdates.kt`,
+`app/.../account/AppStorage.kt` (new), `app/build.gradle.kts`, `app/proguard-rules.pro` (new);
+`telegram/api/.../TelegramFileRepository.kt`, `telegram/core/.../TelegramClient.kt`,
+`DefaultTelegramFileRepository.kt`, `telegram/tdlib/.../TdlibTelegramClient.kt`;
+`playback/media3/.../PlaybackModule.kt`, `playback/torrent/.../TorrentEngine.kt`,
+`sync/.../SyncModule.kt`; `ui/screens/.../settings/Storage.kt` (new), `AppPreferences.kt`,
+`Settings.kt`, `SettingsCatalog.kt`, navigation; `strings.xml`; `.github/workflows/ci.yml`,
+`release.yml`; `docs/SECURITY_REVIEW.md`, `docs/RELEASE_R8.md` (new), `docs/UI.md`.
+
+**Tests added:** `SecureDnsTest` (fallback off) · `ImageRoutingTest` (proxies off) ·
+`TmdbKeysTest` (encrypted at rest, migration, undecryptable key, removal) · `ChecksumTest` ·
+`StorageTest` (sizes, Telegram confirmation, result and refusal).
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass (579 JVM tests
+in the result files, 0 failures); lint 0 errors, 15 warnings (a new `UsableSpace` warning from
+the storage page was fixed by using `getAllocatableBytes`). `:app:assembleRelease
+-Pyourstream.minify=true`: builds; dex inspected as above.
+
+**Real-device checks:** `docs/RELEASE_R8.md` (minified build); Settings → Storage sizes and each
+Clear (with and without a video playing); TMDB key saved, app restarted, key still works; an
+older version's plain key migrated; Image proxies / Secure DNS for blocked sites off on a network
+that blocks TMDB (posters show titles, no requests to the proxies).

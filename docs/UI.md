@@ -144,8 +144,9 @@ Laid out like Nuvio's: a search field, the Telegram account as a profile card, t
 (You, Look, Watch, Services, System) of category pages (`SettingsPageRoute`): Appearance (style,
 theme, AMOLED black, tab names, reduce motion), Layout (Home rows, poster size), Content & discovery (add-ons,
 Telegram sources, library status), Playback (player, controls, up next, audio and subtitles,
-decoders, stream buffer, torrents), Integrations (TMDB, secure DNS), Advanced (image cache,
-reset) and About (version, updates, source, open-source licenses). Every row is declared once in
+decoders, stream buffer, torrents), Integrations (TMDB, secure DNS, secure DNS for blocked
+sites, image proxies: each says which third party sees what), Advanced (Storage: each cache's
+size and limit with a Clear button, Telegram videos after a confirmation; reset) and About (version, updates, source, open-source licenses). Every row is declared once in
 `SettingsCatalog.kt`; the hub, the pages and the search results all render from that list, so a
 search result is the working row itself.
 
