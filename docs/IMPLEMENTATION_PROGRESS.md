@@ -84,8 +84,21 @@ of the next commit. All four runs restored the same 117 task outputs from the bu
 cache contents are not the difference. Tried and not reproduced locally: a cold build with
 the cache filled by the previous commit (passed, 17 s). The failing test names were only in an
 artifact this session cannot download, so CI now prints them (and the module's generated Hilt
-metadata and compiled classes) in a "Failure summary" step. **Status: open, intermittent;
-next failure gives the evidence.**
+metadata and compiled classes) in a "Failure summary" step.
+
+**Update 2 — evidence and fix attempt.** The push run of `5dcc747` failed again (and its re-run).
+The new summary showed: no failing tests, and `playback:media3`'s Hilt metadata present and
+compiled. The missing bindings this time came from *other* modules (`catalog:sync`:
+`CatalogCache`, `LocalCatalogSource`, `LibraryAvailability`, `ExternalMetadataFallback`;
+`assistant:engine`: `MediaAssistant`). So the app's Hilt aggregation intermittently sees an
+incomplete set of library classes, whichever modules they are. All affected modules applied the
+Hilt Gradle plugin, which adds a bytecode transform (`transformDebugClassesWithAsm`) whose
+output replaces each library's classes for consumers. Libraries need that plugin only for
+`@AndroidEntryPoint` classes, and only `app` has any (`MainActivity`, `YourStreamApp`,
+`GitHubAppUpdates`' receiver). **Change:** the plugin is removed from the 12 library modules
+(KSP `hilt-compiler` still generates their modules and factories); only `app` applies it. Clean
+cache-less build, all tests, lint and APK pass. **Status: fix applied, being verified by repeated
+CI runs** (an intermittent failure needs several green runs, not one).
 
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
