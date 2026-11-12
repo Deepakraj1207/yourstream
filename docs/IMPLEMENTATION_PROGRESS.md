@@ -576,4 +576,7 @@ warning was fixed by handling Android 14's "selected videos only").
 resolution; the player finds the duration); subtitles beside a local video are not picked up
 yet; a playback error on a local file may be worded like a network error.
 
+**CI:** push run 35 and pull-request run 36 passed on `6cadd9a` (including the minified
+release build).
+
 **Real-device checks:** `docs/LOCAL_MEDIA.md` "Needs a device" (8 steps).
