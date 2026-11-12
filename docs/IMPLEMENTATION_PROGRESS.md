@@ -144,6 +144,14 @@ time, which points at KSP tasks running concurrently (KSP2 runs inside the Gradl
 (root `build.gradle.kts`); the failure summary now also prints the KSP-generated file count of
 every module. **Status: fix applied; verifying with repeated push runs.**
 
+**Result:** with KSP serialised, CI on `2708d76` passed 4 of 4 runs (the push run three times,
+plus the pull-request run), every step green (APK, tests, lint). Before it, 7 of the previous
+11 push runs had failed. Counted as fixed; the failure summary stays in CI, so a recurrence
+would show the module and its KSP output at once. Cost: KSP steps no longer overlap (the APK
+step took ≈4–5 min on CI). Earlier attempts that did not fix it, kept or reverted as noted:
+library Hilt plugin removed (kept as a cleanup), build cache off (reverted), build/test/lint
+split (kept: clearer CI, and tests no longer compete with compilation).
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first
