@@ -31,6 +31,11 @@ data class IndexedChatEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     /** Paused by the user: no indexing runs until resumed (live updates still apply). */
     @ColumnInfo(name = "paused", defaultValue = "0") val paused: Boolean = false,
+    /**
+     * v14: where the files come from: TELEGRAM (a chat; [chatId] is Telegram's) or LOCAL (a folder
+     * or the device's videos; [chatId] is in the reserved local range, see `LocalSourceIds`).
+     */
+    @ColumnInfo(name = "source", defaultValue = "TELEGRAM") val source: String = "TELEGRAM",
 )
 
 /**
@@ -124,6 +129,11 @@ data class MediaEntity(
      * file's own name and caption carry no title. Null: not looked for yet; "": looked, none.
      */
     @ColumnInfo(name = "context_caption") val contextCaption: String? = null,
+    /**
+     * v14: a file on this device: its `content://` address (Storage Access Framework document or
+     * MediaStore item). Null for Telegram files, which are found by [chatId] and [messageId].
+     */
+    @ColumnInfo(name = "locator") val locator: String? = null,
 )
 
 /**

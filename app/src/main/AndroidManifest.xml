@@ -9,6 +9,12 @@
     <!-- Background playback: the media session runs as a foreground service while a video plays. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Only for Settings → Files on this device → "Add all videos" (asked at that moment).
+         Folders chosen with the system picker need no permission. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Android 14+: the user may allow only the videos they select; MediaStore then lists just those. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Runs on Android TV too: no touchscreen required, leanback launcher supported. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

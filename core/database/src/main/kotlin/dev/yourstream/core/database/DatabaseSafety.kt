@@ -47,7 +47,7 @@ data class DatabaseOpenReport(
  * Destructive migration is never used. The app always gets a working database.
  */
 object DatabaseOpener {
-    const val CURRENT_VERSION = 13
+    const val CURRENT_VERSION = 14
 
     fun open(context: Context, name: String = YourStreamDatabase.NAME, log: (String, Throwable?) -> Unit = { _, _ -> }): Pair<YourStreamDatabase, DatabaseOpenReport> {
         val start = System.nanoTime()

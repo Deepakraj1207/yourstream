@@ -49,7 +49,7 @@ internal fun MediaVersionRow.toModel() = MediaVersion(
     durationSeconds = durationSeconds, resolution = resolution, quality = quality, videoCodec = videoCodec,
     languages = languages?.split(',')?.filter { it.isNotBlank() }.orEmpty(), isDeleted = isDeleted, isDuplicate = isDuplicate,
     episodeId = episodeId, isManual = method == LibrarySynchronizer.METHOD_MANUAL,
-    isExcluded = method == LibrarySynchronizer.METHOD_EXCLUDED, downloadState = downloadState,
+    isExcluded = method == LibrarySynchronizer.METHOD_EXCLUDED, downloadState = downloadState, locator = locator,
 )
 
 internal fun WatchStateEntity.toProgress() = WatchProgress(positionMs, durationMs, completed, lastWatchedAt)

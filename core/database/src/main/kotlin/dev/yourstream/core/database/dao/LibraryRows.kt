@@ -97,6 +97,8 @@ data class MediaVersionRow(
     @ColumnInfo(name = "episode_id") val episodeId: Long?,
     val method: String,
     @ColumnInfo(name = "download_state") val downloadState: String,
+    /** v14: `content://` address of a file on this device; null for Telegram files. */
+    val locator: String? = null,
 )
 
 /** Continue-watching / recently-watched entry. */

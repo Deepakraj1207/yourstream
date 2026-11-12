@@ -85,7 +85,18 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
         workManager.enqueueUniquePeriodicWork(PERIODIC_NAME, existing, request)
     }
 
-    private fun request(chatId: Long, mode: IndexMode) = OneTimeWorkRequestBuilder<IndexChatWorker>()
+    private fun request(chatId: Long, mode: IndexMode) =
+        if (dev.yourstream.media.api.LocalSourceIds.isLocal(chatId)) localRequest(chatId) else telegramRequest(chatId, mode)
+
+    /** Files on this device: no network needed; never on a low battery when the policy says so. */
+    private fun localRequest(chatId: Long) = OneTimeWorkRequestBuilder<dev.yourstream.media.indexer.local.LocalScanWorker>()
+        .setInputData(workDataOf(IndexChatWorker.KEY_CHAT_ID to chatId))
+        .setConstraints(localConstraintsFor(_policy.value))
+        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+        .addTag(TAG)
+        .build()
+
+    private fun telegramRequest(chatId: Long, mode: IndexMode) = OneTimeWorkRequestBuilder<IndexChatWorker>()
         .setInputData(workDataOf(IndexChatWorker.KEY_CHAT_ID to chatId, IndexChatWorker.KEY_MODE to mode.name))
         .setConstraints(constraints)
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -100,6 +111,10 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
         /** WorkManager conditions for [policy] (pure; tested). */
         fun constraintsFor(policy: IndexingPolicy): Constraints = Constraints.Builder()
             .setRequiredNetworkType(if (policy.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(policy.batteryAware)
+            .build()
+        /** Local scans read the system's index only: the battery rule applies, the network rule does not (pure; tested). */
+        fun localConstraintsFor(policy: IndexingPolicy): Constraints = Constraints.Builder()
             .setRequiresBatteryNotLow(policy.batteryAware)
             .build()
         private const val PERIODIC_NAME = "media-index-periodic"

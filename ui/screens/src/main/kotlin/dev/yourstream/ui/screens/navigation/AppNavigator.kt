@@ -57,6 +57,7 @@ class AppNavigator(private val nav: NavHostController) {
     fun tmdb() = nav.navigate(TmdbRoute) { launchSingleTop = true }
     fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
+    fun localFiles() = nav.navigate(LocalFilesRoute) { launchSingleTop = true }
     fun storage() = nav.navigate(StorageRoute) { launchSingleTop = true }
 
     /** The guided first run (on first launch, or from Settings → About). */

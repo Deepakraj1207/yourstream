@@ -99,7 +99,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         WatchDismissalEntity::class,
         UserLibraryEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -127,6 +127,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         AutoMigration(from = 11, to = 12),
         // v13: indexed_chat.paused (indexing paused by the user). Adds a column defaulting to 0.
         AutoMigration(from = 12, to = 13),
+        AutoMigration(from = 13, to = 14),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {

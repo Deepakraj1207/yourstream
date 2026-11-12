@@ -93,7 +93,8 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(
             signedInAs = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
             signedIn = a == AuthState.Ready,
-            enabledSources = chats.count { it.enabled },
+            // Telegram chats only: folders on the device have their own row.
+            enabledSources = chats.count { it.enabled && !dev.yourstream.media.api.LocalSourceIds.isLocal(it.chatId) },
             languages = langs,
             reviewCount = r,
             syncOn = syncOn,
@@ -169,6 +170,8 @@ data class SettingsLinks(
     val setupGuide: (() -> Unit)? = null,
     /** Settings → Advanced → Storage. */
     val storage: (() -> Unit)? = null,
+    /** Settings → Content → Files on this device. */
+    val localFiles: (() -> Unit)? = null,
 )
 
 /**

@@ -72,6 +72,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
 @Serializable data object ProgressSyncRoute : Route
+/** Settings → Content → Files on this device. */
+@Serializable data object LocalFilesRoute : Route
 /** Settings → Advanced → Storage. */
 @Serializable data object StorageRoute : Route
 /** The guided first run: welcome, Telegram, chats, indexing, library, playback basics. */

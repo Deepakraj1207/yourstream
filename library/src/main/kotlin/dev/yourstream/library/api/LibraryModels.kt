@@ -153,7 +153,11 @@ data class MediaVersion(
     val isManual: Boolean,
     val isExcluded: Boolean,
     val downloadState: String,
-)
+    /** A file on this device (`content://` address); null for Telegram files. */
+    val locator: String? = null,
+) {
+    val isLocal: Boolean get() = locator != null
+}
 
 data class LibraryItemDetails(
     val summary: LibraryItemSummary,

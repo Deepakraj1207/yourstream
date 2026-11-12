@@ -85,6 +85,7 @@ class TelegramPlaybackControllerFactory @Inject constructor(
 abstract class PlaybackModule {
 
     @Binds abstract fun resolver(impl: LibraryMediaSourceResolver): MediaSourceResolver
+    @Binds abstract fun localFileCheck(impl: AndroidLocalFileCheck): LocalFileCheck
 
     @Binds abstract fun trackPreferences(impl: RoomTrackPreferenceStore): dev.yourstream.playback.tracks.TrackPreferenceStore
 

@@ -135,7 +135,7 @@ class FirstRunViewModel @Inject constructor(
             starting = a == AuthState.Unknown || a == AuthState.WaitParameters,
             unavailable = a is AuthState.NotConfigured,
             name = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
-            sources = chats.count { it.enabled },
+            sources = chats.count { it.enabled && !dev.yourstream.media.api.LocalSourceIds.isLocal(it.chatId) },
             indexing = indexing,
             files = files,
         )

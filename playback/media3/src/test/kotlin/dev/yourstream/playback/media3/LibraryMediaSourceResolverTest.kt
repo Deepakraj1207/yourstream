@@ -51,7 +51,8 @@ class LibraryMediaSourceResolverTest {
     }
     private val episodeRepo = stub(EpisodeRepository::class.java) { name, _ -> if (name == "versions") versions else error(name) }
     private val messages = stub(TelegramMessageRepository::class.java) { name, _ -> if (name == "lookupMessages") lookup else error(name) }
-    private val resolver = LibraryMediaSourceResolver(mediaRepo, episodeRepo, db, messages, sim)
+    private val readableLocal = mutableSetOf<String>()
+    private val resolver = LibraryMediaSourceResolver(mediaRepo, episodeRepo, db, messages, sim) { it in readableLocal }
 
     private fun version(mediaId: Long, resolution: Int?, size: Long = 1000, deleted: Boolean = false, duplicate: Boolean = false, excluded: Boolean = false) = MediaVersion(
         mediaId = mediaId, chatId = 1, messageId = mediaId * 10, fileName = "Movie.$resolution.mkv", sizeBytes = size, durationSeconds = 6,
@@ -85,6 +86,37 @@ class LibraryMediaSourceResolverTest {
     }
 
     @Test
+    fun aFileOnThisDevicePlaysFromItsAddressWithoutTelegram(): Unit = runBlocking {
+        val uri = "content://com.android.externalstorage.documents/tree/primary%3AMovies/document/primary%3AMovies%2FVikram.mkv"
+        versions = listOf(version(1, 1080).copy(chatId = dev.yourstream.media.api.LocalSourceIds.of(0), locator = uri))
+        readableLocal += uri
+        // Telegram is not asked (the message stub would fail the test if it were).
+        lookup = AppResult.Err(AppError.Network("offline"))
+        val media = (resolver.resolve(PlaybackTarget(7)) as AppResult.Ok).value
+        assertTrue(media.isLocal)
+        assertEquals(uri, media.localUri)
+        assertEquals(0, media.fileId)
+        assertEquals(uri, media.mediaItem().localConfiguration!!.uri.toString(), "Media3 opens the content address directly")
+        assertEquals(1L, media.mediaId)
+    }
+
+    @Test
+    fun aLocalFileThatIsGoneFallsThroughToAnotherVersion(): Unit = runBlocking {
+        val gone = "content://media/external/video/media/99"
+        sim.addFile(42, TestMedia.file(TestMedia.SMALL_360P, dir))
+        // The best version is a local file deleted since the last scan; the Telegram copy plays instead.
+        versions = listOf(version(1, 2160).copy(locator = gone), version(2, 720))
+        lookup = AppResult.Ok(listOf(found(42, 20)))
+        val media = (resolver.resolve(PlaybackTarget(7)) as AppResult.Ok).value
+        assertEquals(2L, media.mediaId)
+        assertEquals(false, media.isLocal)
+        // Asked for by itself, the gone file says so plainly.
+        val err = (resolver.resolve(PlaybackTarget(7), mediaId = 1) as AppResult.Err).error
+        assertIs<AppError.NotFound>(err)
+        assertTrue(err.message.contains("no longer on this device"))
+    }
+
+    @Test
     fun deletedMessagesAndUndownloadableFilesAreUnavailable(): Unit = runBlocking {
         versions = listOf(version(1, 720))
         lookup = AppResult.Ok(listOf(MessageLookup.Missing(10)))
@@ -105,7 +137,7 @@ class LibraryMediaSourceResolverTest {
     fun offlineUsesTheStoredFileIdWhenTelegramStillKnowsIt(): Unit = runBlocking {
         // Indexed media row: file_id 5, unique id "u5" (the simulator's ids are "u<id>").
         db.openHelper.writableDatabase.apply {
-            execSQL("INSERT INTO indexed_chat VALUES (1, 'Chat', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0)")
+            execSQL("INSERT INTO indexed_chat VALUES (1, 'Chat', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0, 'TELEGRAM')")
             execSQL(
                 """INSERT INTO media (id, chat_id, message_id, album_id, message_date, edit_date, file_id, file_unique_id,
                 remote_file_id, file_name, mime_type, extension, size_bytes, duration_seconds, width, height, video_codec,

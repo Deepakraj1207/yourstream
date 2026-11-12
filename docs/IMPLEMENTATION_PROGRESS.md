@@ -16,7 +16,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 5. Metadata and library | COMPLETED |
 | 6. UI/UX | NEEDS REAL-DEVICE TESTING |
 | 7. Performance and security | NEEDS REAL-DEVICE TESTING |
-| 8. Local media | NOT STARTED |
+| 8. Local media | NEEDS REAL-DEVICE TESTING |
 | 9. Advanced features | NOT STARTED |
 | 10. Release readiness | NOT STARTED |
 
@@ -524,3 +524,56 @@ release step (the push run now takes about 17 minutes instead of about 9).
 Clear (with and without a video playing); TMDB key saved, app restarted, key still works; an
 older version's plain key migrated; Image proxies / Secure DNS for blocked sites off on a network
 that blocks TMDB (posters show titles, no requests to the proxies).
+
+
+---
+
+## Phase 8 — Local media · NEEDS REAL-DEVICE TESTING
+
+**Objective:** videos stored on the device in the same library as Telegram videos, through a
+source abstraction, without rebuilding the index. Details: `docs/LOCAL_MEDIA.md`.
+
+**Inspected first:** `media` / `indexed_chat` entities and their keys, `RoomIndexStore.savePage`
+(upsert by chat + message, duplicate detection), `MediaNormalizer` (the parser's input),
+`IndexScheduler` / `IndexChatWorker` / `DefaultMediaIndexer` (queues, pause/resume),
+`IndexerInitializer`, the library's version query and `MediaVersion`,
+`LibraryMediaSourceResolver`, `PlayableMedia`, `TelegramMediaSourceFactory` (default factory for
+other URIs), `TelegramPlaybackController` (every Telegram-only step), `AccountData` (sign-out).
+
+**Decision (stated reason):** local media follows the account like the rest of the library.
+Scanning only while signed in; sign-out removes local rows too. Otherwise the sign-out rule
+("no account data while signed out") would wipe and rebuild local rows on every start. The
+**choice** of folders is a device setting and survives, so sources are rescanned after sign-in.
+
+| Item | Status | Change |
+|---|---|---|
+| Source abstraction + migration | COMPLETED | Schema v14 (AutoMigration): `indexed_chat.source` (TELEGRAM default), `media.locator`; reserved id range `LocalSourceIds`; migration test |
+| Folder sources (SAF) | NEEDS REAL-DEVICE TESTING | Picker, persisted access, recursive listing (`AndroidLocalFileLister`), scan worker on the per-chat queue; scanner tested on real Room with a stand-in listing |
+| All videos (MediaStore) | NEEDS REAL-DEVICE TESTING | `READ_MEDIA_VIDEO` / partial access on 14+ / `READ_EXTERNAL_STORAGE` ≤ 12, asked only on "Add all videos" |
+| Library integration | COMPLETED (JVM-verified) | Titles, episodes, duplicates, availability unchanged; the same film on Telegram and on the device is one title with two versions (tested) |
+| Playback | NEEDS REAL-DEVICE TESTING | Resolver checks the file is readable and plays `content://` directly; Telegram streaming steps skipped; a gone file falls through to another version (tested on the JVM) |
+| UI | COMPLETED (JVM-verified) | Settings → Content → Files on this device (add folder, add all videos, remove, scan again, signed-out note); Library status wording no longer says "From Telegram" |
+| Settings and first-run counts | COMPLETED | "N chats" counts Telegram chats only |
+
+**Files modified:** `core/database` (entities, DAO, v14 schema, `DatabaseSafety`),
+`media/api/.../LocalMedia.kt` (new), `media/parser/.../MediaNormalizer.kt`,
+`media/indexer` (`local/*` new, `IndexScheduler`, `IndexerInitializer`, `EntityMappers`, DI),
+`library` (`MediaVersion`, mapper), `playback/media3` (`PlayableMedia`, resolver,
+`LocalFileCheck`, controller guards, DI), `ui/screens` (`settings/LocalFiles.kt` new, catalog,
+navigation, counts, strings), `app` (manifest permissions, `DeviceAccountData` comment);
+`docs/LOCAL_MEDIA.md` (new), `docs/SECURITY_REVIEW.md`, `docs/TELEGRAM_SETUP.md`.
+
+**Tests added:** `LocalScannerTest` (7) · `LocalMediaLibraryTest` (3) ·
+`LibraryMediaSourceResolverTest` (+2) · `LocalFilesTest` (2) · `MigrationTest.v13ToV14…`.
+Positional `indexed_chat` fixtures in five test files got the new `source` value; the
+end-to-end pipeline passes a check that no local file is readable (it only uses Telegram).
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass (594 JVM tests
+in the result files, 0 failures); lint 0 errors, 15 warnings (a new `SelectedPhotoAccess`
+warning was fixed by handling Android 14's "selected videos only").
+
+**Known limitations:** no duration or resolution read from folder files (the name gives the
+resolution; the player finds the duration); subtitles beside a local video are not picked up
+yet; a playback error on a local file may be worded like a network error.
+
+**Real-device checks:** `docs/LOCAL_MEDIA.md` "Needs a device" (8 steps).

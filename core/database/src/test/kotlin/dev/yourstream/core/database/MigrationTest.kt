@@ -220,4 +220,21 @@ class MigrationTest {
             close()
         }
     }
+
+    @Test
+    fun v13ToV14AddsTheSourceAndLocatorKeepingEverythingTelegram() = runTest {
+        helper.createDatabase(name, 13).apply {
+            execSQL("INSERT INTO indexed_chat (chat_id, title, category, enabled, state, last_error, last_indexed_at, last_verified_at, verify_cursor, added_at, updated_at, paused) VALUES (7, 'Tamil Movies', 'CHANNEL', 1, 'COMPLETED', NULL, 5, NULL, 0, 1, 2, 0)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 14, true).apply {
+            query("SELECT title, source FROM indexed_chat WHERE chat_id = 7").use {
+                it.moveToFirst()
+                assertEquals("Tamil Movies", it.getString(0), "the chat survives")
+                assertEquals("TELEGRAM", it.getString(1), "existing chats are Telegram chats")
+            }
+            query("SELECT locator FROM media LIMIT 0").use { assertEquals(1, it.columnCount, "media has a locator column") }
+            close()
+        }
+    }
 }

@@ -34,6 +34,9 @@ Assets, most sensitive first:
 | Torrent peers and trackers | Only after the user turns torrents on and accepts the warning (off by default) | Torrent protocol traffic | Every peer and tracker, which see the device's IP |
 | GitHub (`api.github.com`, release assets) | Update check | `User-Agent: YourStream/<version> (Android)` | GitHub |
 
+Files on this device (Phase 8) are read locally and never uploaded; their parsed title and year
+go to the metadata providers above exactly like a Telegram file's.
+
 Nothing else: no analytics, no crash upload, no ads. Diagnostics stay on the device unless the
 user exports them.
 
@@ -46,6 +49,7 @@ user exports them.
 | Library, history, search index | Room database | Sandbox; wiped on sign-out (`AccountData`) |
 | TMDB key (user's) | SharedPreferences `tmdb` | **AES-256-GCM with an Android Keystore key** (since Phase 7); older plain keys are encrypted on first read and the plain copy removed |
 | Progress-sync key | SharedPreferences | AES-256-GCM, Android Keystore |
+| Local sources (folders, "all videos") | SharedPreferences `local_sources` + persisted folder access | Sandbox; a device setting (kept at sign-out); the indexed files follow the account (wiped at sign-out) |
 | Web stream / torrent / image caches | `cacheDir/stream-cache`, `torrents`, `posters` | Bounded (512 MB / per stream / 300 MB); Settings → Storage shows and clears; wiped on sign-out |
 | Logs, events, crash reports | app files | Redacted on write (`Redactor`); wiped on sign-out |
 
@@ -53,7 +57,11 @@ user exports them.
 
 * **Permissions:** `INTERNET`, `ACCESS_NETWORK_STATE`, `REQUEST_INSTALL_PACKAGES` (in-app
   updater; blocks a Play Store listing as is), `FOREGROUND_SERVICE`,
-  `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (background playback).
+  `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (background playback), `READ_MEDIA_VIDEO` (with
+  `READ_MEDIA_VISUAL_USER_SELECTED` on Android 14+ for "selected videos only") /
+  `READ_EXTERNAL_STORAGE` (≤ Android 12) asked only when the user chooses "Add all videos on this
+  device" (Phase 8). Folders chosen with the system picker need no permission and only that
+  folder becomes readable.
 * **Exported components:** only the launcher activity. `PlaybackService` is not exported and its
   media session accepts only the system's media controllers, trusted controllers and the app
   itself. The update receiver and the file providers are not exported. No deep links, no WebView.

@@ -71,7 +71,7 @@ class ProgressSyncTest {
         var benS1E2 = 0L
 
         init {
-            sql.execSQL("INSERT INTO indexed_chat VALUES (1, 'Movies', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0)")
+            sql.execSQL("INSERT INTO indexed_chat VALUES (1, 'Movies', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0, 'TELEGRAM')")
             item(vikram, "MOVIE", "movie:vikram:2022")
             item(ben, "SERIES", "series:ben 10")
             sql.execSQL("INSERT INTO season (id, series_id, number, title, episode_count) VALUES (?, ?, 1, NULL, 2)", arrayOf<Any?>(10 + idOffset, ben))

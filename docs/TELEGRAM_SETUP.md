@@ -125,6 +125,10 @@ Needs a build with the API credentials (section 2) and a phone with Telegram on 
 11. **Flood limit:** many wrong codes in a row: "Too many attempts. Telegram asks you to wait …".
 12. Logs (adb logcat, tag prefix `YS/`) contain no phone numbers, codes or passwords.
 
+* **Files on this device** (Phase 8) are part of the account's library: their index rows go with
+  everything else. The choice of folders is a device setting and stays; they are scanned again
+  after the next sign-in (`docs/LOCAL_MEDIA.md`).
+
 ### Test servers (optional)
 
 Set `telegram.useTestDc=true`. Test accounts are separate from production accounts. Numbers

@@ -162,6 +162,11 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.settings_sources), pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
             Icons.AutoMirrored.Filled.List, tag = "settings-sources", onClick = host.onSources)
     })
+    add(entry("local-files", co, R.string.settings_group_sources, R.string.settings_local_files, "local device phone folder storage sd card mediastore offline files",
+        shown = { it.links.localFiles != null }) {
+        SettingRow(stringResource(R.string.settings_local_files), stringResource(R.string.settings_local_files_detail), Icons.AutoMirrored.Filled.List,
+            tag = "settings-local-files", onClick = host.links.localFiles)
+    })
     add(entry("index-wifi", co, R.string.settings_group_indexing, R.string.settings_index_wifi, "wifi mobile data metered indexing") {
         SettingToggle(stringResource(R.string.settings_index_wifi), stringResource(R.string.settings_index_wifi_detail), AppIcons.Update,
             host.indexing.wifiOnly, "pref-index-wifi") { host.onIndexing(host.indexing.copy(wifiOnly = it)) }

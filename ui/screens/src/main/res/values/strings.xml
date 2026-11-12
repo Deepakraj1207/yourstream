@@ -173,7 +173,7 @@
 
     <!-- Library status -->
     <string name="status_title">Library status</string>
-    <string name="status_stage_files">From Telegram</string>
+    <string name="status_stage_files">From your sources</string>
     <string name="status_syncing">Syncing…</string>
     <string name="status_synced_at">Up to date · checked %1$s</string>
     <string name="status_not_synced">Not synced yet</string>
@@ -190,8 +190,8 @@
     <string name="status_sources">Sources</string>
     <string name="status_manage_sources">Manage</string>
     <string name="status_source_found">%1$d files found so far</string>
-    <string name="status_privacy">Your files stay in Telegram. To find posters and details, only a title and year are sent to %1$s: no account and nothing about what you watch.</string>
-    <string name="status_privacy_no_providers">Your files stay in Telegram, and nothing about your library leaves this device.</string>
+    <string name="status_privacy">Your files stay where they are, in Telegram or on this device. To find posters and details, only a title and year are sent to %1$s: no account and nothing about what you watch.</string>
+    <string name="status_privacy_no_providers">Your files stay where they are, in Telegram or on this device, and nothing about your library leaves this device.</string>
 
     <!-- Match review -->
     <string name="review_title">Check matches</string>
@@ -659,4 +659,25 @@
     <string name="storage_telegram_confirm_title">Clear Telegram videos?</string>
     <string name="storage_telegram_confirm">This also removes videos you saved to this device. They stay in Telegram and stream again when you play them.</string>
     <string name="storage_busy">a video is playing. Stop it and try again.</string>
+
+    <!-- Files on this device -->
+    <string name="settings_local_files">Files on this device</string>
+    <string name="settings_local_files_detail">Folders with videos on this phone or tablet</string>
+    <string name="local_title">Files on this device</string>
+    <string name="local_intro">Add folders with movies and series stored on this device. They join your library next to your Telegram videos, with posters, episodes and resume.</string>
+    <string name="local_signed_out">Folders are scanned while you are signed in to Telegram: your library belongs to your account.</string>
+    <string name="local_none">No folders yet</string>
+    <string name="local_add_folder">Add a folder</string>
+    <string name="local_add_device">Add all videos on this device</string>
+    <string name="local_add_device_detail">Asks for permission to read your videos, including camera clips. Choosing folders needs no permission.</string>
+    <string name="local_device_videos">All videos on this device</string>
+    <string name="local_rescan">Scan again</string>
+    <string name="local_remove">Remove %1$s</string>
+    <string name="local_scanning">Scanning…</string>
+    <string name="local_not_scanned">Not scanned yet</string>
+    <plurals name="local_videos">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <string name="local_privacy">Files are read on this device and never uploaded. Only the title and year found in a file name are looked up for posters, as for Telegram videos. Removing a folder removes its videos from the library, not from the device.</string>
 </resources>

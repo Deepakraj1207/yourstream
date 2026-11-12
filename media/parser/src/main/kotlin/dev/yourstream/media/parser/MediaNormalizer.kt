@@ -58,6 +58,8 @@ data class NormalizedMedia(
     val parsed: ParsedMedia,
     /** The post above the file that gave its title (see [ParsedMediaMapper.needsContext]); "" = looked, none. */
     val contextCaption: String? = null,
+    /** A file on this device: its `content://` address (null for Telegram files). */
+    val locator: String? = null,
 ) {
     /** A video without a title of its own and without a post above it looked up yet. */
     val needsContext: Boolean get() = contextCaption == null && mediaType == MediaType.VIDEO && ParsedMediaMapper.needsContext(parsed)

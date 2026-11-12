@@ -28,7 +28,9 @@ import javax.inject.Singleton
  * Removed: indexed files, library, metadata matches, watch history and progress, track choices,
  * search index ([AccountData]); indexing work; posters and thumbnails; cached web and torrent
  * streams; the progress-sync key; logs, events and crash reports (they can name chats and titles).
- * Kept (device settings): app settings, language preferences, add-ons, the TMDB key.
+ * Kept (device settings): app settings, language preferences, add-ons, the TMDB key, the choice
+ * of local folders (their indexed files are removed with the rest and scanned again after the
+ * next sign-in).
  */
 @Singleton
 class DeviceAccountData @Inject constructor(
