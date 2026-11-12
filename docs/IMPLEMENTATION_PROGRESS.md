@@ -621,6 +621,8 @@ Telegram files) · `MappingTest.versionsSayWhereTheyAreFromTheStoredDownloadStat
 in the result files, 0 failures); lint 0 errors, 15 warnings (a new `UseKtx` warning from the
 sign-out step was fixed).
 
+**CI:** push run 39 passed on `5fb367b` (including the minified release build).
+
 **Known limitations:** downloads only from a title's Details (a movie's versions); episodes are
 not downloadable from the Episodes screen yet; downloads stop when Android ends the app.
 
