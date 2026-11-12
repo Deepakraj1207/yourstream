@@ -110,6 +110,17 @@ forcing the fallback: old test 3/3 fail, fixed test 3/3 pass. Fix (`56b484f`): t
 a speed at which the whole clip takes ~12 s. CI after both fixes: push and pull-request runs of
 `56b484f` passed; a re-run of the push run was started to confirm.
 
+**Update 4 — the Hilt part was not fixed by removing the plugin.** The next push run (`bd6cdfd`,
+docs only) failed with missing bindings from yet another module (`media:indexer`:
+`MediaIndexRepository`, `MediaIndexer`). Pattern over all runs: the module missing from the Hilt
+graph differs every time; every failing build reused task outputs from the Gradle build cache
+(CI push runs, and the one local failure); no build without the cache has failed (four cold
+local builds, every release build, which uses `--no-build-cache`). **Change:**
+`org.gradle.caching=false` in `gradle.properties` (CI and local). The plugin removal stays as a
+cleanup (libraries have no `@AndroidEntryPoint`), but it is not the fix. The test fix stands on
+its own (reproduced and verified). **Status: fix applied, needs several green push runs to be
+called fixed.**
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first
