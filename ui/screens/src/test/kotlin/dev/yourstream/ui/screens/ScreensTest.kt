@@ -302,6 +302,16 @@ class ScreensTest {
     }
 
     @Test
+    fun backgroundPlaybackIsOnByDefaultAndCanBeTurnedOff() {
+        assertEquals(true, dev.yourstream.ui.screens.settings.AppSettings().backgroundPlayback)
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsPageScreen(SettingsPage.PLAYBACK, SettingsHost(SettingsUiState("Asha", true, 3, ""), prefs = prefs, onPrefs = { prefs = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-background"))
+        compose.onNodeWithTag("pref-background").performClick()
+        assertEquals(false, prefs.backgroundPlayback)
+    }
+
+    @Test
     fun settingsContentPageOpensSources() {
         var sources = 0
         set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), onSources = { sources++ }), {}) }

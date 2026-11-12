@@ -46,6 +46,11 @@ data class AppSettings(
     val holdSpeed: Float = 2f,
     /** Leaving the app while a video plays keeps it playing in a floating window. */
     val pictureInPicture: Boolean = true,
+    /**
+     * Leaving the app or turning the screen off keeps the sound playing, with controls in the
+     * notification and on the lock screen. Off: playback pauses on leaving.
+     */
+    val backgroundPlayback: Boolean = true,
     /** Subtitle text size relative to the player's default. */
     val subtitleScale: Float = 1f,
     /** Subtitles on a dark box (else white text with a black outline). */
@@ -107,6 +112,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("player_landscape", s.playerLandscape)
             .putFloat("hold_speed", s.holdSpeed)
             .putBoolean("pip", s.pictureInPicture)
+            .putBoolean("background_playback", s.backgroundPlayback)
             .putFloat("subtitle_scale", s.subtitleScale)
             .putBoolean("subtitle_box", s.subtitleBox)
             .putBoolean("torrents", s.torrentStreaming)
@@ -136,6 +142,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         playerLandscape = prefs.getBoolean("player_landscape", true),
         holdSpeed = prefs.getFloat("hold_speed", 2f).takeIf { it in AppSettings.HOLD_SPEEDS } ?: 2f,
         pictureInPicture = prefs.getBoolean("pip", true),
+        backgroundPlayback = prefs.getBoolean("background_playback", true),
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
         // Off unless the user turned it on (before 0.11 it defaulted to on without asking).

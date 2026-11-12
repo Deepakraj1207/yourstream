@@ -554,4 +554,7 @@
     <string name="settings_index_wifi_detail">Reading your chats uses a little data; on mobile data it waits for Wi-Fi</string>
     <string name="settings_index_battery">Wait while the battery is low</string>
     <string name="settings_index_battery_detail">Indexing pauses below about 15% battery, unless charging</string>
+    <string name="settings_background">Keep playing in the background</string>
+    <string name="settings_background_detail">With the screen off or another app open, the sound continues; controls in the notification and on the lock screen</string>
+    <string name="player_waiting_network">No connection. Playback continues when you\'re back online.</string>
 </resources>

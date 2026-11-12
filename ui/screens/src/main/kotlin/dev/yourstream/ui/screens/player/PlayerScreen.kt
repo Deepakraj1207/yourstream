@@ -119,10 +119,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    // Leaving the screen visibly (home button, another app) pauses playback.
+    // Leaving the screen visibly (home button, another app, screen off) pauses playback, unless
+    // background playback is on (Settings → Playback): then the media notification takes over.
     val owner = LocalLifecycleOwner.current
+    val background by androidx.compose.runtime.rememberUpdatedState(dev.yourstream.ui.screens.settings.LocalAppSettings.current.backgroundPlayback)
     DisposableEffect(owner) {
-        val observer = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_STOP) vm.onAction(PlayerAction.Pause) }
+        val observer = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_STOP && !background) vm.onAction(PlayerAction.Pause) }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
@@ -343,7 +345,9 @@ fun PlayerScreen(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = if (controls) 88.dp else 24.dp)
                     .semantics { liveRegion = LiveRegionMode.Polite },
             ) {
-                Text(r, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("recovery"))
+                // The controller's wording is technical; the common case gets a plain sentence.
+                val text = if (r == "waiting for network") stringResource(R.string.player_waiting_network) else r
+                Text(text, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("recovery"))
             }
         }
 

@@ -12,7 +12,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 1. Critical fixes | COMPLETED (one item moved to monitored risks, see below) |
 | 2. Telegram authentication | NEEDS REAL-DEVICE TESTING |
 | 3. Media indexing | NEEDS REAL-DEVICE TESTING |
-| 4. Streaming engine | NOT STARTED |
+| 4. Streaming engine | NEEDS REAL-DEVICE TESTING |
 | 5. Metadata and library | NOT STARTED |
 | 6. UI/UX | NOT STARTED |
 | 7. Performance and security | NOT STARTED |
@@ -288,3 +288,62 @@ release, not from this change).
 
 **Next:** Phase 4 — Streaming engine (background playback with a media session, process
 recreation, device validation checklist).
+
+---
+
+## Phase 4 — Streaming engine · NEEDS REAL-DEVICE TESTING
+
+**Objective:** playback that behaves like a media app: keeps playing in the background with
+system controls, recovers from network trouble and process death, and is validated on a device.
+
+**Inspected first:** `TelegramPlaybackController`, `PlaybackRecoveryPolicy`,
+`TelegramLoadErrorHandlingPolicy`, `TelegramFileStreamer`/`StreamingConfig`,
+`LibraryMediaSourceResolver`, `WebStreams`, `PlayerViewModel`/`PlayerScreen`,
+`StreamPlayerViewModel`, the manifest, `PlaybackSessionStore`, the existing playback tests.
+
+**Already sound (kept; covered by the existing simulated-Telegram tests):** range streaming
+while downloading, seek jumps the download window, adaptive buffering and prefetch, network-loss
+recovery with backoff and version fallback, offline wait bounded (`maxOfflineWaitMs` 120 s — the
+audit's "no deadline" item is not accurate), track selection and memory, FFmpeg audio, position
+saving (periodic + pause/stop/end) and restore after process death (`PlaybackSessionStore`).
+
+**Existing problems:** no media session: no notification or lock-screen controls, no
+headset buttons, no foreground service, and the library player paused on every `ON_STOP`, so
+playback stopped with the screen off; the offline message was raw text ("waiting for network").
+
+| Item | Status | Change |
+|---|---|---|
+| Background playback + system controls | COMPLETED (JVM) | `ActivePlayback` + `TitledPlayer` (`playback:media3`), `PlaybackService` (app, Media3 `MediaSessionService`, `foregroundServiceType=mediaPlayback`); both players register/unregister; started from `YourStreamApp` when a player registers |
+| Setting | COMPLETED | Settings → Playback → *Keep playing in the background* (on); off restores pause-on-leave in both players |
+| Session privacy | COMPLETED | Service not exported; `onConnect` accepts only the media notification, trusted system controllers and this app; swipe-away stops playback |
+| Offline message | COMPLETED | "No connection. Playback continues when you're back online." |
+| Real-device checklist | COMPLETED (written) | `docs/PLAYBACK.md` §9b: 18 checks (seek in > 2 GB MKV, tracks, sync, MP4 index at end, airplane mode, Wi-Fi→mobile, background, lock screen, headset, swipe-away, notification tap, don't-keep-activities, process kill, next episode, deleted message) |
+
+**Files modified:** `gradle/libs.versions.toml` (`media3-session`, same version 1.11.1),
+`app/build.gradle.kts`, `app/src/main/AndroidManifest.xml` (service, `FOREGROUND_SERVICE`,
+`FOREGROUND_SERVICE_MEDIA_PLAYBACK`), `app/.../playback/PlaybackService.kt` (new),
+`app/.../YourStreamApp.kt`, `playback/media3/.../ActivePlayback.kt` (new),
+`playback/media3/build.gradle.kts` (test dep), `ui/screens/.../player/Player.kt`,
+`PlayerScreen.kt`, `addon/StreamPlayer.kt`, `settings/AppPreferences.kt`, `SettingsCatalog.kt`,
+`strings.xml`, `docs/PLAYBACK.md`.
+
+**Tests added:** `ActivePlaybackTest` (Robolectric: registration rules incl. a stale detach; a real
+`MediaController` on a real `MediaSession` sees the title/subtitle and its play/pause drive the
+ExoPlayer) · `ScreensTest.backgroundPlaybackIsOnByDefaultAndCanBeTurnedOff`.
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass; lint 0
+errors, 15 warnings (unchanged). Merged manifest checked: service not exported, media playback
+type, both permissions.
+
+**Known limitations / remaining work:**
+* **Real Telegram playback is not validated** in this phase either: all playback tests use a
+  simulated Telegram file source. The checklist in `docs/PLAYBACK.md` §9b is the validation; its
+  results go here when run.
+* `PlaybackService` (foreground notification, lock screen, swipe-away) runs only on a device;
+  only the session/controller path is tested.
+* No Android 13+ notification-permission prompt: media-session notifications are exempt from it
+  (Android behaviour; to confirm on a device, checklist item 9).
+* Add-on streams still save no progress (backlog item 20, P2).
+
+**Next:** Phase 5 — Metadata and library (availability states, playable-only filter, a view for
+unmatched/hidden files).

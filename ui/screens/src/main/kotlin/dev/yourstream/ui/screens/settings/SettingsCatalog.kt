@@ -188,6 +188,10 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(pictureInPicture = it))
         }
     })
+    add(entry("background", pl, R.string.settings_group_player, R.string.settings_background, "background audio screen off lock screen notification") {
+        SettingToggle(stringResource(R.string.settings_background), stringResource(R.string.settings_background_detail), AppIcons.Volume,
+            prefs.backgroundPlayback, "pref-background") { change(prefs.copy(backgroundPlayback = it)) }
+    })
     add(entry("seek", pl, R.string.settings_group_controls, R.string.settings_seek, "skip forward back double tap") {
         SettingRow(stringResource(R.string.settings_seek), stringResource(R.string.settings_seconds, prefs.seekSeconds), AppIcons.FastForward, tag = "pref-seek") { open(SettingsDialog.SEEK) }
     })

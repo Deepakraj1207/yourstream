@@ -36,6 +36,7 @@ class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImag
     @Inject lateinit var database: dagger.Lazy<OpenedDatabase>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
     @Inject lateinit var accountSession: dagger.Lazy<dev.yourstream.ui.screens.settings.AccountSession>
+    @Inject lateinit var activePlayback: dev.yourstream.playback.media3.ActivePlayback
 
     private lateinit var diagnostics: AppDiagnostics
 
@@ -54,6 +55,19 @@ class YourStreamApp : Application(), Configuration.Provider, coil3.SingletonImag
         super.onCreate()
         registerComponentCallbacks(memoryCallbacks)
         appScope.launch { startup() }
+        startPlaybackServiceWhenPlaying()
+    }
+
+    /**
+     * A player was registered (the user opened one: the app is in the foreground, so starting a
+     * service is allowed): start the media session service. It becomes a foreground service while
+     * playing and stops itself when the player is unregistered.
+     */
+    private fun startPlaybackServiceWhenPlaying() = appScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+        activePlayback.current.collect { entry ->
+            if (entry != null) runCatching { startService(android.content.Intent(this@YourStreamApp, dev.yourstream.playback.PlaybackService::class.java)) }
+                .onFailure { diagnostics.events.warn(DiagnosticCategory.PLAYBACK, "Media session service not started: ${it.message}") }
+        }
     }
 
     /**

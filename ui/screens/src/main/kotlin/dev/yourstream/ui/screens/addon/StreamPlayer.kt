@@ -132,6 +132,7 @@ data class StreamPlayerState(
 @HiltViewModel
 class StreamPlayerViewModel @Inject constructor(
     saved: SavedStateHandle, web: WebStreams, private val torrents: TorrentEngine, prefs: dev.yourstream.ui.screens.settings.AppPreferences,
+    private val active: dev.yourstream.playback.media3.ActivePlayback,
 ) : ViewModel() {
     val route = saved.toRoute<StreamPlayerRoute>()
     private val headers: Map<String, String> = runCatching {
@@ -159,6 +160,8 @@ class StreamPlayerViewModel @Inject constructor(
             player.playWhenReady = true
         }
         viewModelScope.launch { while (isActive) { publish(); delay(500) } }
+        // The media notification and lock screen show what plays, and control this player.
+        active.attach(player, route.title, route.subtitle)
     }
 
     /** Peers send the file list, then the player starts reading the file while it downloads. */
@@ -241,6 +244,7 @@ class StreamPlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        active.detach(player) // before release: the media session lets go of it first
         player.release()
         torrent?.let(torrents::close)
     }
@@ -258,6 +262,14 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
     ImmersiveMode()
     Orientation(landscape)
     RestoreBrightnessOnExit()
+    // As in the library player: leaving pauses unless background playback is on.
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val background by androidx.compose.runtime.rememberUpdatedState(settings.backgroundPlayback)
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP && !background) vm.player.pause() }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
     var controls by remember { mutableStateOf(true) }
     var poke by remember { mutableIntStateOf(0) }
     var hint by remember { mutableStateOf<PlayerHint?>(null) }

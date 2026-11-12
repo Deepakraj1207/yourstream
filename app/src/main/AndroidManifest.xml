@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- In-app updates: hands a downloaded release APK to the system installer (the user confirms). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Background playback: the media session runs as a foreground service while a video plays. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Runs on Android TV too: no touchscreen required, leanback launcher supported. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -42,6 +45,19 @@
             </intent-filter>
         </activity>
 
+
+        <!--
+          Media session: notification and lock-screen controls, background playback. Not exported:
+          only the system and this app connect (PlaybackService.onConnect checks it too).
+        -->
+        <service
+            android:name=".playback.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
 
         <!-- The package installer's answer for an in-app update (confirm / done / failed). -->
         <receiver android:name=".update.UpdateInstallReceiver" android:exported="false" />

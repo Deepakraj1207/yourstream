@@ -148,6 +148,8 @@ dependencies {
     implementation(projects.core.diagnostics)
     implementation(projects.core.database)
     implementation(libs.androidx.media3.ui)
+    // Media session: notification and lock-screen controls, background playback (PlaybackService).
+    implementation(libs.androidx.media3.session)
     implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
