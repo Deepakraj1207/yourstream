@@ -121,6 +121,18 @@ cleanup (libraries have no `@AndroidEntryPoint`), but it is not the fix. The tes
 its own (reproduced and verified). **Status: fix applied, needs several green push runs to be
 called fixed.**
 
+**Update 5 — not the cache either.** The push run of `06fc4ca` (cache off) failed the same way
+(missing bindings, a different module again), so the cache change is reverted. Checked with
+`--dry-run`: `:app:hiltAggregateDepsDebug` does depend on every library's
+`bundleLibCompileToJarDebug`/`bundleLibRuntimeToJarDebug`, so it is not a missing task
+dependency. Observations that remain: pull-request runs passed 6/6, push runs fail often and run
+slower (≈10 vs 8 min); the build ran tests, lint and compilation in one parallel invocation with
+a 4 GB Gradle daemon, a Kotlin daemon of the same size and test JVMs up to 3 GB on a 16 GB
+runner. **Working hypothesis (unproven): memory pressure kills or degrades the Kotlin/KSP daemon
+mid-build.** Change: CI builds the APK first, then runs tests, then lint (separate steps, so
+compilation never competes with test JVMs), and the failure summary now reports daemon/OOM
+messages, the kernel's OOM log and the Hilt metadata count in every library jar.
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first

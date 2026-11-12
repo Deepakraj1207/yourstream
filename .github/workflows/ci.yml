@@ -37,9 +37,17 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Unit tests of every module (Android modules have only the debug variant), lint, the APK.
-      - name: Tests, lint, debug APK
-        run: ./gradlew --continue test :app:lintDebug :app:assembleDebug
+      # Build first, then tests, then lint: compiling (Kotlin/KSP daemons, Hilt) never competes
+      # for the runner's memory with the test JVMs. Output kept for the failure summary.
+      - name: Debug APK
+        run: ./gradlew :app:assembleDebug 2>&1 | tee build-apk.log; exit ${PIPESTATUS[0]}
+
+      # Unit tests of every module (Android modules have only the debug variant).
+      - name: Tests
+        run: ./gradlew --continue test 2>&1 | tee build-test.log; exit ${PIPESTATUS[0]}
+
+      - name: Lint
+        run: ./gradlew :app:lintDebug 2>&1 | tee build-lint.log; exit ${PIPESTATUS[0]}
 
       # Failures readable in the log itself: each failing test with its message, and (for the
       # intermittent Hilt "missing binding" error) what the playback module generated and compiled.
@@ -61,6 +69,14 @@ jobs:
           find playback/media3/build -path '*hilt_aggregated_deps*' -name '*.class' 2>/dev/null || true
           echo "== playback:media3 generated sources count"
           find playback/media3/build/generated -name '*.java' 2>/dev/null | wc -l
+          echo "== Daemons, memory (a crashed Kotlin/KSP daemon can leave a module half-compiled)"
+          grep -hiE "daemon|OutOfMemory|fallback strategy|Killed|exit code 137|GC overhead" build-*.log 2>/dev/null | sort | uniq -c | head -40 || true
+          sudo dmesg 2>/dev/null | grep -iE "out of memory|oom-kill|killed process" | tail -20 || true
+          free -m || true
+          echo "== Hilt metadata per library jar"
+          for jar in $(find . -path '*/build/intermediates/compile_library_classes_jar/debug/*' -name '*.jar'); do
+            echo "$jar: $(unzip -l "$jar" 2>/dev/null | grep -c hilt_aggregated_deps)"
+          done
 
       - name: Reports
         if: failure()
