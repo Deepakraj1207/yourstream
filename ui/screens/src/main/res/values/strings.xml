@@ -478,8 +478,13 @@
     <string name="settings_group_licenses">Open-source licenses</string>
     <string name="settings_amoled">AMOLED black</string>
     <string name="settings_amoled_detail">Dark theme on pure black: deeper contrast, less power on OLED screens</string>
-    <string name="settings_dock_labels">Tab names in the dock</string>
-    <string name="settings_dock_labels_detail">Show each tab\'s name under its icon</string>
+    <string name="settings_dock_labels">Tab names</string>
+    <string name="settings_dock_labels_detail">Show every tab\'s name in the navigation bar, not only the selected one\'s</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_detail">Pages fade instead of sliding; loading placeholders stay still. On automatically when the system\'s \"Remove animations\" is on</string>
+    <string name="settings_group_accessibility">Accessibility</string>
+    <string name="settings_setup_guide">Setup guide</string>
+    <string name="settings_setup_guide_detail">Walk through connecting Telegram, choosing chats and playback basics again</string>
     <string name="settings_home_hero">Featured banner</string>
     <string name="settings_home_hero_detail">The large banner at the top of Home</string>
     <string name="settings_home_catalogs">Add-on catalogs</string>
@@ -568,4 +573,65 @@
     <string name="details_removed">Removed from Telegram: every file of this title was deleted from your chats. Your progress is kept.</string>
     <string name="details_not_matched">Not matched with an online catalogue: the details come from the file name. Use Fix match to choose the right title.</string>
     <string name="details_on_device">On this device</string>
+
+    <!-- First run -->
+    <string name="first_run_step">Step %1$d of %2$d</string>
+    <string name="first_run_skip">Skip</string>
+    <string name="first_run_back">Back</string>
+    <string name="first_run_next">Next</string>
+    <string name="first_run_start">Get started</string>
+    <string name="first_run_not_now">Not now</string>
+    <string name="first_run_finish">Start watching</string>
+    <string name="first_run_welcome_title">Welcome to YourStream</string>
+    <string name="first_run_welcome_body">Watch the movies and series you keep in your Telegram chats, with posters, episodes and resume, on this device.</string>
+    <string name="first_run_privacy_title">What stays private</string>
+    <string name="first_run_privacy_files">Your videos stay in Telegram. Nothing is uploaded anywhere else.</string>
+    <string name="first_run_privacy_metadata">To find posters and details, only a title and year are sent to a movie database. Your messages are never sent.</string>
+    <string name="first_run_privacy_signout">Signing out removes your account\'s data from this device.</string>
+    <string name="first_run_telegram_title">Connect Telegram</string>
+    <string name="first_run_telegram_body">YourStream signs in with your own Telegram account, the same way the Telegram app does.</string>
+    <string name="first_run_telegram_how">Use your phone number and the code Telegram sends you, or scan a QR code from Telegram on another device.</string>
+    <string name="first_run_telegram_connect">Connect Telegram</string>
+    <string name="first_run_telegram_connected">Connected</string>
+    <string name="first_run_telegram_connected_as">Connected as %1$s</string>
+    <string name="first_run_telegram_starting">Getting Telegram ready…</string>
+    <string name="first_run_telegram_unavailable">Telegram sign-in is not available in this build of the app.</string>
+    <string name="first_run_sources_title">Choose your chats</string>
+    <string name="first_run_sources_body">Pick the channels, groups or chats where your videos are. Only those are read, and you can change them any time in Settings.</string>
+    <string name="first_run_sources_sign_in_first">Connect Telegram first to see your chats.</string>
+    <string name="first_run_sources_none">No chats chosen yet</string>
+    <string name="first_run_sources_choose">Choose chats</string>
+    <string name="first_run_sources_change">Change chats</string>
+    <plurals name="first_run_sources_chosen">
+        <item quantity="one">%1$d chat chosen</item>
+        <item quantity="other">%1$d chats chosen</item>
+    </plurals>
+    <string name="first_run_indexing_title">Building your library</string>
+    <string name="first_run_indexing_body">YourStream looks through the chosen chats for video files and recognises movies and series from their names.</string>
+    <plurals name="first_run_indexing_found">
+        <item quantity="one">%1$s video found so far</item>
+        <item quantity="other">%1$s videos found so far</item>
+    </plurals>
+    <plurals name="first_run_indexing_done">
+        <item quantity="one">%1$s video found</item>
+        <item quantity="other">%1$s videos found</item>
+    </plurals>
+    <string name="first_run_indexing_background">This carries on in the background. You can keep going.</string>
+    <string name="first_run_indexing_no_sources">Nothing to look through yet: choose chats first.</string>
+    <string name="first_run_indexing_waiting">Waiting to start. It begins when the device is online.</string>
+    <string name="first_run_indexing_controls">It waits when the battery is low and continues where it stopped. Pause it, or limit it to Wi-Fi, in Library status and Settings → Content.</string>
+    <string name="first_run_library_title">Finding things to watch</string>
+    <string name="first_run_library_body">The tabs at the bottom of the screen:</string>
+    <string name="first_run_tab_home">Home: continue watching, what was added recently, and suggestions.</string>
+    <string name="first_run_tab_movies">Movies and Series: everything found, with posters, filters and sorting.</string>
+    <string name="first_run_tab_search">Search: titles and file names, even with typos.</string>
+    <string name="first_run_tab_library">Library: the titles you add. Long-press a poster and choose Add to library.</string>
+    <string name="first_run_tab_settings">Settings: your account, chats, look and playback.</string>
+    <string name="first_run_playback_title">Playback basics</string>
+    <string name="first_run_playback_body">Tap a title, then Play. Videos stream from Telegram; nothing needs to be downloaded first.</string>
+    <string name="first_run_playback_resume">Stopped halfway? Play picks up where you left off.</string>
+    <string name="first_run_playback_seek">Double-tap the left or right side to skip back or forward.</string>
+    <string name="first_run_playback_swipe">Swipe up or down on the left for brightness, on the right for volume. Press and hold for 2× speed.</string>
+    <string name="first_run_playback_tracks">Audio language and subtitles: the buttons in the player\'s controls.</string>
+    <string name="first_run_playback_background">Audio keeps playing with the screen off, with controls on the lock screen.</string>
 </resources>

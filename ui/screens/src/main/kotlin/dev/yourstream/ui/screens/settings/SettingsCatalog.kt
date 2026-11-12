@@ -129,6 +129,11 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(dockLabels = it))
         }
     })
+    add(entry("reduce-motion", ap, R.string.settings_group_accessibility, R.string.settings_reduce_motion, "animation motion accessibility still fade") {
+        SettingToggle(stringResource(R.string.settings_reduce_motion), stringResource(R.string.settings_reduce_motion_detail), AppIcons.Brightness, prefs.reduceMotion, "pref-reduce-motion") {
+            change(prefs.copy(reduceMotion = it))
+        }
+    })
 
     // ---- Layout
     val la = SettingsPage.LAYOUT
@@ -269,6 +274,10 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     })
     add(entry("update", ab, R.string.settings_group_app, R.string.update_row, "update upgrade new version apk", shown = { it.onUpdate != null }) {
         SettingRow(stringResource(R.string.update_row), host.updateLine, AppIcons.Update, tag = "update-row", onClick = host.onUpdate)
+    })
+    add(entry("setup-guide", ab, R.string.settings_group_app, R.string.settings_setup_guide, "welcome first run setup guide tour help start",
+        shown = { it.links.setupGuide != null }) {
+        SettingRow(stringResource(R.string.settings_setup_guide), stringResource(R.string.settings_setup_guide_detail), Icons.Filled.Info, tag = "setup-guide", onClick = host.links.setupGuide)
     })
     add(entry("source", ab, R.string.settings_group_app, R.string.settings_source, "github open source code", shown = { it.onSourceCode != null }) {
         SettingRow(stringResource(R.string.settings_source), stringResource(R.string.settings_source_detail), Icons.Filled.Share, onClick = host.onSourceCode)

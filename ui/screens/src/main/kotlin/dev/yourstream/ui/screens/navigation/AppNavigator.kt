@@ -57,5 +57,14 @@ class AppNavigator(private val nav: NavHostController) {
     fun tmdb() = nav.navigate(TmdbRoute) { launchSingleTop = true }
     fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
+    /** The guided first run (on first launch, or from Settings → About). */
+    fun firstRun() = nav.navigate(FirstRunRoute) { launchSingleTop = true }
+
+    /** The first run is over: back to Home, as a fresh start. */
+    fun finishFirstRun() {
+        if (!nav.popBackStack(FirstRunRoute, inclusive = true)) return
+        top(TopLevel.HOME)
+    }
+
     fun back(): Boolean = nav.popBackStack()
 }

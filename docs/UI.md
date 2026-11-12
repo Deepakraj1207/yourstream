@@ -90,14 +90,14 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 | Destination | Route | Reached from |
 |---|---|---|
-| Home | `HomeRoute` (start) | top level |
-| Library | `LibraryRoute` | top level |
-| Movies / Series | `MoviesRoute` / `SeriesRoute` | top level (rail/drawer/TV); Library kind filter on phones; Home → "See all" |
-| Search | `SearchRoute` | top level |
-| Continue watching | `ContinueWatchingRoute` | top level (rail/drawer/TV); Home → "See all" |
-| Recently added | `RecentlyAddedRoute` | top level (rail/drawer/TV); Home → "See all" |
-| Favorites | `FavoritesRoute` | top level; Home → "See all" |
-| Settings | `SettingsRoute` | top level |
+| Home | `HomeRoute` (start) | main tab |
+| Movies / Series | `MoviesRoute` / `SeriesRoute` | main tabs; Home → "See all" |
+| Search | `SearchRoute` | main tab |
+| Library | `LibraryRoute` | main tab |
+| Settings | `SettingsRoute` | main tab |
+| Continue watching | `ContinueWatchingRoute` | Home → "See all" (top level; Home shows as the selected tab) |
+| Recently added | `RecentlyAddedRoute` | Home → "See all" (top level; Home shows as the selected tab) |
+| First run | `FirstRunRoute` | first launch; Settings → About → Setup guide (full screen, no navigation) |
 | Details | `DetailsRoute(itemId)` | any card |
 | Episodes | `EpisodesRoute(seriesId, seasonId?)` | Details → season |
 | Player | `PlayerRoute(itemId, episodeId?, mediaId?)` | Play / Resume / version / episode / continue-watching card / search `s2e5` |
@@ -105,20 +105,44 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Sources | `SourcesRoute` | Settings; Home "Choose chats" |
 | Audio & subtitles | `LanguagesRoute` | Settings |
 
-### Phone dock and indexing status
+### Main navigation and indexing status
 
-Phones navigate with a floating dock like Nuvio's: a frosted-glass pill (Home, Search, Library,
-Settings) floating over the content on the four main tabs only, each tab an icon with its name
-underneath (Settings → Appearance can hide the names), the current one on a soft pill. Glass is a
-translucent tint, a sheen and a hairline edge, with no backdrop blur, so it costs nothing per
-frame. Lists keep `LocalBottomClearance` free under their last item. Manga style: paper and ink,
-names in comic lettering. A light haptic tick on change.
+Every layout has the same six items, `MAIN_TABS`: Home, Movies, Series, Search, Library and
+Settings. Phones use a plain Material 3 navigation bar under the content (Phase 6 replaced the
+floating glass dock: six tabs did not fit it, and the brief asks for plain Material 3 without
+glass effects). It shows on the main tabs only; other pages use the whole screen. It is M3's
+container, elevation, insets and `NavigationBarItem`s without the 8 dp gaps `NavigationBar` puts
+between items: with them six tabs are 46–47 dp wide on a 320 dp screen (small phones, large
+display size); without them at least 53 dp (tested at 320 dp). Items are full-height tabs ("tab"
+role, selected state). Settings → Appearance → Tab names
+off shows only the selected tab's name; screen readers still get every name (tested). Manga style
+adds an ink rule along the top. Nothing floats over the lists, so `LocalBottomClearance` is 0.
+
+### First run
+
+`FirstRunScreen` (`ui/screens/.../firstrun/FirstRun.kt`) opens over Home on first launch: welcome
+with what stays private → Connect Telegram (opens the real sign-in screen; shows "Connected as …")
+→ Choose chats (the real chat picker; shows how many) → indexing progress (live from
+`IndexingMonitor` and the index count) → the tabs explained → playback basics. "Skip" on any
+step, or Back on the first, ends it; it is then not shown again (`FirstRunStore`, prefs file
+`first_run`, a device preference that sign-out keeps). Someone updating with chats already chosen
+never sees it. Settings → About → Setup guide opens it again. No API ids, hashes, error codes or
+provider internals appear: a build without Telegram credentials gets one plain sentence.
+
+### Reduced motion
+
+`LocalReducedMotion` is true when the system's "Remove animations" is on (animator duration
+scale 0, observed live) or Settings → Appearance → Reduce motion is on. Then page transitions
+are a 120 ms cross-fade (no slide or zoom), skeleton placeholders stop pulsing, the indexing
+icon stops spinning and its pill appears without sliding, and focused cards on TV are not
+lifted (the focus border remains). Compose itself already shortens finite animations by the
+system scale.
 
 ### Settings
 
 Laid out like Nuvio's: a search field, the Telegram account as a profile card, then sections
 (You, Look, Watch, Services, System) of category pages (`SettingsPageRoute`): Appearance (style,
-theme, AMOLED black, dock names), Layout (Home rows, poster size), Content & discovery (add-ons,
+theme, AMOLED black, tab names, reduce motion), Layout (Home rows, poster size), Content & discovery (add-ons,
 Telegram sources, library status), Playback (player, controls, up next, audio and subtitles,
 decoders, stream buffer, torrents), Integrations (TMDB, secure DNS), Advanced (image cache,
 reset) and About (version, updates, source, open-source licenses). Every row is declared once in
@@ -204,10 +228,10 @@ speed labels are pure functions in `PlayerViewModel` (tested).
 
 | Layout | When | Navigation | Cards |
 |---|---|---|---|
-| COMPACT | < 600 dp | bottom bar (Home, Library, Search, Favorites, Settings) | see `Dimens` |
-| MEDIUM | 600–839 dp | navigation rail (all 9) | see `Dimens` |
-| EXPANDED | ≥ 840 dp | permanent drawer | see `Dimens` |
-| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus) | 48 dp overscan gutter, always dark |
+| COMPACT | < 600 dp | Material 3 navigation bar (the six `MAIN_TABS`) | see `Dimens` |
+| MEDIUM | 600–839 dp | navigation rail (the same six) | see `Dimens` |
+| EXPANDED | ≥ 840 dp | permanent drawer (the same six) | see `Dimens` |
+| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus; the same six) | 48 dp overscan gutter, always dark |
 
 * **Rotation and size changes:** `MainActivity` handles them in place, so the player keeps
   playing.
@@ -278,7 +302,7 @@ speed labels are pure functions in `PlayerViewModel` (tested).
 
 ## Not done yet
 
-* **Visuals:** animated transitions between screens, backdrop (landscape) artwork, trailers.
+* **Visuals:** backdrop (landscape) artwork, trailers.
 * **Player:** scrub thumbnails, picture-in-picture, remembering the speed across episodes,
   subtitle styling.
 * **Input:** search voice input, a TV on-screen keyboard tuned for D-pad.
@@ -287,7 +311,8 @@ speed labels are pure functions in `PlayerViewModel` (tested).
 
 ## Adding a screen
 
-1. Add a `@Serializable` route in `Routes.kt` and, if top level, an entry in `TopLevel`.
+1. Add a `@Serializable` route in `Routes.kt` and, if top level, an entry in `TopLevel` (and in
+   `MAIN_TABS` only if it belongs in the navigation).
 2. In a new package, write a contract (`XxxUiState`, `XxxAction`) and a `@HiltViewModel` that
    only calls domain interfaces.
 3. Write a stateless `XxxScreen(state, onAction, …)` from `:ui:core` components, using

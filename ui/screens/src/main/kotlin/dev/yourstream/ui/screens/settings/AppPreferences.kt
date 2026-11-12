@@ -64,8 +64,13 @@ data class AppSettings(
     val secureDns: Boolean = false,
     /** Dark theme on pure black (OLED screens): backgrounds and cards' surroundings turn #000. */
     val amoledBlack: Boolean = false,
-    /** The phone's dock shows each tab's name under its icon. */
+    /** The phone's navigation bar shows every tab's name under its icon (else only the selected one's). */
     val dockLabels: Boolean = true,
+    /**
+     * Less movement: pages cross-fade instead of sliding, loading placeholders and the indexing
+     * icon stay still. The system "Remove animations" option has the same effect.
+     */
+    val reduceMotion: Boolean = false,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val homeRows: HomeRowsShown = HomeRowsShown(),
     /** Add-on and torrent streams: how far ahead the player buffers (within its memory limit). */
@@ -119,6 +124,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("secure_dns", s.secureDns)
             .putBoolean("amoled", s.amoledBlack)
             .putBoolean("dock_labels", s.dockLabels)
+            .putBoolean("reduce_motion", s.reduceMotion)
             .putString("poster_size", s.posterSize.name)
             .putBoolean("home_hero", s.homeRows.hero)
             .putBoolean("home_continue", s.homeRows.continueWatching)
@@ -150,6 +156,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         secureDns = prefs.getBoolean("secure_dns", false),
         amoledBlack = prefs.getBoolean("amoled", false),
         dockLabels = prefs.getBoolean("dock_labels", true),
+        reduceMotion = prefs.getBoolean("reduce_motion", false),
         posterSize = runCatching { PosterSize.valueOf(prefs.getString("poster_size", null)!!) }.getOrDefault(PosterSize.MEDIUM),
         homeRows = HomeRowsShown(
             hero = prefs.getBoolean("home_hero", true),

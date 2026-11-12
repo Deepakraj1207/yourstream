@@ -34,9 +34,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-/** A gently pulsing placeholder surface (the pulse follows the system animation scale). */
+/** A gently pulsing placeholder surface; still when motion is reduced ([LocalReducedMotion]). */
 fun Modifier.skeleton(): Modifier = composed {
-    val alpha = if (LocalInspectionMode.current) 0.6f else {
+    val alpha = if (LocalInspectionMode.current || LocalReducedMotion.current) 0.6f else {
         val t = rememberInfiniteTransition(label = "skeleton")
         val a by t.animateFloat(0.45f, 0.85f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "skeleton-alpha")
         a

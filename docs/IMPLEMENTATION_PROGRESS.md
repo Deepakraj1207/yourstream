@@ -14,15 +14,16 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 3. Media indexing | NEEDS REAL-DEVICE TESTING |
 | 4. Streaming engine | NEEDS REAL-DEVICE TESTING |
 | 5. Metadata and library | COMPLETED |
-| 6. UI/UX | NOT STARTED |
+| 6. UI/UX | IN PROGRESS |
 | 7. Performance and security | NOT STARTED |
 | 8. Local media | NOT STARTED |
 | 9. Advanced features | NOT STARTED |
 | 10. Release readiness | NOT STARTED |
 
 Decisions taken (user said "proceed" on the audit's recommendations, 11 Nov 2026):
-add-ons and torrents stay as optional extras, torrents off by default; the dock question (glass
-vs. plain Material 3) is decided in Phase 6.
+add-ons and torrents stay as optional extras, torrents off by default. Phase 6 (user said "Yes",
+12 Nov 2026): the glass dock is replaced by a plain Material 3 navigation bar with Movies and
+Series added.
 
 ---
 
@@ -401,3 +402,62 @@ became inaccessible is shown per chat in Library status, not per title.
 
 **Next:** Phase 6 — UI/UX (first-run flow, Movies/Series in the main navigation, reduced motion,
 dock decision).
+
+
+---
+
+## Phase 6 — UI/UX · IN PROGRESS
+
+**Objective:** simple navigation (Home, Movies, Series, Search, Library, Settings); a guided first
+run that hides API ids, hashes and provider internals; Material 3, dark and light, reusable
+components, loading/empty/error states, accessible touch targets, reduced motion, no glass
+effects.
+
+**Inspected first:** `AppShell`/`AdaptiveShell`, `Dock.kt`, `Routes.kt` (`TopLevel`),
+`AppNavigator`, `AppNavHost` (transitions), Home's setup panel and banner, Account and Sources
+screens, `IndexingMonitor`, `Skeleton`, `Focus`, every `infiniteRepeatable`/`AnimatedVisibility`,
+user-visible strings for credentials (none: the API id and hash are build config, never shown),
+the screen tests and screenshots.
+
+**Already sound (kept):** Material 3 throughout with dark, light, AMOLED and manga styles;
+shared components (`MediaRow`, `ListRow`, `EmptyState`, `ErrorState`, skeletons) with loading,
+empty and error states on Home, browse, Search and Details (existing tests); Compose already
+shortens finite animations by the system animation scale.
+
+**Existing problems:** the phone dock had four tabs (Movies and Series only via Home or the
+Library filter) and a glass look the brief rules out; no first-run guidance; looping animations
+(skeleton pulse, indexing spinner) and sliding/zooming page transitions ignored "Remove
+animations", and there was no app-level option.
+
+| Item | Status | Change |
+|---|---|---|
+| Six-tab navigation | COMPLETED | `MAIN_TABS` on every layout; phone: plain M3 `NavigationBar` under the content (glass dock and `Dock.kt` removed, indexing pill moved to `IndexingPill.kt`); Continue watching / Recently added count as Home; tab names option kept, names stay in the accessibility tree |
+| Guided first run | COMPLETED (JVM-verified) | `firstrun/FirstRun.kt`: 6 steps, skip on every step, links to the real sign-in and chat screens, live indexing progress; shown on first launch only (`FirstRunStore`), not to updating users who already read chats; Settings → About → Setup guide reopens it; full screen on every layout |
+| Reduced motion | COMPLETED (JVM-verified) | `ui/core/Motion.kt` `LocalReducedMotion` = system "Remove animations" (observed live) or Settings → Appearance → Reduce motion: cross-fade transitions, still skeletons, no spinner, no focus lift |
+| Touch targets | COMPLETED (JVM-verified) | New check: every clickable node ≥ 48 × 48 dp on Home, Search, Details, Settings, the navigation and the first run. It found the six tabs at 46–47 dp on a 320 dp screen (M3 `NavigationBar`'s 8 dp item gaps); fixed by building the bar from M3's container and items without the gaps (≥ 53 dp) |
+| No glass / excessive gradients | COMPLETED | Glass dock removed; remaining gradients are text scrims over artwork and the title placeholder |
+| Polished Home / Details / Search / Player | NOT STARTED in this phase | Existing screens kept; no further redesign done here (see Known limitations) |
+
+**Files modified:** `ui/core/.../Motion.kt` (new), `Skeleton.kt`, `Focus.kt`;
+`ui/screens/.../navigation/AppShell.kt`, `IndexingPill.kt` (was `Dock.kt`), `Routes.kt`,
+`AppNavigator.kt`, `AppNavHost.kt`, `ShellViewModel.kt`; `firstrun/FirstRun.kt` (new);
+`settings/AppPreferences.kt`, `SettingsCatalog.kt`, `Settings.kt`; `strings.xml`; `docs/UI.md`.
+
+**Tests added:** `FirstRunTest` (all six steps with live state changes; back and skip; Telegram
+step while starting or unavailable shows no ids or reasons; privacy text; shown once / not to
+set-up users / kept across restarts; finishing returns Home from first launch and from Settings,
+on a real `NavHost`) · `ReducedMotionTest` (system animation scale read and followed live) ·
+`ScreensTest` (six tabs on every layout, Home selected on Continue/Recent pages, tab names kept
+for screen readers without labels, Reduce motion toggle, 48 dp touch targets on Home, Search,
+Details, Settings and the navigation) · screenshots: first-run welcome, Telegram (light),
+indexing, playback; all phone screenshots re-rendered with the new bar.
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass (569 JVM
+tests in the result files, 0 failures); lint 0 errors, 15 warnings (unchanged). Screenshots
+re-rendered (41) and reviewed: home, library (dark and manga), first-run welcome and Telegram.
+
+**Known limitations / untested:** the first run, the new bar and reduced motion are verified on
+Robolectric only; no device, TalkBack or TV pass yet. On a 320 dp screen longer tab names in
+other languages may be shortened with an ellipsis (English fits). Home, Details, Search and Player
+were not redesigned in this phase beyond the navigation changes: the brief's "polished screens"
+item stays open, so this phase stays IN PROGRESS until it is scoped and done.

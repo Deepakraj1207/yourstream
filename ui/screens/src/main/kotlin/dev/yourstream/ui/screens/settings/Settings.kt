@@ -173,6 +173,8 @@ data class SettingsLinks(
     val sync: (() -> Unit)? = null,
     val addons: (() -> Unit)? = null,
     val tmdb: (() -> Unit)? = null,
+    /** The guided first run, opened again. */
+    val setupGuide: (() -> Unit)? = null,
 )
 
 /**

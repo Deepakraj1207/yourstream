@@ -72,21 +72,33 @@ import kotlinx.serialization.Serializable
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
 @Serializable data object ProgressSyncRoute : Route
+/** The guided first run: welcome, Telegram, chats, indexing, library, playback basics. */
+@Serializable data object FirstRunRoute : Route
 
 /**
- * Top-level destinations. [compact] = shown in the phone's bottom bar (max 5); all appear in the
- * rail, drawer and TV drawer. Movies, Series, Continue Watching on phones: from Library / Home.
+ * Top-level destinations: pages that open without a back arrow and keep their state when another
+ * tab is chosen. [MAIN_TABS] are the ones in the navigation (bar, rail, drawer, TV drawer);
+ * Continue watching and Recently added open from Home's "See all" and count as Home ([tab]).
  */
-enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector, val compact: Boolean) {
-    HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home, true),
-    LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List, true),
-    MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie, false),
-    SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv, false),
-    SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search, true),
-    CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
-    RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
-    SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings, true),
+enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector) {
+    HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home),
+    LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List),
+    MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie),
+    SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv),
+    SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search),
+    CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow),
+    RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange),
+    SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings);
+
+    /** The navigation item shown as selected on this destination. */
+    val tab: TopLevel get() = when (this) {
+        CONTINUE, RECENT -> HOME
+        else -> this
+    }
 }
+
+/** The navigation's items, in order, on every layout (phone bar, tablet rail, drawer, TV). */
+val MAIN_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.MOVIES, TopLevel.SERIES, TopLevel.SEARCH, TopLevel.LIBRARY, TopLevel.SETTINGS)
 
 /** What tapping a card opens. Decided by the ViewModel's mapping, executed by the navigator. */
 sealed interface OpenTarget {

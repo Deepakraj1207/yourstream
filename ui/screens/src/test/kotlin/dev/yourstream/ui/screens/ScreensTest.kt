@@ -60,6 +60,10 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import dev.yourstream.ui.screens.home.HomeUiState
 import dev.yourstream.ui.screens.navigation.AdaptiveShell
+import dev.yourstream.ui.screens.navigation.MAIN_TABS
+import dev.yourstream.ui.screens.navigation.MainNavigationBar
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assert
 import dev.yourstream.ui.screens.navigation.AppNavigator
 import dev.yourstream.ui.screens.navigation.DetailsRoute
 import dev.yourstream.ui.screens.navigation.HomeRoute
@@ -88,6 +92,28 @@ class ScreensTest {
     private fun set(layout: WindowLayout = WindowLayout.COMPACT, content: @androidx.compose.runtime.Composable () -> Unit) =
         compose.setContent { YourStreamTheme(layout) { content() } }
 
+    /**
+     * Every tappable thing on screen has a touch area of at least 48 × 48 dp (Material and Android
+     * accessibility guidance), including the area Material adds around smaller visuals.
+     */
+    private fun assertTouchTargets() {
+        val min = 48f - 0.5f // rounding of dp ↔ px
+        val small = compose.onAllNodes(androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().filter { n ->
+            // Big enough by its own size (even when scrolled partly out of view, which clips the
+            // touch bounds), or by its touch bounds (Material icon buttons draw 40 dp and extend
+            // their touch area to 48 dp around it).
+            val t = n.touchBoundsInRoot
+            with(compose.density) {
+                (n.size.width.toDp().value < min || n.size.height.toDp().value < min) &&
+                    (t.width.toDp().value < min || t.height.toDp().value < min)
+            }
+        }
+        assertTrue(small.isEmpty(), "touch targets under 48 dp: " + small.joinToString { n ->
+            "${n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.TestTag) { null } ?: n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.Text) { null } ?: n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null } ?: n.id} " +
+                with(compose.density) { "${n.size.width.toDp()}×${n.size.height.toDp()}" }
+        })
+    }
+
     @androidx.compose.runtime.Composable
     private fun rows(vararg recent: Tile): HomeRows {
         val r = kotlinx.coroutines.flow.flowOf(PagingData.from(recent.toList())).collectAsLazyPagingItems()
@@ -115,6 +141,7 @@ class ScreensTest {
         compose.onNodeWithTag("home").performScrollToNode(hasTestTag("card:item:7"))
         compose.onNodeWithTag("card:item:7").performClick()
         assertEquals(OpenTarget.Details(7), opened.last())
+        assertTouchTargets()
     }
 
     @Test
@@ -153,6 +180,7 @@ class ScreensTest {
         compose.onNodeWithText("doremon → doraemon").assertExists()
         compose.onNodeWithTag("top-result").performClick()
         assertEquals(listOf<OpenTarget>(OpenTarget.Details(1)), opened)
+        assertTouchTargets()
     }
 
     @Test
@@ -170,6 +198,7 @@ class ScreensTest {
         compose.onNodeWithTag("settings-page:ABOUT").performClick()
         assertEquals(listOf(SettingsPage.PLAYBACK, SettingsPage.ABOUT), opened)
         compose.onNodeWithText("Developer tools").assertDoesNotExist()
+        assertTouchTargets()
     }
 
     @Test
@@ -219,6 +248,9 @@ class ScreensTest {
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
         compose.onNodeWithTag("pref-dock-labels").performClick()
         assertEquals(false, prefs.dockLabels)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reduce-motion"))
+        compose.onNodeWithTag("pref-reduce-motion").performClick()
+        assertEquals(true, prefs.reduceMotion)
         page = SettingsPage.LAYOUT
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-home-hero"))
         compose.onNodeWithTag("pref-home-hero").performClick()
@@ -381,6 +413,7 @@ class ScreensTest {
         compose.onNodeWithTag("my-library").performScrollTo().performClick()
         assertEquals(listOf<DetailsAction>(DetailsAction.ToggleLibrary), actions)
         compose.onNodeWithTag("favorite").assertDoesNotExist()
+        assertTouchTargets()
     }
 
     @Test
@@ -416,17 +449,41 @@ class ScreensTest {
         val selected = mutableListOf<TopLevel>()
         var layout by androidx.compose.runtime.mutableStateOf(WindowLayout.COMPACT)
         set { AdaptiveShell(layout, TopLevel.HOME, { selected += it }) { m -> Text("content", m) } }
-        // Phone: bottom bar with the 5 primary destinations.
+        // Phone: a Material 3 navigation bar with the six main tabs.
         compose.onNodeWithTag("nav:bar").assertExists()
-        compose.onNodeWithTag("nav:MOVIES").assertDoesNotExist()
+        for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+        compose.onNodeWithTag("nav:CONTINUE").assertDoesNotExist()
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+        assertTouchTargets()
         compose.onNodeWithTag("nav:SEARCH").performClick()
-        assertEquals(listOf(TopLevel.SEARCH), selected)
-        // Tablet rail, large-screen drawer, TV drawer: every destination.
+        compose.onNodeWithTag("nav:MOVIES").performClick()
+        assertEquals(listOf(TopLevel.SEARCH, TopLevel.MOVIES), selected)
+        // Tablet rail, large-screen drawer, TV drawer: the same six.
         for ((l, tag) in listOf(WindowLayout.MEDIUM to "nav:rail", WindowLayout.EXPANDED to "nav:drawer", WindowLayout.TV to "nav:tv")) {
             layout = l
             compose.onNodeWithTag(tag).assertExists()
-            compose.onNodeWithTag("nav:MOVIES").assertExists()
+            for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+            compose.onNodeWithTag("nav:RECENT").assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun continueAndRecentPagesShowHomeAsTheSelectedTab() {
+        set { AdaptiveShell(WindowLayout.COMPACT, TopLevel.RECENT, {}) { m -> Text("content", m) } }
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+    }
+
+    @Test
+    fun tabNamesStayReadableWithoutLabels() {
+        // Settings → Appearance → Tab names off: only the selected tab shows its name, but screen
+        // readers still get every tab's name.
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides dev.yourstream.ui.screens.settings.AppSettings(dockLabels = false)) {
+                YourStreamTheme(WindowLayout.COMPACT) { MainNavigationBar(TopLevel.HOME, {}) }
+            }
+        }
+        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
+        compose.onNodeWithTag("nav:SETTINGS").assert(androidx.compose.ui.test.hasText("Settings"))
     }
 
     @Test
