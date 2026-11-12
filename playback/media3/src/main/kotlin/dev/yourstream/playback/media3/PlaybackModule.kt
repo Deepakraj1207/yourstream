@@ -91,7 +91,8 @@ abstract class PlaybackModule {
 
     companion object {
         @Provides @Singleton
-        fun streamCache(files: TelegramFileRepository) = StreamCache(files)
+        fun streamCache(files: TelegramFileRepository, downloads: dagger.Lazy<VideoDownloads>) =
+            StreamCache(files, keep = { downloads.get().isKept(it.remoteUniqueId) })
 
         @Provides @Singleton @PlaybackScope
         fun playbackScope(logger: Logger): CoroutineScope =

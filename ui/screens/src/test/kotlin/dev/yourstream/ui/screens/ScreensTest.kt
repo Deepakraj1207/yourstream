@@ -358,6 +358,29 @@ class ScreensTest {
     }
 
     @Test
+    fun versionsCanBeDownloadedCancelledAndRemoved() {
+        val actions = mutableListOf<DetailsAction>()
+        val play = OpenTarget.Play(PlaybackTarget(1), 7)
+        fun row(id: Long, onDevice: Boolean = false, local: Boolean = false) =
+            dev.yourstream.ui.screens.details.VersionRow(id, "Vikram.$id.mkv", "1080p", OpenTarget.Play(PlaybackTarget(1), id), onDevice = onDevice, isLocal = local)
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 0, PrimaryAction.Play(play),
+                    versions = listOf(row(7), row(8), row(9, onDevice = true), row(10, local = true)), seasons = emptyList(), matched = true)),
+                    downloading = mapOf(8L to 0.42f)),
+                { actions += it }, {}, {},
+            )
+        }
+        compose.onNodeWithTag("details").performScrollToNode(hasTestTag("version:10"))
+        compose.onNodeWithText("1080p · Downloading 42%").assertExists()
+        compose.onNodeWithTag("download:10").assertDoesNotExist() // a file on this device: nothing to download
+        compose.onNodeWithTag("download:7").performClick()
+        compose.onNodeWithTag("download-cancel:8").performClick()
+        compose.onNodeWithTag("download-remove:9").performClick()
+        assertEquals(listOf(DetailsAction.Download(7), DetailsAction.CancelDownload(8), DetailsAction.RemoveDownload(9)), actions)
+    }
+
+    @Test
     fun aDownloadedVersionSaysItIsOnThisDevice() {
         val play = OpenTarget.Play(PlaybackTarget(1), 7)
         set {

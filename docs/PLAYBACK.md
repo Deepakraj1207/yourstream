@@ -274,6 +274,37 @@ toggle, stop.
   connected to a real `MediaSession` sees the title/subtitle and its play/pause reach the player.
   The service itself (foreground notification, lock screen, task removal) runs only on a device.
 
+## 9c. Offline downloads (Phase 9)
+
+A title's version row has **Download** (Telegram files only; files from a folder on the device
+have nothing to download). `VideoDownloads` resolves the current Telegram file id through the
+resolver and asks TDLib for the whole file at priority 1, below playback, so a video that is
+playing always downloads first. While it runs the row shows "Downloading 42%" and **Cancel**;
+when TDLib reports the file complete the library marks the version "On this device" and it
+plays without a connection (the resolver's offline path uses the stored file id).
+**Remove download** deletes the copy; the video stays in Telegram.
+
+* Files the user downloaded are remembered by Telegram's stable unique id (`downloads`
+  preferences) and never trimmed by `StreamCache`, even when played while still downloading.
+* Settings → Storage → Telegram videos clears them too (it says so before clearing). Sign-out
+  removes them (TDLib deletes its files on log-out; the list is cleared with the account data).
+* Downloads run while the app runs (no foreground service). One interrupted by the app closing
+  continues from where it stopped when Download is tapped again (TDLib keeps the partial file).
+* Fixed on the way: "On this device" compared the stored state with `COMPLETED`, but the index
+  stores `COMPLETE`, so it never showed (Phase 5 bug; its test bypassed the mapping, the new
+  `MappingTest` goes through it).
+
+## 9d. Resume for add-on streams (Phase 9)
+
+Web and torrent streams from add-ons remember where the user stopped (`StreamProgressStore`,
+table `stream_progress`, schema v15), per catalog title and episode: the IMDb id when the add-on
+gives one, so a different stream (another add-on, another quality) of the same episode resumes
+too. The library's rules apply (`CompletionPolicy`): nothing under 30 s; past 90 % or into the
+credits counts as finished and the next play starts over. Saved every 10 s while playing, on
+pause and when the player closes, and only once the stream has played (a stream that fails to
+load never overwrites a good position). The player shows "Resumed from 12:34 · Start over".
+Watch-history data: wiped on sign-out; the newest 500 entries are kept.
+
 ## 9b. Real-device validation checklist
 
 Nothing below is proven by the JVM tests (they use a simulated Telegram). Run it on a phone with

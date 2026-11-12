@@ -680,4 +680,10 @@
         <item quantity="other">%1$d videos</item>
     </plurals>
     <string name="local_privacy">Files are read on this device and never uploaded. Only the title and year found in a file name are looked up for posters, as for Telegram videos. Removing a folder removes its videos from the library, not from the device.</string>
+
+    <!-- Offline downloads -->
+    <string name="details_download">Download</string>
+    <string name="details_download_cancel">Cancel</string>
+    <string name="details_download_remove">Remove download</string>
+    <string name="details_downloading">Downloading %1$d%%</string>
 </resources>

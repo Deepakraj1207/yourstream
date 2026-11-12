@@ -121,6 +121,8 @@ data class StreamPlayerState(
     val subtitles: List<StreamTrack> = emptyList(),
     /** Torrent streams: peers, speed, what is ready (null for web streams). */
     val torrent: TorrentStats? = null,
+    /** Started at the remembered position (ms); null when it started from the beginning. */
+    val resumedFromMs: Long? = null,
 )
 
 /**
@@ -133,6 +135,7 @@ data class StreamPlayerState(
 class StreamPlayerViewModel @Inject constructor(
     saved: SavedStateHandle, web: WebStreams, private val torrents: TorrentEngine, prefs: dev.yourstream.ui.screens.settings.AppPreferences,
     private val active: dev.yourstream.playback.media3.ActivePlayback,
+    private val progress: dev.yourstream.watch.engine.StreamProgressStore,
 ) : ViewModel() {
     val route = saved.toRoute<StreamPlayerRoute>()
     private val headers: Map<String, String> = runCatching {
@@ -153,13 +156,18 @@ class StreamPlayerViewModel @Inject constructor(
         player.addListener(object : Player.Listener {
             override fun onEvents(p: Player, events: Player.Events) = publish()
             override fun onPlayerError(error: PlaybackException) { _state.update { it.copy(error = describe(error)) } }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) played = true else saveProgress()
+            }
         })
-        if (isTorrent) startTorrent() else {
-            player.setMediaItem(MediaItem.fromUri(route.url))
-            player.prepare()
-            player.playWhenReady = true
+        if (isTorrent) startTorrent() else viewModelScope.launch { start(MediaItem.fromUri(route.url)) }
+        viewModelScope.launch {
+            var ticks = 0
+            while (isActive) {
+                publish(); delay(500)
+                if (++ticks % 20 == 0 && player.isPlaying) saveProgress() // every 10 s while playing
+            }
         }
-        viewModelScope.launch { while (isActive) { publish(); delay(500) } }
         // The media notification and lock screen show what plays, and control this player.
         active.attach(player, route.title, route.subtitle)
     }
@@ -172,15 +180,45 @@ class StreamPlayerViewModel @Inject constructor(
             val s = torrents.open(request) { st -> _state.update { it.copy(torrent = st) } }
             torrent = s
             launch { s.stats.collect { st -> _state.update { it.copy(torrent = st) } } }
-            player.setMediaItem(MediaItem.fromUri(TorrentUri.of(s.key, s.fileName)))
-            player.prepare()
-            player.playWhenReady = true
+            start(MediaItem.fromUri(TorrentUri.of(s.key, s.fileName)))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             _state.update { it.copy(error = e.message ?: "the torrent could not be started") }
         }
     }
+
+    /** True once the stream has played: a stream that never started must not overwrite a good resume point. */
+    private var played = false
+
+    /** Starts [item] where the user stopped last time (same title and episode, any stream). */
+    private suspend fun start(item: MediaItem) {
+        val at = route.progressKey?.let { runCatching { progress.resumeAt(it) }.getOrNull() }
+        player.setMediaItem(item, at ?: 0L)
+        player.prepare()
+        player.playWhenReady = true
+        if (at != null) _state.update { it.copy(resumedFromMs = at) }
+    }
+
+    private fun saveProgress() {
+        val key = route.progressKey ?: return
+        if (!played) return
+        val position = player.currentPosition
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+        // Outlives the screen: the last save happens as the player closes.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching { progress.save(key, route.title, route.subtitle, position, duration) }
+        }
+    }
+
+    /** "Start over": back to 0, and the remembered position is forgotten. */
+    fun startOver() {
+        player.seekTo(0)
+        _state.update { it.copy(resumedFromMs = null) }
+        route.progressKey?.let { key -> kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { runCatching { progress.clear(key) } } }
+    }
+
+    fun dismissResume() = _state.update { it.copy(resumedFromMs = null) }
 
     /** A torrent problem in its own words; otherwise Media3's error code, readable. */
     private fun describe(error: PlaybackException): String {
@@ -244,6 +282,7 @@ class StreamPlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        saveProgress()
         active.detach(player) // before release: the media session lets go of it first
         player.release()
         torrent?.let(torrents::close)
@@ -311,6 +350,10 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(56.dp), color = Color.White)
             // Torrents: say what is happening while the first pieces arrive.
             if (t != null) TorrentStatus(t, Modifier.align(Alignment.Center).padding(top = 140.dp))
+        }
+        // Reopened where the user stopped (same title and episode): say so, with a way back to 0.
+        state.resumedFromMs?.let { r ->
+            dev.yourstream.ui.screens.player.ResumeChip(r, vm::startOver, vm::dismissResume, Modifier.align(Alignment.TopStart).padding(start = 16.dp, top = 80.dp))
         }
 
         AnimatedVisibility(controls && state.error == null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150)), modifier = Modifier.fillMaxSize()) {

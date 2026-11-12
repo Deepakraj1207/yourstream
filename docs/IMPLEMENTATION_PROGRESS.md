@@ -17,7 +17,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 6. UI/UX | NEEDS REAL-DEVICE TESTING |
 | 7. Performance and security | NEEDS REAL-DEVICE TESTING |
 | 8. Local media | NEEDS REAL-DEVICE TESTING |
-| 9. Advanced features | NOT STARTED |
+| 9. Advanced features | NEEDS REAL-DEVICE TESTING |
 | 10. Release readiness | NOT STARTED |
 
 Decisions taken (user said "proceed" on the audit's recommendations, 11 Nov 2026):
@@ -580,3 +580,50 @@ yet; a playback error on a local file may be worded like a network error.
 release build).
 
 **Real-device checks:** `docs/LOCAL_MEDIA.md` "Needs a device" (8 steps).
+
+
+---
+
+## Phase 9 — Optional advanced features · NEEDS REAL-DEVICE TESTING
+
+**Objective (audit items 20–24, optional):** pick what users feel most, at low risk; state what
+is deferred and why.
+
+**Inspected first:** the add-on stream player (no progress kept), the catalog title page (what
+identifies a stream), the library's `CompletionPolicy`, the Telegram file repository (full
+downloads, file updates), `LiveIndexUpdater` (download state into the index), `StreamCache`
+(what it trims), the Details mapping and version rows, the sign-out wipe.
+
+| Item | Status | Change |
+|---|---|---|
+| 20. Resume for add-on streams | NEEDS REAL-DEVICE TESTING | `StreamProgressStore` (table `stream_progress`, schema v15, AutoMigration), keyed by catalog title + episode (IMDb id when known: any stream of the episode resumes); library completion rules; "Resumed from … · Start over"; wiped on sign-out. Store tested on real Room; the player wiring is not covered by a test |
+| 24 (part). Offline downloads | NEEDS REAL-DEVICE TESTING | Download / Cancel / Remove download on a title's versions (`VideoDownloads`, TDLib full download at low priority, live progress); kept downloads never trimmed by the stream cache; cleared on sign-out. Tested against the simulated Telegram file layer, not TDLib |
+| Bug found: "On this device" never shown | COMPLETED | The Details mapping compared with `COMPLETED`; the index stores `COMPLETE` (Phase 5). Fixed; `MappingTest` now goes through the mapping |
+| 21. Foreground-service indexing | NOT STARTED (deferred) | Android 14/15 limit the `dataSync` service type (time limits, start restrictions); needs device data on large channels first |
+| 22. Unify network monitors / scopes / FTS tables | NOT STARTED (deferred) | Refactor with migration risk and no user-visible change; the crash-prone scopes were fixed in Phase 7 |
+| 23. Split `ui:screens` by feature | NOT STARTED (deferred) | Build-structure refactor; the brief says not to rewrite for a preferred architecture |
+| 24. SMB/WebDAV | NOT STARTED (deferred) | New protocols and stored credentials: a project of its own |
+| 24. TV polish | NOT STARTED (deferred) | Cannot be judged without a TV |
+
+**Files modified:** `core/database` (`StreamProgressEntity`, `StreamProgressDao`, v15),
+`watch/engine/.../StreamProgress.kt` (new), `playback/media3/.../VideoDownloads.kt` (new),
+`PlaybackModule.kt`, `playback/stream/.../StreamCache.kt`, `ui/screens` (`addon/StreamPlayer.kt`,
+`addon/CatalogTitle.kt`, `navigation/Routes.kt`, `details/Details.kt`, `DetailsScreen.kt`,
+`player/PlayerScreen.kt` resume chip shared, strings), `app/.../DeviceAccountData.kt`;
+`docs/PLAYBACK.md` §9c–9d, `docs/SECURITY_REVIEW.md`.
+
+**Tests added:** `StreamProgressTest` (4, real Room) · `VideoDownloadsTest` (3, simulated
+Telegram files) · `MappingTest.versionsSayWhereTheyAreFromTheStoredDownloadState` ·
+`ScreensTest.versionsCanBeDownloadedCancelledAndRemoved` · `MigrationTest.v14ToV15…` ·
+`AccountDataTest` now asserts `stream_progress` is wiped.
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass (604 JVM tests
+in the result files, 0 failures); lint 0 errors, 15 warnings (a new `UseKtx` warning from the
+sign-out step was fixed).
+
+**Known limitations:** downloads only from a title's Details (a movie's versions); episodes are
+not downloadable from the Episodes screen yet; downloads stop when Android ends the app.
+
+**Real-device checks:** download a movie, turn on airplane mode, play it; cancel midway and
+resume; remove the download and check Settings → Storage drops; play an add-on stream for a few
+minutes, close, reopen the same episode from another add-on: it resumes; Start over.

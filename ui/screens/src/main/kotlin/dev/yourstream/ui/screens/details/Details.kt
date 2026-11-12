@@ -39,6 +39,8 @@ data class VersionRow(
     val mediaId: Long, val name: String, val detail: String, val target: OpenTarget.Play,
     /** Fully downloaded by Telegram on this device: plays without a connection. */
     val onDevice: Boolean = false,
+    /** A file on this device (local folder): nothing to download. */
+    val isLocal: Boolean = false,
 )
 data class SeasonRow(val seasonId: Long, val name: String, val episodes: Int)
 
@@ -63,12 +65,21 @@ data class DetailsContent(
     val matched: Boolean? = null,
 )
 
-data class DetailsUiState(val content: UiState<DetailsContent> = UiState.Loading)
+data class DetailsUiState(
+    val content: UiState<DetailsContent> = UiState.Loading,
+    /** Downloads running now: media id → fraction done. */
+    val downloading: Map<Long, Float> = emptyMap(),
+)
 
 sealed interface DetailsAction {
     data object ToggleFavorite : DetailsAction
     data object ToggleLibrary : DetailsAction
     data object Retry : DetailsAction
+    /** Save this version on the device to watch offline. */
+    data class Download(val mediaId: Long) : DetailsAction
+    data class CancelDownload(val mediaId: Long) : DetailsAction
+    /** Delete the downloaded copy (the video stays in Telegram). */
+    data class RemoveDownload(val mediaId: Long) : DetailsAction
 }
 
 @HiltViewModel
@@ -76,12 +87,24 @@ class DetailsViewModel @Inject constructor(
     saved: SavedStateHandle,
     private val media: MediaRepository,
     private val watch: WatchIntelligence,
+    private val downloads: dev.yourstream.playback.media3.VideoDownloads,
 ) : ViewModel() {
     private val itemId = saved.toRoute<DetailsRoute>().itemId
     private val _state = MutableStateFlow(DetailsUiState())
     val state: StateFlow<DetailsUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch {
+            var before = emptyMap<Long, Float>()
+            downloads.progress.collect { now ->
+                _state.value = _state.value.copy(downloading = now)
+                // A download finished (or stopped): the version's "On this device" may have changed.
+                if ((before.keys - now.keys).isNotEmpty()) load(showLoading = false)
+                before = now
+            }
+        }
+    }
 
     fun onAction(action: DetailsAction) {
         when (action) {
@@ -94,17 +117,20 @@ class DetailsViewModel @Inject constructor(
                 val c = (state.value.content as? UiState.Content)?.value ?: return
                 viewModelScope.launch { media.setInLibrary(itemId, !c.inLibrary); load(showLoading = false) }
             }
+            is DetailsAction.Download -> viewModelScope.launch { downloads.start(PlaybackTarget(itemId), action.mediaId) }
+            is DetailsAction.CancelDownload -> viewModelScope.launch { downloads.cancel(PlaybackTarget(itemId), action.mediaId) }
+            is DetailsAction.RemoveDownload -> viewModelScope.launch { downloads.remove(PlaybackTarget(itemId), action.mediaId); load(showLoading = false) }
         }
     }
 
     private fun load(showLoading: Boolean = true) = viewModelScope.launch {
-        if (showLoading) _state.value = DetailsUiState(UiState.Loading)
-        _state.value = DetailsUiState(
-            runCatching {
-                val details = media.getItem(itemId) ?: return@runCatching UiState.Error(UiError(ErrorKind.NOT_FOUND, retryable = false))
-                UiState.Content(content(details, watch.summary(itemId)))
-            }.getOrElse { UiState.Error(it.toUiError()) },
-        )
+        if (showLoading) _state.value = _state.value.copy(content = UiState.Loading)
+        val loaded: UiState<DetailsContent> = runCatching {
+            val details = media.getItem(itemId) ?: return@runCatching UiState.Error(UiError(ErrorKind.NOT_FOUND, retryable = false))
+            UiState.Content(content(details, watch.summary(itemId)))
+        }.getOrElse { UiState.Error(it.toUiError()) }
+        // Read the state only now: download progress may have changed while loading.
+        _state.value = _state.value.copy(content = loaded)
     }
 
     companion object {
@@ -129,7 +155,8 @@ class DetailsViewModel @Inject constructor(
                     VersionRow(v.mediaId, v.fileName,
                         listOfNotNull(Presentation.resolution(v.resolution), v.quality, "%.1f GB".format(v.sizeBytes / 1e9), v.languages.joinToString("/").ifEmpty { null }).joinToString(" · "),
                         OpenTarget.Play(PlaybackTarget(s.id), v.mediaId),
-                        onDevice = v.downloadState == "COMPLETED")
+                        onDevice = v.downloadState == dev.yourstream.media.api.model.DownloadState.COMPLETE.name,
+                        isLocal = v.isLocal)
                 },
                 seasons = d.seasons.map { SeasonRow(it.id, it.displayName, it.episodeCount) },
             )

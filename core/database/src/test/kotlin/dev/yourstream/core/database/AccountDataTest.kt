@@ -45,7 +45,7 @@ class AccountDataTest {
     fun wipeEmptiesEveryAccountTableAndKeepsDevicePreferences() = runTest {
         val tables = AccountData.accountTables(sql)
         // The tables that matter most are recognised as account data.
-        for (t in listOf("indexed_chat", "media", "library_item", "watch_history", "watch_state", "metadata_match", "search_doc", "favorite", "track_preference")) {
+        for (t in listOf("indexed_chat", "media", "library_item", "watch_history", "watch_state", "metadata_match", "search_doc", "favorite", "track_preference", "stream_progress")) {
             assertTrue(t in tables, "$t is account data")
         }
         assertFalse("language_settings" in tables)

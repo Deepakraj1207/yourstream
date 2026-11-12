@@ -61,6 +61,8 @@ import kotlinx.serialization.Serializable
     val fileIdx: Int = -1,
     val sources: String = "",
     val fileName: String? = null,
+    /** Where to remember the position (catalog title + episode, `StreamProgressStore.keyOf`); null: not remembered. */
+    val progressKey: String? = null,
 ) : Route
 /** A Settings category page ([page]: a SettingsPage name). */
 @Serializable data class SettingsPageRoute(val page: String) : Route

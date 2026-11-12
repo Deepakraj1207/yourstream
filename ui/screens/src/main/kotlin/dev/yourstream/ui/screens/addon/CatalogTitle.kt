@@ -191,13 +191,15 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
     fun playTarget(s: AddonStream): OpenTarget.Stream? {
         val st = _state.value
         val subtitle = st.episode?.let { e -> listOfNotNull(e.season?.let { "S%02dE%02d".format(it, e.episode ?: 0) }, e.title).joinToString(" · ") }
+        // Any stream of this movie or episode resumes where the last one stopped.
+        val progress = dev.yourstream.watch.engine.StreamProgressStore.keyOf(route.type, route.id, item.ref.imdbId, st.episode?.season, st.episode?.episode)
         if (s.isTorrent) {
             return OpenTarget.Stream(StreamPlayerRoute("", st.title, subtitle, infoHash = s.infoHash, fileIdx = s.fileIdx ?: -1,
-                sources = s.sources.joinToString("\n"), fileName = s.fileName))
+                sources = s.sources.joinToString("\n"), fileName = s.fileName, progressKey = progress))
         }
         val url = s.url?.takeIf { s.playable } ?: return null
         val headers = JsonObject(s.headers.mapValues { JsonPrimitive(it.value) }).toString()
-        return OpenTarget.Stream(StreamPlayerRoute(url, st.title, subtitle, headers))
+        return OpenTarget.Stream(StreamPlayerRoute(url, st.title, subtitle, headers, progressKey = progress))
     }
 }
 

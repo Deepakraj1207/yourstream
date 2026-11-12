@@ -59,6 +59,8 @@ class DeviceAccountData @Inject constructor(
         }
         step("web stream cache") { webStreams.get().clearCache() }
         step("torrents") { torrents.get().shutdown() }
+        // Which Telegram files the user downloaded (TDLib deletes the files themselves on log-out).
+        step("downloads") { context.getSharedPreferences(dev.yourstream.playback.media3.VideoDownloads.PREFS, Context.MODE_PRIVATE).edit(commit = true) { clear() } }
         step("logs") {
             val d = AppDiagnostics.get(context)
             d.log.clear(); d.events.clear(); d.crashes.clear(); d.playbackSession.clear()

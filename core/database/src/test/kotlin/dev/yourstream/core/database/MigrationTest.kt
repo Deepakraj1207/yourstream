@@ -237,4 +237,13 @@ class MigrationTest {
             close()
         }
     }
+
+    @Test
+    fun v14ToV15AddsAnEmptyStreamProgressTable() = runTest {
+        helper.createDatabase(name, 14).close()
+        helper.runMigrationsAndValidate(name, 15, true).apply {
+            query("SELECT COUNT(*) FROM stream_progress").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+            close()
+        }
+    }
 }

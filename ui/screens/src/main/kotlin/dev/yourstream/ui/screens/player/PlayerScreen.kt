@@ -457,7 +457,7 @@ private fun Controls(
             }
         }
 
-        state.resumedFromMs?.let { r -> ResumeChip(r, onAction, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
+        state.resumedFromMs?.let { r -> ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
 
         // Centre: large touch transport (phones and tablets).
         if (!tv) {
@@ -545,12 +545,12 @@ private fun BarIcon(icon: ImageVector, label: String, tag: String, onClick: () -
 }
 
 @Composable
-private fun ResumeChip(fromMs: Long, onAction: (PlayerAction) -> Unit, modifier: Modifier) {
-    LaunchedEffect(fromMs) { delay(10_000); onAction(PlayerAction.DismissResume) }
+internal fun ResumeChip(fromMs: Long, onStartOver: () -> Unit, onDismiss: () -> Unit, modifier: Modifier) {
+    LaunchedEffect(fromMs) { delay(10_000); onDismiss() }
     Surface(shape = MaterialTheme.shapes.medium, color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White, modifier = modifier.testTag("resume-chip")) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.player_resumed, timeLabel(fromMs)), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { onAction(PlayerAction.StartOver) }, modifier = Modifier.focusHighlight().testTag("start-over")) {
+            TextButton(onClick = onStartOver, modifier = Modifier.focusHighlight().testTag("start-over")) {
                 Text(stringResource(R.string.player_start_over))
             }
         }

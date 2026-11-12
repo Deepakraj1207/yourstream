@@ -110,7 +110,14 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                     item { SectionHeader(stringResource(R.string.details_versions)) }
                     items(c.versions, key = { "v${it.mediaId}" }) { v ->
                         val onDevice = stringResource(R.string.details_on_device)
-                        ListRow(v.name, supporting = if (v.onDevice) "${v.detail} · $onDevice" else v.detail, onClick = { onOpen(v.target) },
+                        val progress = state.downloading[v.mediaId]
+                        val supporting = when {
+                            progress != null -> "${v.detail} · " + stringResource(R.string.details_downloading, (progress * 100).toInt())
+                            v.onDevice && !v.isLocal -> "${v.detail} · $onDevice"
+                            else -> v.detail
+                        }
+                        ListRow(v.name, supporting = supporting, onClick = { onOpen(v.target) },
+                            trailing = if (v.isLocal) null else { { DownloadButton(v, progress, onAction) } },
                             modifier = Modifier.testTag("version:${v.mediaId}"))
                     }
                 }
@@ -118,5 +125,18 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
             // Remote users land on the main action.
             LaunchedEffect(c.itemId) { if (c.primary != null) runCatching { primaryFocus.requestFocus() } }
         }
+    }
+}
+
+/** Download a Telegram version for offline viewing, cancel it while it runs, or free its space. */
+@Composable
+private fun DownloadButton(v: VersionRow, progress: Float?, onAction: (DetailsAction) -> Unit) {
+    val (label, action, tag) = when {
+        progress != null -> Triple(R.string.details_download_cancel, DetailsAction.CancelDownload(v.mediaId), "download-cancel:${v.mediaId}")
+        v.onDevice -> Triple(R.string.details_download_remove, DetailsAction.RemoveDownload(v.mediaId), "download-remove:${v.mediaId}")
+        else -> Triple(R.string.details_download, DetailsAction.Download(v.mediaId), "download:${v.mediaId}")
+    }
+    androidx.compose.material3.TextButton(onClick = { onAction(action) }, modifier = Modifier.focusHighlight().testTag(tag)) {
+        androidx.compose.material3.Text(stringResource(label))
     }
 }

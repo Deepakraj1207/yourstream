@@ -93,13 +93,14 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         EpisodeMetadataEntity::class,
         CatalogCacheEntity::class,
         LanguageSettingsEntity::class,
+        dev.yourstream.core.database.entity.StreamProgressEntity::class,
         SearchDocEntity::class,
         SearchFtsEntity::class,
         SearchDirtyEntity::class,
         WatchDismissalEntity::class,
         UserLibraryEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
     autoMigrations = [
         // v2: richer parsed metadata (media_parsed columns + normalized_title index).
@@ -128,6 +129,7 @@ import dev.yourstream.core.database.entity.WatchStateEntity
         // v13: indexed_chat.paused (indexing paused by the user). Adds a column defaulting to 0.
         AutoMigration(from = 12, to = 13),
         AutoMigration(from = 13, to = 14),
+        AutoMigration(from = 14, to = 15),
     ],
 )
 abstract class YourStreamDatabase : RoomDatabase() {
@@ -144,6 +146,7 @@ abstract class YourStreamDatabase : RoomDatabase() {
     abstract fun assistantDao(): AssistantDao
     abstract fun watchIntelligenceDao(): WatchIntelligenceDao
     abstract fun progressSyncDao(): ProgressSyncDao
+    abstract fun streamProgressDao(): dev.yourstream.core.database.dao.StreamProgressDao
 
     /** After creating the v3 tables: queue every already indexed file for the first library sync. */
     class V3 : AutoMigrationSpec {

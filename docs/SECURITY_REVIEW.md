@@ -49,6 +49,7 @@ user exports them.
 | Library, history, search index | Room database | Sandbox; wiped on sign-out (`AccountData`) |
 | TMDB key (user's) | SharedPreferences `tmdb` | **AES-256-GCM with an Android Keystore key** (since Phase 7); older plain keys are encrypted on first read and the plain copy removed |
 | Progress-sync key | SharedPreferences | AES-256-GCM, Android Keystore |
+| Kept downloads list, add-on stream positions | SharedPreferences `downloads`; Room `stream_progress` | Sandbox; both wiped on sign-out |
 | Local sources (folders, "all videos") | SharedPreferences `local_sources` + persisted folder access | Sandbox; a device setting (kept at sign-out); the indexed files follow the account (wiped at sign-out) |
 | Web stream / torrent / image caches | `cacheDir/stream-cache`, `torrents`, `posters` | Bounded (512 MB / per stream / 300 MB); Settings → Storage shows and clears; wiped on sign-out |
 | Logs, events, crash reports | app files | Redacted on write (`Redactor`); wiped on sign-out |
