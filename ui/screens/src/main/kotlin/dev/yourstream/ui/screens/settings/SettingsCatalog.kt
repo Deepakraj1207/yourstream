@@ -157,6 +157,14 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.settings_sources), pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
             Icons.AutoMirrored.Filled.List, tag = "settings-sources", onClick = host.onSources)
     })
+    add(entry("index-wifi", co, R.string.settings_group_indexing, R.string.settings_index_wifi, "wifi mobile data metered indexing") {
+        SettingToggle(stringResource(R.string.settings_index_wifi), stringResource(R.string.settings_index_wifi_detail), AppIcons.Update,
+            host.indexing.wifiOnly, "pref-index-wifi") { host.onIndexing(host.indexing.copy(wifiOnly = it)) }
+    })
+    add(entry("index-battery", co, R.string.settings_group_indexing, R.string.settings_index_battery, "battery power low indexing") {
+        SettingToggle(stringResource(R.string.settings_index_battery), stringResource(R.string.settings_index_battery_detail), AppIcons.Brightness,
+            host.indexing.batteryAware, "pref-index-battery") { host.onIndexing(host.indexing.copy(batteryAware = it)) }
+    })
     add(entry("library-status", co, R.string.settings_group_library, R.string.settings_status, "indexing sync matching progress", shown = { it.links.libraryStatus != null }) {
         SettingRow(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), AppIcons.Episodes, onClick = host.links.libraryStatus)
     })

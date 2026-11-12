@@ -535,4 +535,23 @@
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
     </plurals>
+    <string name="status_pause_all">Pause all</string>
+    <string name="status_resume_all">Resume all</string>
+    <string name="status_source_pause">Pause</string>
+    <string name="status_source_resume">Resume</string>
+    <string name="status_source_stop">Stop</string>
+    <string name="status_state_paused">Paused</string>
+    <string name="status_state_connecting">Connecting to Telegram…</string>
+    <string name="status_state_scanning">Scanning…</string>
+    <string name="status_state_processing">Reading titles…</string>
+    <string name="status_state_waiting">Waiting to continue</string>
+    <string name="status_state_waiting_wifi">Waiting for Wi-Fi</string>
+    <string name="status_state_recovering">Interrupted — continuing soon</string>
+    <string name="status_state_cancelled">Stopped — continues at the next sync</string>
+    <string name="status_state_failed">Stopped on an error</string>
+    <string name="settings_group_indexing">Indexing</string>
+    <string name="settings_index_wifi">Index on Wi-Fi only</string>
+    <string name="settings_index_wifi_detail">Reading your chats uses a little data; on mobile data it waits for Wi-Fi</string>
+    <string name="settings_index_battery">Wait while the battery is low</string>
+    <string name="settings_index_battery_detail">Indexing pauses below about 15% battery, unless charging</string>
 </resources>

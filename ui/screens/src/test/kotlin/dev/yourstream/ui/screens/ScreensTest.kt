@@ -290,6 +290,18 @@ class ScreensTest {
     }
 
     @Test
+    fun indexingCanBeLimitedToWifiAndAGoodBattery() {
+        var policy by androidx.compose.runtime.mutableStateOf(dev.yourstream.media.api.model.IndexingPolicy())
+        set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), indexing = policy, onIndexing = { policy = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-index-wifi"))
+        compose.onNodeWithTag("pref-index-wifi").performClick()
+        assertEquals(true, policy.wifiOnly)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-index-battery"))
+        compose.onNodeWithTag("pref-index-battery").performClick()
+        assertEquals(dev.yourstream.media.api.model.IndexingPolicy(wifiOnly = true, batteryAware = false), policy)
+    }
+
+    @Test
     fun settingsContentPageOpensSources() {
         var sources = 0
         set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), onSources = { sources++ }), {}) }

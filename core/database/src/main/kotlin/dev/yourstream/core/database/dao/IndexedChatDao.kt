@@ -21,6 +21,16 @@ interface IndexedChatDao {
     @Query("SELECT enabled FROM indexed_chat WHERE chat_id = :chatId")
     suspend fun isEnabled(chatId: Long): Boolean?
 
+    @Query("UPDATE indexed_chat SET paused = :paused, updated_at = :now WHERE chat_id = :chatId")
+    suspend fun setPaused(chatId: Long, paused: Boolean, now: Long)
+
+    @Query("SELECT paused FROM indexed_chat WHERE chat_id = :chatId")
+    suspend fun isPaused(chatId: Long): Boolean?
+
+    /** Rows left in [from] by an older version or a killed process, and not paused by the user. */
+    @Query("UPDATE indexed_chat SET state = :to WHERE state IN (:from) AND paused = 0")
+    suspend fun resetUnpausedStates(from: List<String>, to: String)
+
     @Query("UPDATE indexed_chat SET state = :state, last_error = :error, updated_at = :now WHERE chat_id = :chatId")
     suspend fun setState(chatId: Long, state: String, error: String?, now: Long)
 

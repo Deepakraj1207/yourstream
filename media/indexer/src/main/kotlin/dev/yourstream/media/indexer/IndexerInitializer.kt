@@ -20,8 +20,12 @@ class IndexerInitializer @Inject constructor(
     private val listeners: Set<@JvmSuppressWildcards MediaIndexListener>,
 ) {
     suspend fun start(scope: CoroutineScope) {
-        // A process that died mid-run left RUNNING behind; WorkManager will run that work again.
-        db.indexedChatDao().resetStates(listOf(IndexState.RUNNING.name), IndexState.PAUSED.name)
+        // A process that died mid-run left an active state behind (RUNNING before v13);
+        // WorkManager runs that work again, from the saved cursors.
+        val dao = db.indexedChatDao()
+        dao.resetUnpausedStates(listOf("RUNNING", IndexState.CONNECTING.name, IndexState.SCANNING.name, IndexState.PROCESSING.name), IndexState.RECOVERING.name)
+        // Before v13 PAUSED meant "time budget used up, continuation queued": that is QUEUED now.
+        dao.resetUnpausedStates(listOf(IndexState.PAUSED.name), IndexState.QUEUED.name)
         live.start(scope)
         scheduler.ensurePeriodicSync()
         if (reparser.outdatedCount() > 0) scheduler.scheduleReparse()

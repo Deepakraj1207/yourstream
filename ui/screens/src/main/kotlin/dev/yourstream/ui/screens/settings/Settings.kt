@@ -127,6 +127,8 @@ fun SettingsRoute(
     val cleared = stringResource(R.string.settings_cache_cleared)
     val resetDone = stringResource(R.string.settings_reset_done)
     val secured = androidx.compose.runtime.remember { dev.yourstream.core.network.SecureDns.securedHosts().sorted() }
+    val indexingVm: IndexingSettingsViewModel = hiltViewModel()
+    val indexing by indexingVm.policy.collectAsStateWithLifecycle()
     val host = SettingsHost(
         state, appVersion, prefs, { new -> prefsVm.update { new } }, onAccount, onSources, onLanguages, more,
         updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
@@ -155,6 +157,8 @@ fun SettingsRoute(
             android.widget.Toast.makeText(context, resetDone, android.widget.Toast.LENGTH_SHORT).show()
         },
         securedHosts = secured,
+        indexing = indexing,
+        onIndexing = { indexingVm.set(it) },
     )
     if (page == null) SettingsScreen(host, onPage) else SettingsPageScreen(page, host, onBack)
 }
@@ -192,7 +196,17 @@ data class SettingsHost(
     val onReset: (() -> Unit)? = null,
     /** Hosts resolved through DNS over HTTPS right now (Integrations → Secure DNS). */
     val securedHosts: List<String> = emptyList(),
+    /** When background indexing may run (Content & discovery → Indexing). */
+    val indexing: dev.yourstream.media.api.model.IndexingPolicy = dev.yourstream.media.api.model.IndexingPolicy(),
+    val onIndexing: (dev.yourstream.media.api.model.IndexingPolicy) -> Unit = {},
 )
+
+/** The indexing policy for Settings (it lives with the indexer: background workers read it). */
+@HiltViewModel
+class IndexingSettingsViewModel @Inject constructor(private val indexer: dev.yourstream.media.api.MediaIndexer) : ViewModel() {
+    val policy: StateFlow<dev.yourstream.media.api.model.IndexingPolicy> = indexer.policy
+    fun set(policy: dev.yourstream.media.api.model.IndexingPolicy) = viewModelScope.launch { runCatching { indexer.setPolicy(policy) } }
+}
 
 /**
  * Settings laid out like Nuvio's: a search field, the Telegram account as a profile card, then

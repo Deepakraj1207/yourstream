@@ -105,7 +105,7 @@ class LibraryMediaSourceResolverTest {
     fun offlineUsesTheStoredFileIdWhenTelegramStillKnowsIt(): Unit = runBlocking {
         // Indexed media row: file_id 5, unique id "u5" (the simulator's ids are "u<id>").
         db.openHelper.writableDatabase.apply {
-            execSQL("INSERT INTO indexed_chat VALUES (1, 'Chat', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0)")
+            execSQL("INSERT INTO indexed_chat VALUES (1, 'Chat', 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0)")
             execSQL(
                 """INSERT INTO media (id, chat_id, message_id, album_id, message_date, edit_date, file_id, file_unique_id,
                 remote_file_id, file_name, mime_type, extension, size_bytes, duration_seconds, width, height, video_codec,

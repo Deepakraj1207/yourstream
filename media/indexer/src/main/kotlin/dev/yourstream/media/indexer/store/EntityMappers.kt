@@ -209,7 +209,14 @@ internal fun ChatStatusRow.toModel(progress: IndexProgress?) = ChatIndexStatus(
     chatId = chat.chatId,
     title = chat.title,
     enabled = chat.enabled,
-    state = enumOr(chat.state, IndexState.IDLE),
+    // Names from before v13: RUNNING (killed mid-run) and PAUSED without the flag (time budget).
+    state = when {
+        chat.paused -> IndexState.PAUSED
+        chat.state == "RUNNING" -> IndexState.RECOVERING
+        chat.state == "PAUSED" -> IndexState.QUEUED
+        else -> enumOr(chat.state, IndexState.IDLE)
+    },
+    paused = chat.paused,
     mediaCount = mediaCount,
     deletedCount = deletedCount,
     backfillComplete = backfillComplete,

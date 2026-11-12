@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -71,7 +72,7 @@ class AdvancedMappingTest {
     fun libraryPipelineCountsEachStage() {
         val running = IndexProgress(2, IndexMode.INCREMENTAL, IndexPhase.HEAD, null, 1, 50, 12, 3, 0, -1, 0)
         val s = LibraryStatus.of(
-            listOf(chat(1, 1000, at = 500), chat(2, 240, IndexState.RUNNING, progress = running), chat(3, 99, enabled = false), chat(4, 1, IndexState.FAILED, error = "flood wait")),
+            listOf(chat(1, 1000, at = 500), chat(2, 240, IndexState.SCANNING, progress = running), chat(3, 99, enabled = false), chat(4, 1, IndexState.FAILED, error = "flood wait")),
             mapOf("ACCEPTED" to 180, "MANUAL" to 5, "NEEDS_REVIEW" to 12, "NO_MATCH" to 8, "REJECTED" to 2, "FAILED" to 3),
             titles = 240, movies = 180, series = 60, providers = listOf("TMDB"),
         )
@@ -136,6 +137,40 @@ class AdvancedScreensTest {
         assertEquals(1 to 1, syncs to reviews)
         compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("privacy-note"))
         compose.onNodeWithText("only a title and year are sent to TMDB", substring = true).assertExists()
+    }
+
+    @Test
+    fun sourcesShowTheirIndexingStateAndCanBePausedResumedOrStopped() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.library.SourceAction>()
+        var pauseAll: Boolean? = null
+        fun src(id: Long, state: IndexState, paused: Boolean = false, found: Int? = null) =
+            dev.yourstream.ui.screens.library.SourceSync(id, "Chat $id", syncing = !paused && state.isPending, files = 10, lastSyncAt = null, error = null,
+                found = found, state = state, paused = paused)
+        val s = LibraryStatus(
+            sources = listOf(src(1, IndexState.SCANNING, found = 340), src(2, IndexState.QUEUED), src(3, IndexState.PAUSED, paused = true), src(4, IndexState.RECOVERING)),
+            files = 40, policy = dev.yourstream.media.api.model.IndexingPolicy(wifiOnly = true),
+        )
+        set { LibraryStatusScreen(s, {}, {}, {}, {}, now = 60_000, onSource = { actions += it }, onPauseAll = { pauseAll = it }) }
+        compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("source:4"))
+        compose.onNodeWithTag("source-state:1", useUnmergedTree = true).assertTextEquals("10 files · 340 files found so far")
+        compose.onNodeWithTag("source-state:2", useUnmergedTree = true).assertTextEquals("10 files · Waiting for Wi-Fi")
+        compose.onNodeWithTag("source-state:3", useUnmergedTree = true).assertTextEquals("10 files · Paused")
+        compose.onNodeWithTag("source-state:4", useUnmergedTree = true).assertTextEquals("10 files · Interrupted — continuing soon")
+        compose.onNodeWithTag("source-stop:1").performClick()
+        compose.onNodeWithTag("source-pause:1").performClick()
+        compose.onNodeWithTag("source-pause:3").performClick()
+        compose.onNodeWithTag("source-stop:3").assertDoesNotExist()
+        assertEquals(
+            listOf(
+                dev.yourstream.ui.screens.library.SourceAction.Stop(1),
+                dev.yourstream.ui.screens.library.SourceAction.Pause(1),
+                dev.yourstream.ui.screens.library.SourceAction.Resume(3),
+            ),
+            actions,
+        )
+        compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("pause-all"))
+        compose.onNodeWithTag("pause-all").performClick()
+        assertEquals(true, pauseAll, "not all paused: the button pauses all")
     }
 
     @Test

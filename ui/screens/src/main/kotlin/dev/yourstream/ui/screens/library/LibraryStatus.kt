@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dev.yourstream.media.api.model.IndexingPolicy
 import javax.inject.Inject
 
 /** One Telegram source and how far its sync is. */
@@ -77,6 +78,9 @@ data class SourceSync(
     val error: String?,
     /** Files found so far in the running sync. */
     val found: Int?,
+    val state: IndexState = IndexState.IDLE,
+    /** Paused by the user. */
+    val paused: Boolean = false,
 )
 
 /**
@@ -100,7 +104,10 @@ data class LibraryStatus(
     val failed: Int = 0,
     /** Providers matching works with ("TMDB", "Cinemeta"); empty = matching is off. */
     val providers: List<String> = emptyList(),
+    /** When background indexing may run (Settings → Content & discovery). */
+    val policy: IndexingPolicy = IndexingPolicy(),
 ) {
+    val allPaused: Boolean get() = sources.isNotEmpty() && sources.all { it.paused }
     val syncing: Boolean get() = sources.any { it.syncing }
     val lastSyncAt: Long? get() = sources.mapNotNull { it.lastSyncAt }.maxOrNull()
     /** Titles the matcher has not looked at yet. */
@@ -109,17 +116,21 @@ data class LibraryStatus(
 
     companion object {
         /** Pure mapping from the domain's raw state (tested). */
-        fun of(chats: List<ChatIndexStatus>, matchCounts: Map<String, Int>, titles: Int, movies: Int, series: Int, providers: List<String>): LibraryStatus {
+        fun of(
+            chats: List<ChatIndexStatus>, matchCounts: Map<String, Int>, titles: Int, movies: Int, series: Int, providers: List<String>,
+            policy: IndexingPolicy = IndexingPolicy(),
+        ): LibraryStatus {
             val enabled = chats.filter { it.enabled }
             fun n(vararg s: MatchStatus) = s.sumOf { matchCounts[it.name] ?: 0 }
             return LibraryStatus(
                 sources = enabled.map { c ->
                     SourceSync(
                         c.chatId, c.title,
-                        syncing = c.progress != null || c.state == IndexState.RUNNING || c.state == IndexState.QUEUED || c.state == IndexState.PAUSED,
+                        syncing = !c.paused && (c.progress != null || c.state.isPending),
                         files = c.mediaCount, lastSyncAt = c.lastIndexedAt,
-                        error = c.lastError?.takeIf { c.state == IndexState.FAILED },
+                        error = c.lastError?.takeIf { c.state == IndexState.FAILED || c.state == IndexState.RECOVERING },
                         found = c.progress?.let { it.mediaAdded + it.mediaUpdated },
+                        state = c.state, paused = c.paused,
                     )
                 },
                 files = enabled.sumOf { it.mediaCount },
@@ -129,9 +140,19 @@ data class LibraryStatus(
                 unmatched = n(MatchStatus.NO_MATCH, MatchStatus.REJECTED),
                 failed = n(MatchStatus.FAILED),
                 providers = providers,
+                policy = policy,
             )
         }
     }
+}
+
+/** What the user can do with a source's indexing (Library status). */
+sealed interface SourceAction {
+    val chatId: Long
+    data class Pause(override val chatId: Long) : SourceAction
+    data class Resume(override val chatId: Long) : SourceAction
+    /** Stops the current run; the next sync continues from where it stopped. */
+    data class Stop(override val chatId: Long) : SourceAction
 }
 
 @HiltViewModel
@@ -152,7 +173,20 @@ class LibraryStatusViewModel @Inject constructor(
         counts,
         flowOf(Unit).map { runCatching { metadata.configuredProviders() }.getOrDefault(emptyList()) },
     ) { chats, matches, (titles, movies, series), providers -> LibraryStatus.of(chats, matches, titles, movies, series, providers) }
+        .combine(indexer.policy) { status, policy -> status.copy(policy = policy) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryStatus())
+
+    fun onSource(action: SourceAction) = viewModelScope.launch {
+        runCatching {
+            when (action) {
+                is SourceAction.Pause -> indexer.pause(action.chatId)
+                is SourceAction.Resume -> indexer.resume(action.chatId)
+                is SourceAction.Stop -> indexer.cancel(action.chatId)
+            }
+        }
+    }
+
+    fun pauseAll(paused: Boolean) = viewModelScope.launch { runCatching { if (paused) indexer.pauseAll() else indexer.resumeAll() } }
 
     /** Re-reads every source for new files, then matches whatever is new. */
     fun syncNow() = viewModelScope.launch {
@@ -164,11 +198,15 @@ class LibraryStatusViewModel @Inject constructor(
 @Composable
 fun LibraryStatusDestination(onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, vm: LibraryStatusViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    LibraryStatusScreen(state, onSyncNow = { vm.syncNow() }, onReview, onSources, onBack, now = System.currentTimeMillis())
+    LibraryStatusScreen(state, onSyncNow = { vm.syncNow() }, onReview, onSources, onBack, now = System.currentTimeMillis(),
+        onSource = { vm.onSource(it) }, onPauseAll = { vm.pauseAll(it) })
 }
 
 @Composable
-fun LibraryStatusScreen(state: LibraryStatus, onSyncNow: () -> Unit, onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, now: Long) {
+fun LibraryStatusScreen(
+    state: LibraryStatus, onSyncNow: () -> Unit, onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, now: Long,
+    onSource: (SourceAction) -> Unit = {}, onPauseAll: (Boolean) -> Unit = {},
+) {
     ScreenScaffold(stringResource(R.string.status_title), onBack = onBack) {
         LazyColumn(
             Modifier.widthIn(max = 760.dp).testTag("library-status"),
@@ -195,8 +233,13 @@ fun LibraryStatusScreen(state: LibraryStatus, onSyncNow: () -> Unit, onReview: (
                     },
                     busy = state.syncing, tag = "stage-files",
                 ) {
-                    FilledTonalButton(onClick = onSyncNow, enabled = !state.syncing, modifier = Modifier.focusHighlight().testTag("sync-now")) {
-                        Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.status_sync_now))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = onSyncNow, enabled = !state.syncing && !state.allPaused, modifier = Modifier.focusHighlight().testTag("sync-now")) {
+                            Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.status_sync_now))
+                        }
+                        if (state.sources.isNotEmpty()) androidx.compose.material3.OutlinedButton(
+                            onClick = { onPauseAll(!state.allPaused) }, modifier = Modifier.focusHighlight().testTag("pause-all"),
+                        ) { Text(stringResource(if (state.allPaused) R.string.status_resume_all else R.string.status_pause_all)) }
                     }
                 }
             }
@@ -240,20 +283,26 @@ fun LibraryStatusScreen(state: LibraryStatus, onSyncNow: () -> Unit, onReview: (
                 }
             }
             items(state.sources, key = { it.chatId }) { s ->
-                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics(mergeDescendants = true) {}.testTag("source:${s.chatId}")) {
-                    Text(s.title, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        listOfNotNull(
-                            pluralStringResource(R.plurals.status_files, s.files, s.files),
-                            when {
-                                s.syncing -> s.found?.let { stringResource(R.string.status_source_found, it) } ?: stringResource(R.string.status_syncing)
-                                s.lastSyncAt != null -> DateUtils.getRelativeTimeSpanString(s.lastSyncAt, now, DateUtils.MINUTE_IN_MILLIS).toString()
-                                else -> null
-                            },
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    s.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("source:${s.chatId}"), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+                        Text(s.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            listOfNotNull(
+                                pluralStringResource(R.plurals.status_files, s.files, s.files),
+                                sourceStateText(s, state.policy, now),
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("source-state:${s.chatId}"),
+                        )
+                        s.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                    }
+                    if (s.state.isActive && !s.paused) androidx.compose.material3.TextButton(
+                        onClick = { onSource(SourceAction.Stop(s.chatId)) }, modifier = Modifier.focusHighlight().testTag("source-stop:${s.chatId}"),
+                    ) { Text(stringResource(R.string.status_source_stop)) }
+                    androidx.compose.material3.TextButton(
+                        onClick = { onSource(if (s.paused) SourceAction.Resume(s.chatId) else SourceAction.Pause(s.chatId)) },
+                        modifier = Modifier.focusHighlight().testTag("source-pause:${s.chatId}"),
+                    ) { Text(stringResource(if (s.paused) R.string.status_source_resume else R.string.status_source_pause)) }
                 }
             }
             item {
@@ -293,4 +342,20 @@ private fun Stage(
             action?.invoke()
         }
     }
+}
+
+
+/** A source's indexing state in plain words. Null: nothing worth saying beyond the file count. */
+@Composable
+internal fun sourceStateText(s: SourceSync, policy: IndexingPolicy, now: Long): String? = when {
+    s.paused -> stringResource(R.string.status_state_paused)
+    s.state == IndexState.CONNECTING -> stringResource(R.string.status_state_connecting)
+    s.state == IndexState.SCANNING || s.found != null -> s.found?.let { stringResource(R.string.status_source_found, it) } ?: stringResource(R.string.status_state_scanning)
+    s.state == IndexState.PROCESSING -> stringResource(R.string.status_state_processing)
+    s.state == IndexState.QUEUED -> stringResource(if (policy.wifiOnly) R.string.status_state_waiting_wifi else R.string.status_state_waiting)
+    s.state == IndexState.RECOVERING -> stringResource(R.string.status_state_recovering)
+    s.state == IndexState.CANCELLED -> stringResource(R.string.status_state_cancelled)
+    s.state == IndexState.FAILED -> stringResource(R.string.status_state_failed)
+    s.lastSyncAt != null -> DateUtils.getRelativeTimeSpanString(s.lastSyncAt, now, DateUtils.MINUTE_IN_MILLIS).toString()
+    else -> null
 }

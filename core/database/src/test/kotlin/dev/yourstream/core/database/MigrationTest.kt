@@ -203,4 +203,21 @@ class MigrationTest {
             close()
         }
     }
+
+    @Test
+    fun v12ToV13AddsThePausedFlagDefaultingToNotPaused() = runTest {
+        helper.createDatabase(name, 12).apply {
+            execSQL("INSERT INTO indexed_chat (chat_id, title, category, enabled, state, last_error, last_indexed_at, last_verified_at, verify_cursor, added_at, updated_at) VALUES (7, 'Tamil Movies', 'CHANNEL', 1, 'COMPLETED', NULL, 5, NULL, 0, 1, 2)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 13, true).apply {
+            query("SELECT title, state, paused FROM indexed_chat WHERE chat_id = 7").use {
+                it.moveToFirst()
+                assertEquals("Tamil Movies", it.getString(0), "the chat survives")
+                assertEquals("COMPLETED", it.getString(1))
+                assertEquals(0, it.getInt(2), "existing chats are not paused")
+            }
+            close()
+        }
+    }
 }

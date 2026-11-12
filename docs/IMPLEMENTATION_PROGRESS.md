@@ -11,7 +11,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 0. Repository audit | COMPLETED |
 | 1. Critical fixes | COMPLETED (one item moved to monitored risks, see below) |
 | 2. Telegram authentication | NEEDS REAL-DEVICE TESTING |
-| 3. Media indexing | NOT STARTED |
+| 3. Media indexing | NEEDS REAL-DEVICE TESTING |
 | 4. Streaming engine | NOT STARTED |
 | 5. Metadata and library | NOT STARTED |
 | 6. UI/UX | NOT STARTED |
@@ -223,3 +223,68 @@ test of this phase; both runs of the next commit (`66a088d`) passed.
 
 **Next:** Phase 3 — Media indexing (pause/resume/cancel, explicit states, Wi-Fi-only and
 battery-aware scheduling).
+
+---
+
+## Phase 3 — Media indexing · NEEDS REAL-DEVICE TESTING
+
+**Objective:** indexing the user can control and understand: pause, resume and stop, explicit
+states, Wi-Fi-only and battery-aware scheduling, without re-indexing what is already indexed.
+
+**Inspected first:** `IndexingEngine`, `IndexChatWorker`, `IndexScheduler`,
+`DefaultMediaIndexer`, `IndexerInitializer`, `IndexProgressTracker`, `IndexModels`,
+`IndexedChatEntity`/DAO, Library status screen, indexing pill, Settings.
+
+**Already sound (kept, verified by the existing tests):** incremental head/backfill scanning with
+per-filter cursors saved per page (resume after interruption, nothing scanned twice); duplicate
+detection (unique chat+message, grouped versions); deleted-message detection (verify pass + live
+deletions); retries with backoff and FLOOD_WAIT handling; live progress (found, rate, ETA).
+
+**Existing problems:** no pause or resume, and stop was not reachable from any screen; states
+were `RUNNING` plus an overloaded `PAUSED` (it meant "time budget used up"); a network error was
+shown as `FAILED` although it would be retried; work ran on any network, the battery only
+mattered for the periodic sync.
+
+| Item | Status | Change |
+|---|---|---|
+| Explicit states | COMPLETED | `IndexState`: IDLE, QUEUED, CONNECTING, SCANNING, PROCESSING, COMPLETED, PAUSED, FAILED, CANCELLED, RECOVERING (+ `isActive`, `isPending`). QUEUED is kept: it is the honest state for waiting on a turn, Wi-Fi or the battery |
+| Pause / resume (per chat, all) | COMPLETED (JVM) | `indexed_chat.paused` (DB v13, auto-migration, tested); `pause`, `resume`, `pauseAll`, `resumeAll`; scheduler, periodic sync and worker skip paused chats; a pause during a run ends it in PAUSED keeping its pages |
+| Stop (cancel) | COMPLETED (JVM) | Reachable per running chat in Library status; ends in CANCELLED, next sync continues |
+| Wi-Fi only / battery-aware | COMPLETED (JVM) | `IndexingPolicy` stored by `IndexScheduler` (workers read it in any process); WorkManager constraints UNMETERED / batteryNotLow; changing it reschedules waiting and running work; Settings → Content & discovery → Indexing |
+| Recovery | COMPLETED (JVM) | Network errors → RECOVERING with the reason; FAILED only when the worker's retries run out; at start, states left by a killed process (and pre-v13 RUNNING) → RECOVERING, pre-v13 PAUSED → QUEUED |
+| Plain-language status | COMPLETED | Library status per chat: "Connecting to Telegram…", "N files found so far", "Waiting for Wi-Fi", "Interrupted — continuing soon", "Paused", "Stopped — continues at the next sync"; Pause/Resume/Stop and Pause all |
+
+**Files modified:** `media/api/.../IndexModels.kt`, `MediaIndex.kt`;
+`media/indexer/.../DefaultMediaIndexer.kt`, `IndexerInitializer.kt`,
+`engine/IndexingEngine.kt`, `engine/IndexProgressTracker.kt`, `work/IndexChatWorker.kt`,
+`work/IndexScheduler.kt`, `store/IndexStore.kt`, `store/RoomIndexStore.kt`,
+`store/EntityMappers.kt`, `build.gradle.kts` (work-testing); `core/database/.../Entities.kt`,
+`YourStreamDatabase.kt` (v13), `DatabaseSafety.kt`, `dao/IndexedChatDao.kt`, `schemas/.../13.json`;
+`ui/screens/.../library/LibraryStatus.kt`, `IndexingMonitor.kt`, `settings/Settings.kt`,
+`settings/SettingsCatalog.kt`, `strings.xml`; `docs/INDEXING.md`.
+
+**Tests added:** `IndexingControlsTest` (6, real Room + engine + WorkManager test mode: pausing an
+idle chat holds it through schedule/scheduleAll and a queued run makes no Telegram request;
+pausing a running scan keeps its pages and resume adds only the rest; stop ends only this run;
+network failure is RECOVERING with the reason; the policy becomes the work's constraints and is
+persisted; old and killed-process states are read sensibly and a pause survives start-up
+recovery) · `MigrationTest.v12ToV13…` · `AdvancedScreensTest.sourcesShowTheirIndexingState…`
+(state wording, Pause/Resume/Stop, Pause all) · `ScreensTest.indexingCanBeLimitedToWifi…`.
+**Tests updated (meaning changed, not weakened):** `IndexingEngineTest` time-budget stop now
+QUEUED (was PAUSED) and persistent network failure now RECOVERING (was FAILED), each with the
+reason in the assertion; UI tests use SCANNING for the removed RUNNING; positional
+`indexed_chat` fixtures in five modules gained the new column.
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass. Lint 0
+errors, 15 warnings (+1: `NewerVersionAvailable` for kotlinx-serialization 1.13.0, a new upstream
+release, not from this change).
+
+**Known limitations / remaining work:**
+* `IndexChatWorker` itself (paused skip, CONNECTING, FAILED after the last retry) is exercised
+  only by compiling; WorkManager runs it on a device. Manual steps: `docs/INDEXING.md`.
+* Indexing still runs in WorkManager's ~10-minute windows (no foreground service), so a first
+  scan of a very large channel takes several windows (backlog item 21, P2).
+* Live updates still apply to a paused chat (by design: they read nothing; noted in the docs).
+
+**Next:** Phase 4 — Streaming engine (background playback with a media session, process
+recreation, device validation checklist).

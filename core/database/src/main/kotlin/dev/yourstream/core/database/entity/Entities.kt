@@ -29,6 +29,8 @@ data class IndexedChatEntity(
     @ColumnInfo(name = "verify_cursor") val verifyCursor: Long,
     @ColumnInfo(name = "added_at") val addedAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** Paused by the user: no indexing runs until resumed (live updates still apply). */
+    @ColumnInfo(name = "paused", defaultValue = "0") val paused: Boolean = false,
 )
 
 /**
