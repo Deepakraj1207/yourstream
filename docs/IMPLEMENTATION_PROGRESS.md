@@ -517,6 +517,9 @@ in the result files, 0 failures); lint 0 errors, 15 warnings (a new `UsableSpace
 the storage page was fixed by using `getAllocatableBytes`). `:app:assembleRelease
 -Pyourstream.minify=true`: builds; dex inspected as above.
 
+**CI:** push run 31 and pull-request run 32 passed on `537a93d`, including the new minified
+release step (the push run now takes about 17 minutes instead of about 9).
+
 **Real-device checks:** `docs/RELEASE_R8.md` (minified build); Settings → Storage sizes and each
 Clear (with and without a video playing); TMDB key saved, app restarted, key still works; an
 older version's plain key migrated; Image proxies / Secure DNS for blocked sites off on a network
