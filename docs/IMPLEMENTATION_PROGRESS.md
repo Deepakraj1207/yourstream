@@ -100,6 +100,16 @@ output replaces each library's classes for consumers. Libraries need that plugin
 cache-less build, all tests, lint and APK pass. **Status: fix applied, being verified by repeated
 CI runs** (an intermittent failure needs several green runs, not one).
 
+**Update 3 — two separate causes, both fixed.** The push run of `6d885d7` (plugin removed) had
+no Hilt error any more; it failed only on one test, which the new summary named:
+`TelegramPlaybackTest > releaseCancelsTheTelegramDownload` ("download cancelled on release").
+Cause: CI has no ffmpeg-generated 85-minute sample, so the test falls back to a 296 KB clip,
+which downloads completely at the simulated 2 MB/s before `release()` on a fast runner; nothing
+is left to cancel (the app correctly cancels only unfinished downloads). Reproduced locally by
+forcing the fallback: old test 3/3 fail, fixed test 3/3 pass. Fix (`56b484f`): the fallback gets
+a speed at which the whole clip takes ~12 s. CI after both fixes: push and pull-request runs of
+`56b484f` passed; a re-run of the push run was started to confirm.
+
 **Known limitations / remaining work:**
 * Consent dialog and logcat redaction are verified by JVM/Robolectric tests, not on a device.
 * The release-workflow changes (required key, certificate pin, tests first) run for the first
