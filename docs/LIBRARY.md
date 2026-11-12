@@ -85,6 +85,22 @@ Rules that protect user data:
 - **Versions**: an item's or episode's files, best first (live first, then resolution, then size).
 - **Aggregates** (`available_count`, `latest_added_at`, `max_resolution`, `total_size`, season/episode counts, languages, search text) are recomputed per touched item during sync. `watched_count` and `last_watched_at` are kept by the watch repository on every progress change.
 
+## Availability (since 0.11)
+
+What a title's state is, and what the app shows for it:
+
+| State | Source of truth | Shown as |
+|---|---|---|
+| Available in Telegram | `library_item.available_count > 0` (non-deleted files) | Play / Resume on Details |
+| Removed from Telegram | `available_count = 0`; kept only while it has user data (progress, favorite, "My library"); titles without user data are deleted by the sync | No Play button; Details: "Removed from Telegram… your progress is kept"; cards captioned "Removed" and opening Details; listed in the Library tab only with "Playable only" off |
+| On this device | a version's `media.download_state = COMPLETED` (kept current from TDLib file updates by `LiveIndexUpdater`) | "On this device" on the version |
+| Matched / not matched | `metadataTitle` from an online catalogue (TMDB/Cinemeta); personal videos: not applicable | Details: "Not matched… use Fix match" |
+| Untitled (hidden) | `kind = VIDEO` and no poster | Left out of browsing; listed in Library status → *Files without a title* (`LibraryQuery.untitledOnly`), each with Play and Fix match |
+| Source turned off / inaccessible | indexing state of the chat (Library status) and, at play time, `LibraryMediaSourceResolver` (deleted message, file Telegram cannot download → next version or "file unavailable") | Library status per chat; player error |
+
+Next episodes skip episodes without a file (`NextEpisodeDecision.skippedUnavailable`), so a
+series' Play button never points at a removed episode.
+
 ## Pagination
 
 - Every potentially long list returns `Flow<PagingData<…>>` straight from a Room `PagingSource`: items, episodes, recently watched and history.

@@ -66,6 +66,16 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                             Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (c.percent in 1..99) ProgressLine(c.percent / 100f, Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.surfaceVariant)
+                            // Why there is no Play button, and where the details come from.
+                            if (!c.available) {
+                                Text(stringResource(R.string.details_removed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.testTag("details-removed"))
+                            }
+                            when (c.matched) {
+                                false -> Text(stringResource(R.string.details_not_matched), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("details-not-matched"))
+                                else -> Unit
+                            }
                             // Wraps on narrow phones instead of pushing buttons off-screen.
                             androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 c.primary?.let { p ->
@@ -98,7 +108,11 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                 }
                 if (c.versions.size > 1 || (c.versions.isNotEmpty() && c.seasons.isEmpty())) {
                     item { SectionHeader(stringResource(R.string.details_versions)) }
-                    items(c.versions, key = { "v${it.mediaId}" }) { v -> ListRow(v.name, supporting = v.detail, onClick = { onOpen(v.target) }) }
+                    items(c.versions, key = { "v${it.mediaId}" }) { v ->
+                        val onDevice = stringResource(R.string.details_on_device)
+                        ListRow(v.name, supporting = if (v.onDevice) "${v.detail} · $onDevice" else v.detail, onClick = { onOpen(v.target) },
+                            modifier = Modifier.testTag("version:${v.mediaId}"))
+                    }
                 }
             }
             // Remote users land on the main action.

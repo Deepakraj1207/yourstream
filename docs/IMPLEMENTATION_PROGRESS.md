@@ -13,7 +13,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 2. Telegram authentication | NEEDS REAL-DEVICE TESTING |
 | 3. Media indexing | NEEDS REAL-DEVICE TESTING |
 | 4. Streaming engine | NEEDS REAL-DEVICE TESTING |
-| 5. Metadata and library | NOT STARTED |
+| 5. Metadata and library | COMPLETED |
 | 6. UI/UX | NOT STARTED |
 | 7. Performance and security | NOT STARTED |
 | 8. Local media | NOT STARTED |
@@ -347,3 +347,57 @@ type, both permissions.
 
 **Next:** Phase 5 — Metadata and library (availability states, playable-only filter, a view for
 unmatched/hidden files).
+
+---
+
+## Phase 5 — Metadata and library · COMPLETED
+
+**Objective:** every title's availability and match state is visible; nothing is lost from view;
+no Play button for something that cannot play.
+
+**Inspected first:** `LibraryModels`, `LibraryQueryBuilder`, `LibrarySynchronizer` (what is kept
+when files go), `LibraryRepositories`, `DetailsViewModel`/`DetailsScreen`, `Presentation` and
+`tileCard`, browse view models and screen, `LibraryStatus`, watch next-episode rules, Fix match
+(`LibraryMetadataService`), the media download state.
+
+**Already sound (kept):** `available_count` per title; browsing hides titles with no files;
+titles with no files and no user data are deleted by the sync; Details already had no Play for
+an unavailable movie; next-episode logic skips episodes with no file; Fix match exists (videos
+are searched as movies, so it also names untitled files); download state is kept current from
+TDLib file updates.
+
+**Existing problems:** titles kept for their user data (e.g. in "My library") vanished from view
+when their files were deleted, with no explanation; Details showed an empty space where Play was;
+nothing said whether a title was matched or only parsed from the file name; downloaded files were
+not marked; files with no title and no poster (hidden since 0.10) could not be found anywhere.
+
+| Item | Status | Change |
+|---|---|---|
+| Playable-only filter | COMPLETED | Library tab chip "Playable only" (on); off lists removed titles (`BrowseFilters.playableOnly` → `includeUnavailable`, survives process death) |
+| Removed titles marked | COMPLETED | Card caption/badge "Removed", opens Details (never plays); Details explains and shows no Play |
+| Match state | COMPLETED | Details "Not matched… use Fix match" when no catalogue match (not shown for personal videos) |
+| Downloaded | COMPLETED | Version row "On this device" when Telegram has the whole file |
+| Hidden untitled files | COMPLETED | `LibraryQuery.untitledOnly`; Library status → "N files without a title" → list (`UntitledFilesRoute`) with Play and Fix match |
+| Availability reference | COMPLETED | `docs/LIBRARY.md` "Availability" |
+
+**Files modified:** `library/.../api/LibraryModels.kt`, `data/LibraryQueryBuilder.kt`;
+`ui/screens/.../browse/BrowseContract.kt`, `BrowseViewModels.kt`, `BrowseScreen.kt`;
+`Presentation.kt`, `TileActions.kt`; `details/Details.kt`, `DetailsScreen.kt`;
+`library/LibraryStatus.kt`; `navigation/Routes.kt`, `AppNavigator.kt`, `AppNavHost.kt`;
+`strings.xml`; `docs/LIBRARY.md`.
+
+**Tests added:** `LibraryAvailabilityTest` (real Room + library sync: the untitled list shows
+exactly what browsing hides; a title in "My library" whose only file is deleted stays, marked
+unavailable, listed only with "playable only" off) · `ScreensTest` (removed title: no Play and an
+explanation; not-matched line; "On this device"; the Playable-only chip and its query mapping) ·
+`AdvancedTest` (removed caption and Details target; Library status opens the untitled list).
+
+**Tests run:** `./gradlew --continue :app:assembleDebug test :app:lintDebug`: pass; lint 0
+errors, 15 warnings (unchanged).
+
+**Known limitations:** "On this device" reflects TDLib's last file update (a file deleted from
+TDLib's cache while the app was closed shows correctly only after TDLib reports it); a chat that
+became inaccessible is shown per chat in Library status, not per title.
+
+**Next:** Phase 6 — UI/UX (first-run flow, Movies/Series in the main navigation, reduced motion,
+dock decision).

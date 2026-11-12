@@ -38,6 +38,8 @@ data class LibraryQuery(
      * still show in text searches and when [kinds] asks for videos.
      */
     val includeUntitled: Boolean = false,
+    /** Only those untitled, posterless files (the list of what browsing hides). */
+    val untitledOnly: Boolean = false,
     val sort: LibrarySort = LibrarySort.TITLE,
     /** Reverses the natural direction of [sort] (TITLE A→Z, others newest/biggest first). */
     val reversed: Boolean = false,

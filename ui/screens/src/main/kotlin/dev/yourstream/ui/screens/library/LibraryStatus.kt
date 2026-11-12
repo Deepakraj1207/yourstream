@@ -106,6 +106,8 @@ data class LibraryStatus(
     val providers: List<String> = emptyList(),
     /** When background indexing may run (Settings → Content & discovery). */
     val policy: IndexingPolicy = IndexingPolicy(),
+    /** Files browsing leaves out: no title found and no poster. */
+    val untitled: Int = 0,
 ) {
     val allPaused: Boolean get() = sources.isNotEmpty() && sources.all { it.paused }
     val syncing: Boolean get() = sources.any { it.syncing }
@@ -174,6 +176,7 @@ class LibraryStatusViewModel @Inject constructor(
         flowOf(Unit).map { runCatching { metadata.configuredProviders() }.getOrDefault(emptyList()) },
     ) { chats, matches, (titles, movies, series), providers -> LibraryStatus.of(chats, matches, titles, movies, series, providers) }
         .combine(indexer.policy) { status, policy -> status.copy(policy = policy) }
+        .combine(count(LibraryQuery(kinds = setOf(LibraryKind.VIDEO), includeUntitled = true, untitledOnly = true))) { status, n -> status.copy(untitled = n) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryStatus())
 
     fun onSource(action: SourceAction) = viewModelScope.launch {
@@ -196,16 +199,16 @@ class LibraryStatusViewModel @Inject constructor(
 }
 
 @Composable
-fun LibraryStatusDestination(onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, vm: LibraryStatusViewModel = hiltViewModel()) {
+fun LibraryStatusDestination(onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, onUntitled: () -> Unit = {}, vm: LibraryStatusViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     LibraryStatusScreen(state, onSyncNow = { vm.syncNow() }, onReview, onSources, onBack, now = System.currentTimeMillis(),
-        onSource = { vm.onSource(it) }, onPauseAll = { vm.pauseAll(it) })
+        onSource = { vm.onSource(it) }, onPauseAll = { vm.pauseAll(it) }, onUntitled = onUntitled)
 }
 
 @Composable
 fun LibraryStatusScreen(
     state: LibraryStatus, onSyncNow: () -> Unit, onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, now: Long,
-    onSource: (SourceAction) -> Unit = {}, onPauseAll: (Boolean) -> Unit = {},
+    onSource: (SourceAction) -> Unit = {}, onPauseAll: (Boolean) -> Unit = {}, onUntitled: () -> Unit = {},
 ) {
     ScreenScaffold(stringResource(R.string.status_title), onBack = onBack) {
         LazyColumn(
@@ -249,7 +252,12 @@ fun LibraryStatusScreen(
                     Icons.Filled.CheckCircle, stringResource(R.string.status_stage_titles),
                     pluralStringResource(R.plurals.titles_count, state.titles, state.titles),
                     stringResource(R.string.status_titles_split, state.movies, state.series), tag = "stage-titles",
-                )
+                ) {
+                    // Hidden from browsing (no title, no poster): listed here so they are never lost.
+                    if (state.untitled > 0) androidx.compose.material3.OutlinedButton(onClick = onUntitled, modifier = Modifier.focusHighlight().testTag("untitled")) {
+                        Text(pluralStringResource(R.plurals.status_untitled, state.untitled, state.untitled))
+                    }
+                }
             }
             // 3. Posters and details
             item {

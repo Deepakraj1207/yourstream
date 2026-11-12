@@ -145,7 +145,8 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<AccountRoute> { AccountScreenRoute(back) }
         page<SourcesRoute> { SourcesScreenRoute(back) }
         page<LanguagesRoute> { LanguagesScreenRoute(back) }
-        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
+        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back, onUntitled = navigator::untitledFiles) }
+        page<UntitledFilesRoute> { dev.yourstream.ui.screens.browse.UntitledRoute(navigator::open, back) }
         page<MatchReviewRoute> { MatchReviewDestination(back) }
         page<FixMatchRoute> { FixMatchDestination(back) }
         page<StatsRoute> { StatsDestination(back) }

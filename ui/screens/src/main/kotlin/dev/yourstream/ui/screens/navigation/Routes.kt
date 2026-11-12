@@ -64,6 +64,8 @@ import kotlinx.serialization.Serializable
 ) : Route
 /** A Settings category page ([page]: a SettingsPage name). */
 @Serializable data class SettingsPageRoute(val page: String) : Route
+/** Library status → files without a title (hidden from browsing). */
+@Serializable data object UntitledFilesRoute : Route
 /** Settings → TMDB key. */
 @Serializable data object TmdbRoute : Route
 /** Catalog add-ons: built-in ones and those added by link. */

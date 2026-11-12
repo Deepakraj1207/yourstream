@@ -35,7 +35,11 @@ sealed interface PrimaryAction {
     data class Episode(override val target: OpenTarget.Play, val label: String, val resume: Boolean) : PrimaryAction
 }
 
-data class VersionRow(val mediaId: Long, val name: String, val detail: String, val target: OpenTarget.Play)
+data class VersionRow(
+    val mediaId: Long, val name: String, val detail: String, val target: OpenTarget.Play,
+    /** Fully downloaded by Telegram on this device: plays without a connection. */
+    val onDevice: Boolean = false,
+)
 data class SeasonRow(val seasonId: Long, val name: String, val episodes: Int)
 
 data class DetailsContent(
@@ -53,6 +57,10 @@ data class DetailsContent(
     val seasons: List<SeasonRow>,
     /** In "My library" (the Library tab). */
     val inLibrary: Boolean = false,
+    /** A file of it is still in Telegram. False: every file was deleted (no Play; progress kept). */
+    val available: Boolean = true,
+    /** Matched with an online catalogue (true), not (false), or not applicable (null: personal videos). */
+    val matched: Boolean? = null,
 )
 
 data class DetailsUiState(val content: UiState<DetailsContent> = UiState.Loading)
@@ -115,10 +123,13 @@ class DetailsViewModel @Inject constructor(
                 itemId = s.id, kind = s.kind, title = s.metadataTitle ?: s.title, year = s.year, posterUrl = dev.yourstream.ui.screens.Presentation.artwork(s),
                 languages = d.languages.map(LanguageCatalog::displayName), isFavorite = s.isFavorite, inLibrary = s.inLibrary, percent = w?.percent ?: 0,
                 primary = primary,
+                available = s.isAvailable,
+                matched = if (s.kind == LibraryKind.VIDEO) null else s.metadataTitle != null,
                 versions = d.versions.filter { !it.isDeleted && !it.isExcluded }.map { v ->
                     VersionRow(v.mediaId, v.fileName,
                         listOfNotNull(Presentation.resolution(v.resolution), v.quality, "%.1f GB".format(v.sizeBytes / 1e9), v.languages.joinToString("/").ifEmpty { null }).joinToString(" · "),
-                        OpenTarget.Play(PlaybackTarget(s.id), v.mediaId))
+                        OpenTarget.Play(PlaybackTarget(s.id), v.mediaId),
+                        onDevice = v.downloadState == "COMPLETED")
                 },
                 seasons = d.seasons.map { SeasonRow(it.id, it.displayName, it.episodeCount) },
             )

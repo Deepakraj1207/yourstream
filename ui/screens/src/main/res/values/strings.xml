@@ -557,4 +557,15 @@
     <string name="settings_background">Keep playing in the background</string>
     <string name="settings_background_detail">With the screen off or another app open, the sound continues; controls in the notification and on the lock screen</string>
     <string name="player_waiting_network">No connection. Playback continues when you\'re back online.</string>
+    <string name="untitled_title">Files without a title</string>
+    <string name="untitled_intro">No title could be found for these files, from Telegram or the file name, and they have no poster, so Home and the library leave them out. Open one to play it, or use Fix match to give it the right title.</string>
+    <plurals name="status_untitled">
+        <item quantity="one">%d file without a title</item>
+        <item quantity="other">%d files without a title</item>
+    </plurals>
+    <string name="filter_playable_only">Playable only</string>
+    <string name="caption_removed">Removed</string>
+    <string name="details_removed">Removed from Telegram: every file of this title was deleted from your chats. Your progress is kept.</string>
+    <string name="details_not_matched">Not matched with an online catalogue: the details come from the file name. Use Fix match to choose the right title.</string>
+    <string name="details_on_device">On this device</string>
 </resources>

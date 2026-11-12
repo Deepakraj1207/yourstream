@@ -312,6 +312,52 @@ class ScreensTest {
     }
 
     @Test
+    fun aRemovedTitleHasNoPlayButtonAndSaysWhy() {
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 40, primary = null,
+                    versions = emptyList(), seasons = emptyList(), available = false, matched = false))),
+                {}, {}, {},
+            )
+        }
+        compose.onNodeWithTag("primary").assertDoesNotExist()
+        compose.onNodeWithTag("details-removed").assertExists()
+        compose.onNodeWithTag("details-not-matched").assertExists()
+    }
+
+    @Test
+    fun aDownloadedVersionSaysItIsOnThisDevice() {
+        val play = OpenTarget.Play(PlaybackTarget(1), 7)
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 0, PrimaryAction.Play(play),
+                    versions = listOf(dev.yourstream.ui.screens.details.VersionRow(7, "Vikram.2022.1080p.mkv", "1080p · 2.1 GB", play, onDevice = true)),
+                    seasons = emptyList(), matched = true))),
+                {}, {}, {},
+            )
+        }
+        compose.onNodeWithTag("details").performScrollToNode(hasTestTag("version:7"))
+        compose.onNodeWithText("1080p · 2.1 GB · On this device").assertExists()
+        compose.onNodeWithTag("details-not-matched").assertDoesNotExist()
+    }
+
+    @Test
+    fun theLibraryTabCanShowRemovedTitles() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.browse.BrowseAction>()
+        val items = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>()))
+        set {
+            BrowseScreen("Library", EmptyKind.MY_LIBRARY_EMPTY,
+                BrowseUiState(controls = dev.yourstream.ui.screens.browse.BrowseControls(kind = true, sort = true, watch = true, playable = true), count = 3),
+                items.collectAsLazyPagingItems(), { actions += it }, {})
+        }
+        compose.onNodeWithTag("playable-only").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.browse.BrowseAction>(dev.yourstream.ui.screens.browse.BrowseAction.SetPlayableOnly(false)), actions)
+        // The filter maps to the domain query.
+        assertEquals(true, dev.yourstream.ui.screens.browse.BrowseFilters(playableOnly = false).toQuery(null).includeUnavailable)
+        assertEquals(false, dev.yourstream.ui.screens.browse.BrowseFilters().toQuery(null).includeUnavailable)
+    }
+
+    @Test
     fun settingsContentPageOpensSources() {
         var sources = 0
         set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), onSources = { sources++ }), {}) }

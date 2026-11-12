@@ -69,6 +69,16 @@ class AdvancedMappingTest {
         ChatIndexStatus(id, "Chat $id", enabled, state, files, 0, true, at, null, error, progress)
 
     @Test
+    fun aRemovedTitleIsCaptionedAndOpensItsDetails() {
+        val s = dev.yourstream.library.api.LibraryItemSummary(7, dev.yourstream.library.api.LibraryKind.MOVIE, "Vikram", 2022, availableCount = 0, seasonCount = 0, episodeCount = 0,
+            watchedEpisodeCount = 0, maxResolution = 1080, totalSize = 0, addedAt = 0, latestAddedAt = null, lastWatchedAt = null, isFavorite = false, progress = null)
+        val tile = dev.yourstream.ui.screens.Presentation.tile(s)
+        assertEquals(dev.yourstream.ui.screens.TileCaption.Removed, tile.caption)
+        assertEquals(OpenTarget.Details(7), tile.open, "never plays a title with no file")
+        assertEquals(null, dev.yourstream.ui.screens.Presentation.tile(s.copy(availableCount = 1)).caption)
+    }
+
+    @Test
     fun libraryPipelineCountsEachStage() {
         val running = IndexProgress(2, IndexMode.INCREMENTAL, IndexPhase.HEAD, null, 1, 50, 12, 3, 0, -1, 0)
         val s = LibraryStatus.of(
@@ -171,6 +181,15 @@ class AdvancedScreensTest {
         compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("pause-all"))
         compose.onNodeWithTag("pause-all").performClick()
         assertEquals(true, pauseAll, "not all paused: the button pauses all")
+    }
+
+    @Test
+    fun hiddenUntitledFilesAreReachableFromLibraryStatus() {
+        var opened = 0
+        set { LibraryStatusScreen(LibraryStatus(titles = 10, untitled = 4), {}, {}, {}, {}, now = 0, onUntitled = { opened++ }) }
+        compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("untitled"))
+        compose.onNodeWithText("4 files without a title").performClick()
+        assertEquals(1, opened)
     }
 
     @Test
