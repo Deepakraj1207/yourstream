@@ -38,6 +38,8 @@ data class LibraryQuery(
      * still show in text searches and when [kinds] asks for videos.
      */
     val includeUntitled: Boolean = false,
+    /** Only those untitled, posterless files (the list of what browsing hides). */
+    val untitledOnly: Boolean = false,
     val sort: LibrarySort = LibrarySort.TITLE,
     /** Reverses the natural direction of [sort] (TITLE A→Z, others newest/biggest first). */
     val reversed: Boolean = false,
@@ -151,7 +153,11 @@ data class MediaVersion(
     val isManual: Boolean,
     val isExcluded: Boolean,
     val downloadState: String,
-)
+    /** A file on this device (`content://` address); null for Telegram files. */
+    val locator: String? = null,
+) {
+    val isLocal: Boolean get() = locator != null
+}
 
 data class LibraryItemDetails(
     val summary: LibraryItemSummary,

@@ -61,30 +61,55 @@ import kotlinx.serialization.Serializable
     val fileIdx: Int = -1,
     val sources: String = "",
     val fileName: String? = null,
+    /** Where to remember the position (catalog title + episode, `StreamProgressStore.keyOf`); null: not remembered. */
+    val progressKey: String? = null,
 ) : Route
 /** A Settings category page ([page]: a SettingsPage name). */
 @Serializable data class SettingsPageRoute(val page: String) : Route
+/** Library status → files without a title (hidden from browsing). */
+@Serializable data object UntitledFilesRoute : Route
 /** Settings → TMDB key. */
 @Serializable data object TmdbRoute : Route
 /** Catalog add-ons: built-in ones and those added by link. */
 @Serializable data object AddonsRoute : Route
 /** Optional multi-device progress sync. */
 @Serializable data object ProgressSyncRoute : Route
+/** Settings → Content → Files on this device. */
+@Serializable data object LocalFilesRoute : Route
+/** Settings → Advanced → Storage. */
+@Serializable data object StorageRoute : Route
+/** The guided first run: welcome, Telegram, chats, indexing, library, playback basics. */
+@Serializable data object FirstRunRoute : Route
 
 /**
- * Top-level destinations. [compact] = shown in the phone's bottom bar (max 5); all appear in the
- * rail, drawer and TV drawer. Movies, Series, Continue Watching on phones: from Library / Home.
+ * Top-level destinations: pages that open without a back arrow and keep their state when another
+ * tab is chosen. [MAIN_TABS] are the ones in the navigation (bar, rail, drawer, TV drawer); the
+ * others open from Home's "See all" or the Library and count as Home ([tab]).
  */
-enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector, val compact: Boolean) {
-    HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home, true),
-    LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List, true),
-    MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie, false),
-    SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv, false),
-    SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search, true),
-    CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow, false),
-    RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange, false),
-    SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings, true),
+enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector) {
+    HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home),
+    LIBRARY(LibraryRoute, R.string.nav_library, Icons.AutoMirrored.Filled.List),
+    MOVIES(MoviesRoute, R.string.nav_movies, AppIcons.Movie),
+    SERIES(SeriesRoute, R.string.nav_series, AppIcons.Tv),
+    SEARCH(SearchRoute(), R.string.nav_search, Icons.Filled.Search),
+    CONTINUE(ContinueWatchingRoute, R.string.nav_continue, Icons.Filled.PlayArrow),
+    RECENT(RecentlyAddedRoute, R.string.nav_recent, Icons.Filled.DateRange),
+    SETTINGS(SettingsRoute, R.string.nav_settings, Icons.Filled.Settings);
+
+    /** The navigation item shown as selected on this destination. */
+    val tab: TopLevel get() = when (this) {
+        // Opened from Home's rows ("See all") and the Library's filters, not from the navigation.
+        CONTINUE, RECENT, MOVIES, SERIES -> HOME
+        else -> this
+    }
 }
+
+/**
+ * The navigation's items, in order, on every layout (phone bar, tablet rail, drawer, TV). Movies
+ * and Series are not tabs (user's choice, 13 Nov 2026): Home's rows and the Library's filters
+ * open them.
+ */
+val MAIN_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.SEARCH, TopLevel.LIBRARY, TopLevel.SETTINGS)
 
 /** What tapping a card opens. Decided by the ViewModel's mapping, executed by the navigator. */
 sealed interface OpenTarget {

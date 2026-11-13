@@ -270,6 +270,11 @@ class TdlibTelegramClient @Inject constructor(
 
     override suspend fun deleteFile(fileId: Int): AppResult<Unit> = request("deleteFile") { deleteFile(fileId) }.unit()
 
+    // Size, age and count limits of 0 with no immunity delay: TDLib removes every local file of
+    // every type and chat (its own bookkeeping stays consistent, unlike deleting the directory).
+    override suspend fun deleteAllLocalFiles(): AppResult<Unit> =
+        request("optimizeStorage") { optimizeStorage(0L, 0, 0, 0, emptyArray(), LongArray(0), LongArray(0), false, 0) }.unit()
+
     // ---- Saved Messages (optional progress sync) ----
 
     override suspend fun savedMessagesChatId(): AppResult<Long> {

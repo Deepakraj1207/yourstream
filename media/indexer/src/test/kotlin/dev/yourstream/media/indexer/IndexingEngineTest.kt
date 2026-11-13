@@ -141,7 +141,7 @@ class IndexingEngineTest {
         assertEquals(Outcome.MORE_WORK, first.outcome)
         val partial = count()
         assertTrue(partial in 1..9, "partial progress was saved: $partial")
-        assertEquals(IndexState.PAUSED, env.repository.observeChat(chat).first()!!.state)
+        assertEquals(IndexState.QUEUED, env.repository.observeChat(chat).first()!!.state, "the rest is queued, not paused")
 
         env.telegram.millisPerCall = 0
         env.telegram.calls.clear()
@@ -247,7 +247,8 @@ class IndexingEngineTest {
         val result = env.engine.run(chat, IndexMode.INCREMENTAL, 5.minutes)
         assertEquals(Outcome.RETRY, result.outcome)
         val status = env.repository.observeChat(chat).first()!!
-        assertEquals(IndexState.FAILED, status.state)
+        // Retried later by WorkManager: RECOVERING with the reason (FAILED only once retries run out).
+        assertEquals(IndexState.RECOVERING, status.state)
         assertEquals("Network unavailable", status.lastError)
     }
 

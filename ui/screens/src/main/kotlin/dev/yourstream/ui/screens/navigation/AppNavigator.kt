@@ -53,8 +53,21 @@ class AppNavigator(private val nav: NavHostController) {
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
     fun settingsPage(page: dev.yourstream.ui.screens.settings.SettingsPage) = nav.navigate(SettingsPageRoute(page.name)) { launchSingleTop = true }
+    fun untitledFiles() = nav.navigate(UntitledFilesRoute) { launchSingleTop = true }
     fun tmdb() = nav.navigate(TmdbRoute) { launchSingleTop = true }
     fun addons() = nav.navigate(AddonsRoute) { launchSingleTop = true }
     fun progressSync() = nav.navigate(ProgressSyncRoute) { launchSingleTop = true }
+    fun localFiles() = nav.navigate(LocalFilesRoute) { launchSingleTop = true }
+    fun storage() = nav.navigate(StorageRoute) { launchSingleTop = true }
+
+    /** The guided first run (on first launch, or from Settings → About). */
+    fun firstRun() = nav.navigate(FirstRunRoute) { launchSingleTop = true }
+
+    /** The first run is over: back to Home, as a fresh start. */
+    fun finishFirstRun() {
+        if (!nav.popBackStack(FirstRunRoute, inclusive = true)) return
+        top(TopLevel.HOME)
+    }
+
     fun back(): Boolean = nav.popBackStack()
 }

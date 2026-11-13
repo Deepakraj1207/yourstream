@@ -46,18 +46,35 @@ data class AppSettings(
     val holdSpeed: Float = 2f,
     /** Leaving the app while a video plays keeps it playing in a floating window. */
     val pictureInPicture: Boolean = true,
+    /**
+     * Leaving the app or turning the screen off keeps the sound playing, with controls in the
+     * notification and on the lock screen. Off: playback pauses on leaving.
+     */
+    val backgroundPlayback: Boolean = true,
     /** Subtitle text size relative to the player's default. */
     val subtitleScale: Float = 1f,
     /** Subtitles on a dark box (else white text with a black outline). */
     val subtitleBox: Boolean = false,
-    /** Torrent results from stream add-ons play with the built-in torrent engine. */
-    val torrentStreaming: Boolean = true,
-    /** Resolve every host through DNS over HTTPS (blocked hosts use it automatically anyway). */
+    /**
+     * Torrent results from stream add-ons play with the built-in torrent engine. Off until the
+     * user agrees (peers see the device's IP address): [TorrentConsentDialog].
+     */
+    val torrentStreaming: Boolean = false,
+    /** Resolve every host through DNS over HTTPS. */
     val secureDns: Boolean = false,
+    /** Hosts the network's DNS blocks are looked up through DNS over HTTPS (Cloudflare, Google). */
+    val secureDnsFallback: Boolean = true,
+    /** Posters from blocked image hosts are fetched through public image proxies (wsrv.nl, i0.wp.com). */
+    val imageProxies: Boolean = true,
     /** Dark theme on pure black (OLED screens): backgrounds and cards' surroundings turn #000. */
     val amoledBlack: Boolean = false,
-    /** The phone's dock shows each tab's name under its icon. */
+    /** The phone's navigation bar shows every tab's name under its icon (else only the selected one's). */
     val dockLabels: Boolean = true,
+    /**
+     * Less movement: pages cross-fade instead of sliding, loading placeholders and the indexing
+     * icon stay still. The system "Remove animations" option has the same effect.
+     */
+    val reduceMotion: Boolean = false,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val homeRows: HomeRowsShown = HomeRowsShown(),
     /** Add-on and torrent streams: how far ahead the player buffers (within its memory limit). */
@@ -80,13 +97,15 @@ val LocalAppSettings = staticCompositionLocalOf { AppSettings() }
 
 @Singleton
 class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
-    private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).also(::upgrade)
     private val _settings = MutableStateFlow(load().also(::apply))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     /** Settings that live below the UI (network, decoders) take effect right away. */
     private fun apply(s: AppSettings) {
         dev.yourstream.core.network.SecureDns.always = s.secureDns
+        dev.yourstream.core.network.SecureDns.fallback = s.secureDnsFallback
+        dev.yourstream.ui.core.ImageRouting.useProxies = s.imageProxies
         dev.yourstream.playback.media3.PlayerDecoders.appAudioFirst = s.appAudioDecodersFirst
     }
 
@@ -104,12 +123,16 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("player_landscape", s.playerLandscape)
             .putFloat("hold_speed", s.holdSpeed)
             .putBoolean("pip", s.pictureInPicture)
+            .putBoolean("background_playback", s.backgroundPlayback)
             .putFloat("subtitle_scale", s.subtitleScale)
             .putBoolean("subtitle_box", s.subtitleBox)
             .putBoolean("torrents", s.torrentStreaming)
             .putBoolean("secure_dns", s.secureDns)
+            .putBoolean("secure_dns_fallback", s.secureDnsFallback)
+            .putBoolean("image_proxies", s.imageProxies)
             .putBoolean("amoled", s.amoledBlack)
             .putBoolean("dock_labels", s.dockLabels)
+            .putBoolean("reduce_motion", s.reduceMotion)
             .putString("poster_size", s.posterSize.name)
             .putBoolean("home_hero", s.homeRows.hero)
             .putBoolean("home_continue", s.homeRows.continueWatching)
@@ -124,6 +147,22 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         _settings.value = s
     }
 
+    /**
+     * Settings files from before 0.11 (no format number): torrents are turned off. Those versions
+     * wrote `torrents = true` (then the default) whenever any setting was saved, so the stored
+     * value does not mean the user chose torrents; turning them on now goes through the consent
+     * dialog (peers see the device's IP address).
+     */
+    private fun upgrade(p: android.content.SharedPreferences) {
+        if (p.getInt(KEY_FORMAT, 0) >= FORMAT) return
+        p.edit().putBoolean("torrents", false).putInt(KEY_FORMAT, FORMAT).commit()
+    }
+
+    private companion object {
+        const val KEY_FORMAT = "settings_format"
+        const val FORMAT = 2
+    }
+
     private fun load() = AppSettings(
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null)!!) }.getOrDefault(ThemeMode.SYSTEM),
         style = runCatching { UiStyle.valueOf(prefs.getString("style", null)!!) }.getOrDefault(UiStyle.MANGA),
@@ -133,12 +172,17 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         playerLandscape = prefs.getBoolean("player_landscape", true),
         holdSpeed = prefs.getFloat("hold_speed", 2f).takeIf { it in AppSettings.HOLD_SPEEDS } ?: 2f,
         pictureInPicture = prefs.getBoolean("pip", true),
+        backgroundPlayback = prefs.getBoolean("background_playback", true),
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
-        torrentStreaming = prefs.getBoolean("torrents", true),
+        // Off unless the user turned it on (before 0.11 it defaulted to on without asking).
+        torrentStreaming = prefs.getBoolean("torrents", false),
         secureDns = prefs.getBoolean("secure_dns", false),
+        secureDnsFallback = prefs.getBoolean("secure_dns_fallback", true),
+        imageProxies = prefs.getBoolean("image_proxies", true),
         amoledBlack = prefs.getBoolean("amoled", false),
         dockLabels = prefs.getBoolean("dock_labels", true),
+        reduceMotion = prefs.getBoolean("reduce_motion", false),
         posterSize = runCatching { PosterSize.valueOf(prefs.getString("poster_size", null)!!) }.getOrDefault(PosterSize.MEDIUM),
         homeRows = HomeRowsShown(
             hero = prefs.getBoolean("home_hero", true),

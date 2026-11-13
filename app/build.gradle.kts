@@ -98,7 +98,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 (shrink, optimise, obfuscate) only when asked: -Pyourstream.minify=true. Off by
+            // default until a minified build has passed the device checks in docs/RELEASE_R8.md,
+            // since TDLib, libtorrent and FFmpeg reach Java classes from native code, which no
+            // JVM test can exercise.
+            val minify = providers.gradleProperty("yourstream.minify").map(String::toBoolean).getOrElse(false)
+            isMinifyEnabled = minify
+            isShrinkResources = minify
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Not debuggable: Compose runs far faster than in debug, and the libraries' baseline
             // profiles are installed. Signed with the release key when one is configured (CI),
             // else with the debug key so it can still be sideloaded.
@@ -139,6 +146,7 @@ dependencies {
     implementation(projects.catalog.sync)
     implementation(projects.catalog.indian)
     implementation(projects.playback.media3)
+    implementation(projects.playback.torrent)
     implementation(projects.search.engine)
     implementation(projects.assistant.engine)
     implementation(projects.watch.engine)
@@ -147,6 +155,8 @@ dependencies {
     implementation(projects.core.diagnostics)
     implementation(projects.core.database)
     implementation(libs.androidx.media3.ui)
+    // Media session: notification and lock-screen controls, background playback (PlaybackService).
+    implementation(libs.androidx.media3.session)
     implementation(projects.core.network)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)

@@ -28,7 +28,7 @@ class RoomIndexStore @Inject constructor(
     private val runs = db.indexRunDao()
 
     override suspend fun chat(chatId: Long): ChatRecord? = chats.get(chatId)?.let {
-        ChatRecord(it.chatId, it.title, it.enabled, it.verifyCursor, it.lastVerifiedAt)
+        ChatRecord(it.chatId, it.title, it.enabled, paused = it.paused, verifyCursor = it.verifyCursor, lastVerifiedAt = it.lastVerifiedAt)
     }
 
     override suspend fun cursor(chatId: Long, filter: MediaSearchFilter): ScanCursor =

@@ -9,6 +9,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithContentDescription
+import dev.yourstream.core.common.AppError
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -58,6 +60,10 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import dev.yourstream.ui.screens.home.HomeUiState
 import dev.yourstream.ui.screens.navigation.AdaptiveShell
+import dev.yourstream.ui.screens.navigation.MAIN_TABS
+import dev.yourstream.ui.screens.navigation.MainNavigationBar
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assert
 import dev.yourstream.ui.screens.navigation.AppNavigator
 import dev.yourstream.ui.screens.navigation.DetailsRoute
 import dev.yourstream.ui.screens.navigation.HomeRoute
@@ -77,6 +83,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class ScreensTest {
@@ -84,6 +91,28 @@ class ScreensTest {
 
     private fun set(layout: WindowLayout = WindowLayout.COMPACT, content: @androidx.compose.runtime.Composable () -> Unit) =
         compose.setContent { YourStreamTheme(layout) { content() } }
+
+    /**
+     * Every tappable thing on screen has a touch area of at least 48 × 48 dp (Material and Android
+     * accessibility guidance), including the area Material adds around smaller visuals.
+     */
+    private fun assertTouchTargets() {
+        val min = 48f - 0.5f // rounding of dp ↔ px
+        val small = compose.onAllNodes(androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().filter { n ->
+            // Big enough by its own size (even when scrolled partly out of view, which clips the
+            // touch bounds), or by its touch bounds (Material icon buttons draw 40 dp and extend
+            // their touch area to 48 dp around it).
+            val t = n.touchBoundsInRoot
+            with(compose.density) {
+                (n.size.width.toDp().value < min || n.size.height.toDp().value < min) &&
+                    (t.width.toDp().value < min || t.height.toDp().value < min)
+            }
+        }
+        assertTrue(small.isEmpty(), "touch targets under 48 dp: " + small.joinToString { n ->
+            "${n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.TestTag) { null } ?: n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.Text) { null } ?: n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null } ?: n.id} " +
+                with(compose.density) { "${n.size.width.toDp()}×${n.size.height.toDp()}" }
+        })
+    }
 
     @androidx.compose.runtime.Composable
     private fun rows(vararg recent: Tile): HomeRows {
@@ -112,6 +141,7 @@ class ScreensTest {
         compose.onNodeWithTag("home").performScrollToNode(hasTestTag("card:item:7"))
         compose.onNodeWithTag("card:item:7").performClick()
         assertEquals(OpenTarget.Details(7), opened.last())
+        assertTouchTargets()
     }
 
     @Test
@@ -150,6 +180,7 @@ class ScreensTest {
         compose.onNodeWithText("doremon → doraemon").assertExists()
         compose.onNodeWithTag("top-result").performClick()
         assertEquals(listOf<OpenTarget>(OpenTarget.Details(1)), opened)
+        assertTouchTargets()
     }
 
     @Test
@@ -167,6 +198,7 @@ class ScreensTest {
         compose.onNodeWithTag("settings-page:ABOUT").performClick()
         assertEquals(listOf(SettingsPage.PLAYBACK, SettingsPage.ABOUT), opened)
         compose.onNodeWithText("Developer tools").assertDoesNotExist()
+        assertTouchTargets()
     }
 
     @Test
@@ -216,6 +248,9 @@ class ScreensTest {
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
         compose.onNodeWithTag("pref-dock-labels").performClick()
         assertEquals(false, prefs.dockLabels)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reduce-motion"))
+        compose.onNodeWithTag("pref-reduce-motion").performClick()
+        assertEquals(true, prefs.reduceMotion)
         page = SettingsPage.LAYOUT
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-home-hero"))
         compose.onNodeWithTag("pref-home-hero").performClick()
@@ -229,6 +264,152 @@ class ScreensTest {
         compose.onNodeWithTag("pref-reset").performClick()
         compose.onNodeWithTag("reset-confirm").performClick()
         assertEquals(1, resets)
+    }
+
+    @Test
+    fun torrentStreamingIsOffByDefaultAndAsksBeforeTurningOn() {
+        assertEquals(false, dev.yourstream.ui.screens.settings.AppSettings().torrentStreaming)
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsPageScreen(SettingsPage.PLAYBACK, SettingsHost(SettingsUiState("Asha", true, 3, ""), prefs = prefs, onPrefs = { prefs = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-torrents"))
+        // Cancel: stays off.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-cancel").performClick()
+        assertEquals(false, prefs.torrentStreaming)
+        // Agree: on.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-enable").performClick()
+        assertEquals(true, prefs.torrentStreaming)
+        // Turning off never asks.
+        compose.onNodeWithTag("pref-torrents").performClick()
+        compose.onNodeWithTag("torrent-consent-enable").assertDoesNotExist()
+        assertEquals(false, prefs.torrentStreaming)
+    }
+
+    @Test
+    fun signingOutAsksFirstAndSaysWhatIsRemoved() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.settings.AccountAction>()
+        set { dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.SignedIn("Asha")), { actions += it }, {}) }
+        compose.onNodeWithTag("account-sign-out").performClick()
+        assertTrue(actions.isEmpty(), "one tap does not sign out")
+        compose.onNodeWithText("Sign out of Telegram?").assertExists()
+        compose.onNodeWithTag("account-sign-out-confirm").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.settings.AccountAction>(dev.yourstream.ui.screens.settings.AccountAction.LogOut), actions)
+    }
+
+    @Test
+    fun aSessionEndedElsewhereIsExplainedOnTheSignInScreen() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.settings.AccountAction>()
+        set {
+            dev.yourstream.ui.screens.settings.AccountScreen(
+                dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Phone, signedOutNotice = true), { actions += it }, {},
+            )
+        }
+        compose.onNodeWithText("You were signed out").assertExists()
+        compose.onNodeWithContentDescription("Close").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.settings.AccountAction>(dev.yourstream.ui.screens.settings.AccountAction.DismissNotice), actions)
+    }
+
+    @Test
+    fun signInErrorsAreInPlainWords() {
+        var error by androidx.compose.runtime.mutableStateOf<AppError>(AppError.RateLimited(3_600))
+        set { dev.yourstream.ui.screens.settings.AccountScreen(dev.yourstream.ui.screens.settings.AccountUiState(dev.yourstream.ui.screens.settings.AccountStep.Phone, error = error), {}, {}) }
+        compose.onNodeWithTag("account-error").assertTextEquals("Too many attempts. Telegram asks you to wait 1 hour before trying again.")
+        error = AppError.Network("Request aborted")
+        compose.onNodeWithTag("account-error").assertTextEquals("Can't reach Telegram. Check your internet connection and try again.")
+        error = AppError.Telegram(400, "SOMETHING_NEW")
+        compose.onNodeWithTag("account-error").assertTextEquals("Telegram couldn't do that. Try again in a moment. (Details: SOMETHING_NEW)")
+    }
+
+    @Test
+    fun indexingCanBeLimitedToWifiAndAGoodBattery() {
+        var policy by androidx.compose.runtime.mutableStateOf(dev.yourstream.media.api.model.IndexingPolicy())
+        set { SettingsPageScreen(SettingsPage.CONTENT, SettingsHost(SettingsUiState("Asha", true, 3, ""), indexing = policy, onIndexing = { policy = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-index-wifi"))
+        compose.onNodeWithTag("pref-index-wifi").performClick()
+        assertEquals(true, policy.wifiOnly)
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-index-battery"))
+        compose.onNodeWithTag("pref-index-battery").performClick()
+        assertEquals(dev.yourstream.media.api.model.IndexingPolicy(wifiOnly = true, batteryAware = false), policy)
+    }
+
+    @Test
+    fun backgroundPlaybackIsOnByDefaultAndCanBeTurnedOff() {
+        assertEquals(true, dev.yourstream.ui.screens.settings.AppSettings().backgroundPlayback)
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsPageScreen(SettingsPage.PLAYBACK, SettingsHost(SettingsUiState("Asha", true, 3, ""), prefs = prefs, onPrefs = { prefs = it }), {}) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-background"))
+        compose.onNodeWithTag("pref-background").performClick()
+        assertEquals(false, prefs.backgroundPlayback)
+    }
+
+    @Test
+    fun aRemovedTitleHasNoPlayButtonAndSaysWhy() {
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 40, primary = null,
+                    versions = emptyList(), seasons = emptyList(), available = false, matched = false))),
+                {}, {}, {},
+            )
+        }
+        compose.onNodeWithTag("primary").assertDoesNotExist()
+        compose.onNodeWithTag("details-removed").assertExists()
+        compose.onNodeWithTag("details-not-matched").assertExists()
+    }
+
+    @Test
+    fun versionsCanBeDownloadedCancelledAndRemoved() {
+        val actions = mutableListOf<DetailsAction>()
+        val play = OpenTarget.Play(PlaybackTarget(1), 7)
+        fun row(id: Long, onDevice: Boolean = false, local: Boolean = false) =
+            dev.yourstream.ui.screens.details.VersionRow(id, "Vikram.$id.mkv", "1080p", OpenTarget.Play(PlaybackTarget(1), id), onDevice = onDevice, isLocal = local)
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 0, PrimaryAction.Play(play),
+                    versions = listOf(row(7), row(8), row(9, onDevice = true), row(10, local = true)), seasons = emptyList(), matched = true)),
+                    downloading = mapOf(8L to 0.42f)),
+                { actions += it }, {}, {},
+            )
+        }
+        compose.onNodeWithTag("details").performScrollToNode(hasTestTag("version:10"))
+        compose.onNodeWithText("1080p · Downloading 42%").assertExists()
+        compose.onNodeWithTag("download:10").assertDoesNotExist() // a file on this device: nothing to download
+        compose.onNodeWithTag("download:7").performClick()
+        compose.onNodeWithTag("download-cancel:8").performClick()
+        compose.onNodeWithTag("download-remove:9").performClick()
+        assertEquals(listOf(DetailsAction.Download(7), DetailsAction.CancelDownload(8), DetailsAction.RemoveDownload(9)), actions)
+    }
+
+    @Test
+    fun aDownloadedVersionSaysItIsOnThisDevice() {
+        val play = OpenTarget.Play(PlaybackTarget(1), 7)
+        set {
+            DetailsScreen(
+                DetailsUiState(UiState.Content(DetailsContent(1, LibraryKind.MOVIE, "Vikram", 2022, null, emptyList(), false, 0, PrimaryAction.Play(play),
+                    versions = listOf(dev.yourstream.ui.screens.details.VersionRow(7, "Vikram.2022.1080p.mkv", "1080p · 2.1 GB", play, onDevice = true)),
+                    seasons = emptyList(), matched = true))),
+                {}, {}, {},
+            )
+        }
+        compose.onNodeWithTag("details").performScrollToNode(hasTestTag("version:7"))
+        compose.onNodeWithText("1080p · 2.1 GB · On this device").assertExists()
+        compose.onNodeWithTag("details-not-matched").assertDoesNotExist()
+    }
+
+    @Test
+    fun theLibraryTabCanShowRemovedTitles() {
+        val actions = mutableListOf<dev.yourstream.ui.screens.browse.BrowseAction>()
+        val items = kotlinx.coroutines.flow.flowOf(PagingData.from(emptyList<Tile>()))
+        set {
+            BrowseScreen("Library", EmptyKind.MY_LIBRARY_EMPTY,
+                BrowseUiState(controls = dev.yourstream.ui.screens.browse.BrowseControls(kind = true, sort = true, watch = true, playable = true), count = 3),
+                items.collectAsLazyPagingItems(), { actions += it }, {})
+        }
+        compose.onNodeWithTag("playable-only").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.browse.BrowseAction>(dev.yourstream.ui.screens.browse.BrowseAction.SetPlayableOnly(false)), actions)
+        // The filter maps to the domain query.
+        assertEquals(true, dev.yourstream.ui.screens.browse.BrowseFilters(playableOnly = false).toQuery(null).includeUnavailable)
+        assertEquals(false, dev.yourstream.ui.screens.browse.BrowseFilters().toQuery(null).includeUnavailable)
     }
 
     @Test
@@ -255,6 +436,7 @@ class ScreensTest {
         compose.onNodeWithTag("my-library").performScrollTo().performClick()
         assertEquals(listOf<DetailsAction>(DetailsAction.ToggleLibrary), actions)
         compose.onNodeWithTag("favorite").assertDoesNotExist()
+        assertTouchTargets()
     }
 
     @Test
@@ -290,17 +472,63 @@ class ScreensTest {
         val selected = mutableListOf<TopLevel>()
         var layout by androidx.compose.runtime.mutableStateOf(WindowLayout.COMPACT)
         set { AdaptiveShell(layout, TopLevel.HOME, { selected += it }) { m -> Text("content", m) } }
-        // Phone: bottom bar with the 5 primary destinations.
+        // Phone: a navigation bar with the four main tabs (Movies and Series open from Home and Library).
         compose.onNodeWithTag("nav:bar").assertExists()
+        for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+        compose.onNodeWithTag("nav:CONTINUE").assertDoesNotExist()
         compose.onNodeWithTag("nav:MOVIES").assertDoesNotExist()
+        compose.onNodeWithTag("nav:SERIES").assertDoesNotExist()
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+        assertTouchTargets()
         compose.onNodeWithTag("nav:SEARCH").performClick()
-        assertEquals(listOf(TopLevel.SEARCH), selected)
-        // Tablet rail, large-screen drawer, TV drawer: every destination.
+        compose.onNodeWithTag("nav:LIBRARY").performClick()
+        assertEquals(listOf(TopLevel.SEARCH, TopLevel.LIBRARY), selected)
+        // Tablet rail, large-screen drawer, TV drawer: the same four.
         for ((l, tag) in listOf(WindowLayout.MEDIUM to "nav:rail", WindowLayout.EXPANDED to "nav:drawer", WindowLayout.TV to "nav:tv")) {
             layout = l
             compose.onNodeWithTag(tag).assertExists()
-            compose.onNodeWithTag("nav:MOVIES").assertExists()
+            for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+            compose.onNodeWithTag("nav:RECENT").assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun pagesOpenedFromHomeShowHomeAsTheSelectedTab() {
+        for (page in listOf(TopLevel.RECENT, TopLevel.MOVIES, TopLevel.SERIES)) {
+            assertEquals(TopLevel.HOME, page.tab, "$page")
+        }
+        set { AdaptiveShell(WindowLayout.COMPACT, TopLevel.MOVIES, {}) { m -> Text("content", m) } }
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+    }
+
+    @Test
+    fun theMangaBarIsTabsWithNamesAndTouchTargets() {
+        val selected = mutableListOf<TopLevel>()
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT, darkTheme = true, manga = true) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalMangaStyle provides true) {
+                    MainNavigationBar(TopLevel.LIBRARY, { selected += it })
+                }
+            }
+        }
+        compose.onNodeWithTag("nav:LIBRARY").assertIsSelected()
+        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
+        assertTouchTargets()
+        compose.onNodeWithTag("nav:SETTINGS").performClick()
+        assertEquals(listOf(TopLevel.SETTINGS), selected)
+    }
+
+    @Test
+    fun tabNamesStayReadableWithoutLabels() {
+        // Settings → Appearance → Tab names off: only the selected tab shows its name, but screen
+        // readers still get every tab's name.
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides dev.yourstream.ui.screens.settings.AppSettings(dockLabels = false)) {
+                YourStreamTheme(WindowLayout.COMPACT) { MainNavigationBar(TopLevel.HOME, {}) }
+            }
+        }
+        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
+        compose.onNodeWithTag("nav:SETTINGS").assert(androidx.compose.ui.test.hasText("Settings"))
     }
 
     @Test

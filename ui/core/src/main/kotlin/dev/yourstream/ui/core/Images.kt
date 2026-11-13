@@ -58,15 +58,21 @@ fun appImageLoader(context: Context, thumbnails: ThumbnailSource? = null): Image
  * image, 403/451/5xx) is repeated through wsrv.nl, then WordPress's i0.wp.com, which fetch the
  * image on their side. The failing host is remembered for 30 minutes, so the next posters go
  * straight to a proxy instead of waiting for the block again. 404s are real: never proxied.
+ *
+ * The proxies see the image's address (which title's poster) and the device's IP address, so
+ * they can be turned off ([enabled], Settings → Integrations → Image proxies); a blocked poster
+ * then shows the title placeholder.
  */
 class ImageRouting(
     private val now: () -> Long = System::currentTimeMillis,
     private val routes: (okhttp3.HttpUrl) -> List<String> = ::proxies,
+    private val enabled: () -> Boolean = { useProxies },
 ) : okhttp3.Interceptor {
     private val blockedUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
         val request = chain.request()
+        if (!enabled()) return chain.proceed(request)
         val host = request.url.host
         if ((blockedUntil[host] ?: 0L) <= now()) {
             try {
@@ -104,6 +110,9 @@ class ImageRouting(
 
     companion object {
         private const val BLOCK_MS = 30 * 60_000L
+
+        /** Settings → "Image proxies" (on by default; see the class description). */
+        @Volatile var useProxies: Boolean = true
 
         /** The same image through public image proxies, in order (pure; tested). */
         fun proxies(url: okhttp3.HttpUrl): List<String> {

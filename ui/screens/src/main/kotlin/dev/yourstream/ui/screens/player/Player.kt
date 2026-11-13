@@ -41,6 +41,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -149,6 +151,7 @@ class PlayerViewModel @Inject constructor(
     private val session: PlaybackSessionStore,
     private val episodes: EpisodeRepository,
     series: SeriesRepository,
+    private val active: dev.yourstream.playback.media3.ActivePlayback,
 ) : ViewModel() {
     private val route = saved.toRoute<PlayerRoute>()
     private val target: PlaybackTarget = route.target
@@ -187,6 +190,11 @@ class PlayerViewModel @Inject constructor(
         }
         target.episodeId?.let { episodeId -> viewModelScope.launch { loadNeighbours(episodeId) } }
         viewModelScope.launch { trackSession() }
+        // The media notification and lock screen show what plays, and control this player.
+        viewModelScope.launch {
+            state.map { it.title to it.subtitle }.filter { it.first.isNotBlank() }.distinctUntilChanged()
+                .collect { (title, subtitle) -> active.attach(controller.player, title, subtitle) }
+        }
     }
 
     fun onAction(action: PlayerAction) {
@@ -231,6 +239,7 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         session.clear() // left normally (not killed): nothing to recover
+        active.detach(controller.player) // before release: the media session lets go of it first
         controller.release()
     }
 

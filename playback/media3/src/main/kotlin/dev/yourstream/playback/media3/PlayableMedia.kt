@@ -28,12 +28,19 @@ data class PlayableMedia(
     val subtitles: List<SideloadedSubtitle> = emptyList(),
     /** What the library knows around the file, for language detection. */
     val trackContext: dev.yourstream.playback.tracks.FileContext? = null,
+    /**
+     * A file on this device: its `content://` address, played directly by Media3 (no Telegram
+     * streaming; [fileId] is 0). Null for Telegram files.
+     */
+    val localUri: String? = null,
 ) {
+    val isLocal: Boolean get() = localUri != null
+
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun mediaItem(): MediaItem = MediaItem.Builder()
-        .setUri(TelegramMediaUri(fileId, StreamHints(sizeBytes.takeIf { it > 0 }, durationMs)).toUri())
+        .setUri(localUri?.let(android.net.Uri::parse) ?: TelegramMediaUri(fileId, StreamHints(sizeBytes.takeIf { it > 0 }, durationMs)).toUri())
         .setMediaId(mediaId?.let { "media:$it" } ?: "tg:$remoteUniqueId")
-        .setCustomCacheKey("tg:$remoteUniqueId")
+        .setCustomCacheKey(if (localUri != null) "local:$remoteUniqueId" else "tg:$remoteUniqueId")
         .setSubtitleConfigurations(subtitles.map { s ->
             MediaItem.SubtitleConfiguration.Builder(android.net.Uri.fromFile(java.io.File(s.localPath)))
                 .setId(s.id)

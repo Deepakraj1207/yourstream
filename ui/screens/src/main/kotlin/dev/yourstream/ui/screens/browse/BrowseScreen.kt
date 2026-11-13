@@ -52,6 +52,13 @@ fun MoviesRoute(onOpen: (OpenTarget) -> Unit, vm: MoviesViewModel = hiltViewMode
 fun SeriesRoute(onOpen: (OpenTarget) -> Unit, vm: SeriesViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_series, EmptyKind.LIBRARY_EMPTY, vm, onOpen)
 
 @Composable
+fun UntitledRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm: UntitledViewModel = hiltViewModel()) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    BrowseScreen(stringResource(R.string.untitled_title), EmptyKind.LIBRARY_EMPTY, state, vm.items.collectAsLazyPagingItems(), vm::onAction, onOpen, onBack = onBack,
+        intro = stringResource(R.string.untitled_intro))
+}
+
+@Composable
 fun RecentlyAddedRoute(onOpen: (OpenTarget) -> Unit, vm: RecentlyAddedViewModel = hiltViewModel()) = BrowseRoute(R.string.nav_recent, EmptyKind.LIBRARY_EMPTY, vm, onOpen)
 
 @Composable
@@ -65,14 +72,21 @@ private fun BrowseRoute(@StringRes title: Int, empty: EmptyKind, vm: BrowseViewM
  * results" when filters are set, with the filters still there to undo them). Loading: skeletons.
  */
 @Composable
-fun BrowseScreen(title: String, empty: EmptyKind, state: BrowseUiState, items: LazyPagingItems<Tile>, onAction: (BrowseAction) -> Unit, onOpen: (OpenTarget) -> Unit) {
+fun BrowseScreen(
+    title: String, empty: EmptyKind, state: BrowseUiState, items: LazyPagingItems<Tile>, onAction: (BrowseAction) -> Unit, onOpen: (OpenTarget) -> Unit,
+    onBack: (() -> Unit)? = null, intro: String? = null,
+) {
     // Nothing to filter: an unfiltered, empty list shows just its empty state (no "0 titles", no chips).
     val nothing = state.count == 0 && !state.filters.isFiltered
     val count = state.count?.takeUnless { nothing }?.let { pluralStringResource(R.plurals.titles_count, it, it) }
     val actions = tileActions({ onAction(BrowseAction.Tile(it)) }, onOpen)
     val card = tileCard()
-    ScreenScaffold(title, count = count) {
+    ScreenScaffold(title, count = count, onBack = onBack) {
         Column {
+            intro?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = LocalDimens.current.gutter).padding(bottom = 8.dp).testTag("browse-intro"))
+            }
             if (!nothing) FilterBar(state, onAction)
             PagedContent(items, if (state.filters.isFiltered) EmptyKind.NO_RESULTS else empty) { paged ->
                 PagedMediaGrid(paged, card, { onOpen(it.open) }, actions = actions)
@@ -85,7 +99,7 @@ fun BrowseScreen(title: String, empty: EmptyKind, state: BrowseUiState, items: L
 @Composable
 private fun FilterBar(state: BrowseUiState, onAction: (BrowseAction) -> Unit) {
     val c = state.controls
-    if (!c.kind && !c.sort && !c.watch) return
+    if (!c.kind && !c.sort && !c.watch && !c.playable) return
     val f = state.filters
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = LocalDimens.current.gutter).padding(bottom = 4.dp),
@@ -107,8 +121,16 @@ private fun FilterBar(state: BrowseUiState, onAction: (BrowseAction) -> Unit) {
             val label = if (f.watch == WatchFilter.ANY) stringResource(R.string.watch_label) else statuses.first { it.value == f.watch }.label
             MenuChip(label, statuses, f.watch, { onAction(BrowseAction.SetWatch(it)) }, highlighted = f.watch != WatchFilter.ANY, tag = "watch")
         }
+        if (c.playable) {
+            // Titles whose files were deleted stay in "My library" for their progress; shown on demand.
+            FilterChip(
+                selected = f.playableOnly, onClick = { onAction(BrowseAction.SetPlayableOnly(!f.playableOnly)) },
+                label = { Text(stringResource(R.string.filter_playable_only), maxLines = 1) },
+                modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("playable-only"),
+            )
+        }
         if (c.kind) {
-            if (c.sort || c.watch) VerticalDivider(Modifier.height(24.dp))
+            if (c.sort || c.watch || c.playable) VerticalDivider(Modifier.height(24.dp))
             listOf(
                 ChipOption<LibraryKind?>(null, stringResource(R.string.filter_all)), ChipOption(LibraryKind.MOVIE, stringResource(R.string.nav_movies)),
                 ChipOption(LibraryKind.SERIES, stringResource(R.string.nav_series)), ChipOption(LibraryKind.VIDEO, stringResource(R.string.filter_videos)),

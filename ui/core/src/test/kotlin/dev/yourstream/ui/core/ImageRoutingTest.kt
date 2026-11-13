@@ -20,9 +20,11 @@ class ImageRoutingTest {
     @Before fun start() { origin.start(); proxy.start() }
     @After fun stop() { origin.close(); proxy.close() }
 
+    private var proxiesOn = true
+
     private fun client() = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS).readTimeout(2, TimeUnit.SECONDS)
-        .addInterceptor(ImageRouting({ clock }) { url -> listOf(proxy.url("/p?url=" + url.encodedPath).toString()) })
+        .addInterceptor(ImageRouting({ clock }, { url -> listOf(proxy.url("/p?url=" + url.encodedPath).toString()) }, { proxiesOn }))
         .build()
 
     private fun image() = MockResponse.Builder().code(200).setHeader("Content-Type", "image/jpeg").body("JPEG").build()
@@ -62,6 +64,16 @@ class ImageRoutingTest {
         proxy.enqueue(image())
         client().newCall(Request.Builder().url(dead).build()).execute().use { assertEquals(200, it.code) }
         assertEquals(1, proxy.requestCount)
+    }
+
+    @Test
+    fun withProxiesOffABlockedPosterNeverReachesAProxy() {
+        proxiesOn = false
+        origin.enqueue(MockResponse.Builder().code(200).setHeader("Content-Type", "text/html").body("<html>blocked</html>").build())
+        get(client(), "/t/p/w342/a.jpg").use { assertEquals("<html>blocked</html>", it.body.string()) }
+        val dead = "http://127.0.0.1:1/t/p/w342/a.jpg"
+        runCatching { client().newCall(Request.Builder().url(dead).build()).execute().close() }
+        assertEquals(0, proxy.requestCount)
     }
 
     @Test

@@ -115,7 +115,8 @@ class Pipeline(val context: Context, recordQueries: Boolean = false) : AutoClose
 
     // Playback
     val streamer = TelegramFileStreamer(files, scope)
-    val resolver = LibraryMediaSourceResolver(media, episodes, db, telegram, files)
+    // Telegram files only in this pipeline: no local file is readable.
+    val resolver = LibraryMediaSourceResolver(media, episodes, db, telegram, files) { false }
     val trackStore = RoomTrackPreferenceStore(db)
     val trackSupport = TrackSupport(trackStore, ExternalSubtitleLoader(subtitles, db, telegram, files, context), TrackContextProvider(db))
     private val controllers = mutableListOf<TelegramPlaybackController>()

@@ -32,6 +32,8 @@ abstract class IndexerModule {
     @Binds abstract fun store(impl: RoomIndexStore): IndexStore
     @Binds abstract fun repository(impl: RoomMediaIndexRepository): MediaIndexRepository
     @Binds abstract fun indexer(impl: DefaultMediaIndexer): MediaIndexer
+    @Binds abstract fun localSources(impl: dev.yourstream.media.indexer.local.DefaultLocalMediaSources): dev.yourstream.media.api.LocalMediaSources
+    @Binds abstract fun localFiles(impl: dev.yourstream.media.indexer.local.AndroidLocalFileLister): dev.yourstream.media.indexer.local.LocalFileLister
 
     /** Other modules (the library) add themselves; empty is fine. */
     @Multibinds abstract fun indexListeners(): Set<MediaIndexListener>

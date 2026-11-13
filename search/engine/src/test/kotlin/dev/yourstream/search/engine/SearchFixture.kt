@@ -41,7 +41,7 @@ class SearchFixture(db: YourStreamDatabase) {
     private val insLink = sql.compileStatement("INSERT INTO media_link (media_id, item_id, episode_id, method, signature, linked_at) VALUES (?, ?, ?, 'AUTO', '', 0)")
 
     fun chat(id: Long, title: String) {
-        sql.execSQL("INSERT OR REPLACE INTO indexed_chat VALUES (?, ?, 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0)", arrayOf<Any?>(id, title))
+        sql.execSQL("INSERT OR REPLACE INTO indexed_chat VALUES (?, ?, 'CHANNEL', 1, 'IDLE', NULL, NULL, NULL, 0, 0, 0, 0, 'TELEGRAM')", arrayOf<Any?>(id, title))
         chats += id
     }
 

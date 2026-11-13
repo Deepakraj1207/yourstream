@@ -90,6 +90,23 @@ class ScreenshotTest {
         HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s), {}, {}, {}, {}, {})
     }
 
+    private fun firstRun(name: String, step: dev.yourstream.ui.screens.firstrun.FirstRunStep, state: dev.yourstream.ui.screens.firstrun.FirstRunUiState, dark: Boolean = true) =
+        shot(name, WindowLayout.COMPACT, null, dark = dark) { dev.yourstream.ui.screens.firstrun.FirstRunScreen(state, {}, {}, {}, initialStep = step) }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneFirstRunWelcome() = firstRun("phone-first-run-welcome", dev.yourstream.ui.screens.firstrun.FirstRunStep.WELCOME, dev.yourstream.ui.screens.firstrun.FirstRunUiState())
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneFirstRunTelegram() = firstRun("phone-first-run-telegram", dev.yourstream.ui.screens.firstrun.FirstRunStep.TELEGRAM,
+        dev.yourstream.ui.screens.firstrun.FirstRunUiState(starting = false), dark = false)
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneFirstRunIndexing() = firstRun("phone-first-run-indexing", dev.yourstream.ui.screens.firstrun.FirstRunStep.INDEXING,
+        dev.yourstream.ui.screens.firstrun.FirstRunUiState(signedIn = true, starting = false, sources = 2, indexing = IndexingStatus(chats = 1, found = 134, scanned = 900, total = 2_400, perSecond = 120f, etaSeconds = 240)))
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneFirstRunPlayback() = firstRun("phone-first-run-playback", dev.yourstream.ui.screens.firstrun.FirstRunStep.PLAYBACK, dev.yourstream.ui.screens.firstrun.FirstRunUiState())
+
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHome() = shot("phone-home-dark", WindowLayout.COMPACT, TopLevel.HOME) { home() }
 
@@ -202,8 +219,8 @@ class ScreenshotTest {
 
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
         SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
-        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}),
-        updateLine = "Version $version · up to date", onUpdate = {}, onClearCache = {}, onSourceCode = {}, onReset = {},
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}, storage = {}),
+        updateLine = "Version $version · up to date", onUpdate = {}, onSourceCode = {}, onReset = {},
         securedHosts = listOf("api.themoviedb.org"),
     )
 

@@ -173,7 +173,7 @@
 
     <!-- Library status -->
     <string name="status_title">Library status</string>
-    <string name="status_stage_files">From Telegram</string>
+    <string name="status_stage_files">From your sources</string>
     <string name="status_syncing">Syncing…</string>
     <string name="status_synced_at">Up to date · checked %1$s</string>
     <string name="status_not_synced">Not synced yet</string>
@@ -190,8 +190,8 @@
     <string name="status_sources">Sources</string>
     <string name="status_manage_sources">Manage</string>
     <string name="status_source_found">%1$d files found so far</string>
-    <string name="status_privacy">Your files stay in Telegram. To find posters and details, only a title and year are sent to %1$s: no account and nothing about what you watch.</string>
-    <string name="status_privacy_no_providers">Your files stay in Telegram, and nothing about your library leaves this device.</string>
+    <string name="status_privacy">Your files stay where they are, in Telegram or on this device. To find posters and details, only a title and year are sent to %1$s: no account and nothing about what you watch.</string>
+    <string name="status_privacy_no_providers">Your files stay where they are, in Telegram or on this device, and nothing about your library leaves this device.</string>
 
     <!-- Match review -->
     <string name="review_title">Check matches</string>
@@ -324,7 +324,7 @@
         <item quantity="one">%1$d catalog</item>
         <item quantity="other">%1$d catalogs</item>
     </plurals>
-    <string name="addons_what_works">Catalogs, details and streams work, torrent streams included (Settings → Streaming).</string>
+    <string name="addons_what_works">Catalogs, details and streams work; torrent streams after you turn them on (Settings → Playback → Streaming).</string>
     <string name="action_add_to_library">Add to library</string>
     <string name="action_remove_from_library">Remove from library</string>
     <string name="player_rotate">Rotate screen</string>
@@ -356,7 +356,7 @@
     <string name="addon_no_streams">No streams found for this title.</string>
     <string name="addon_stream_external">Opens in another app</string>
     <string name="addon_stream_torrent">Torrent · plays while it downloads</string>
-    <string name="addon_stream_torrent_off">Torrent: turned off in Settings → Streaming</string>
+    <string name="addon_stream_torrent_off">Torrent · tap to turn on torrent streaming</string>
     <string name="addon_stream_unsupported">Can\'t be played here</string>
     <string name="stream_tracks">Audio and subtitles</string>
     <string name="stream_audio">Audio</string>
@@ -390,9 +390,8 @@
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>
-    <string name="settings_clear_cache">Clear image cache</string>
-    <string name="settings_clear_cache_detail">Posters download again when needed</string>
-    <string name="settings_cache_cleared">Image cache cleared</string>
+    <string name="settings_storage">Storage</string>
+    <string name="settings_storage_detail">What the app keeps on this device, and clearing it</string>
     <string name="settings_source">Source code</string>
     <string name="settings_source_detail">github.com/Deepakraj1207/yourstream</string>
     <string name="settings_sign_in_hint">Sign in to Telegram to see your videos</string>
@@ -478,8 +477,13 @@
     <string name="settings_group_licenses">Open-source licenses</string>
     <string name="settings_amoled">AMOLED black</string>
     <string name="settings_amoled_detail">Dark theme on pure black: deeper contrast, less power on OLED screens</string>
-    <string name="settings_dock_labels">Tab names in the dock</string>
-    <string name="settings_dock_labels_detail">Show each tab\'s name under its icon</string>
+    <string name="settings_dock_labels">Tab names</string>
+    <string name="settings_dock_labels_detail">Show every tab\'s name in the navigation bar, not only the selected one\'s</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_detail">Pages fade instead of sliding; loading placeholders stay still. On automatically when the system\'s \"Remove animations\" is on</string>
+    <string name="settings_group_accessibility">Accessibility</string>
+    <string name="settings_setup_guide">Setup guide</string>
+    <string name="settings_setup_guide_detail">Walk through connecting Telegram, choosing chats and playback basics again</string>
     <string name="settings_home_hero">Featured banner</string>
     <string name="settings_home_hero_detail">The large banner at the top of Home</string>
     <string name="settings_home_catalogs">Add-on catalogs</string>
@@ -501,7 +505,11 @@
     </plurals>
     <string name="settings_secure_dns">Secure DNS</string>
     <string name="settings_secure_dns_on">Every connection finds its server through DNS over HTTPS (Cloudflare, then Google)</string>
-    <string name="settings_secure_dns_auto">Off: used on its own for sites your network blocks (like TMDB on some Indian networks)</string>
+    <string name="settings_secure_dns_off">Off: your network\'s own DNS finds servers</string>
+    <string name="settings_dns_fallback">Secure DNS for blocked sites</string>
+    <string name="settings_dns_fallback_detail">When your network\'s DNS blocks a site (like TMDB on some Indian networks), its name is looked up through Cloudflare or Google instead. They see the site\'s name and your IP address. Off: blocked sites stay unreachable.</string>
+    <string name="settings_image_proxies">Image proxies</string>
+    <string name="settings_image_proxies_detail">When your network blocks a poster server, posters are fetched through wsrv.nl or i0.wp.com. They see which posters are loaded and your IP address. Off: blocked posters show the title instead.</string>
     <string name="settings_secure_dns_now">Now used for %1$s</string>
     <string name="settings_reset">Reset settings</string>
     <string name="settings_reset_detail">Every choice here back to its default. Your library, sign-in and add-ons stay.</string>
@@ -510,4 +518,172 @@
     <string name="settings_reset_action">Reset</string>
     <string name="settings_reset_done">Settings reset</string>
     <string name="action_cancel">Cancel</string>
+    <string name="torrent_consent_title">Turn on torrent streaming?</string>
+    <string name="torrent_consent_text">A torrent downloads from, and uploads to, other people\'s devices while you watch. They can see your IP address, and it uses data like any stream. Only play what you have the right to watch.</string>
+    <string name="torrent_consent_enable">Turn on</string>
+    <string name="account_sign_out_explained">Signing out removes your library, watch history and cached files from this device. Your Telegram chats are not touched.</string>
+    <string name="account_sign_out_title">Sign out of Telegram?</string>
+    <string name="account_sign_out_text">Your library, watch history and cached files are removed from this device. Settings, languages and add-ons stay. To get it back, sign in and choose your chats again.</string>
+    <string name="account_removing_data">Signing out and removing your library from this device…</string>
+    <string name="account_signed_out_title">You were signed out</string>
+    <string name="account_signed_out_text">Your Telegram session ended: it was closed from another device, expired or the account changed. Your library was removed from this device. Sign in and choose your chats to rebuild it.</string>
+    <string name="account_error_offline">Can\'t reach Telegram. Check your internet connection and try again.</string>
+    <string name="account_error_wait">Too many attempts. Telegram asks you to wait %1$s before trying again.</string>
+    <string name="account_error_wait_unknown">Too many attempts. Wait a while before trying again.</string>
+    <string name="account_error_unexpected">Telegram couldn\'t do that. Try again in a moment. (Details: %1$s)</string>
+    <plurals name="account_wait_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <plurals name="account_wait_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="account_wait_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <string name="status_pause_all">Pause all</string>
+    <string name="status_resume_all">Resume all</string>
+    <string name="status_source_pause">Pause</string>
+    <string name="status_source_resume">Resume</string>
+    <string name="status_source_stop">Stop</string>
+    <string name="status_state_paused">Paused</string>
+    <string name="status_state_connecting">Connecting to Telegram…</string>
+    <string name="status_state_scanning">Scanning…</string>
+    <string name="status_state_processing">Reading titles…</string>
+    <string name="status_state_waiting">Waiting to continue</string>
+    <string name="status_state_waiting_wifi">Waiting for Wi-Fi</string>
+    <string name="status_state_recovering">Interrupted — continuing soon</string>
+    <string name="status_state_cancelled">Stopped — continues at the next sync</string>
+    <string name="status_state_failed">Stopped on an error</string>
+    <string name="settings_group_indexing">Indexing</string>
+    <string name="settings_index_wifi">Index on Wi-Fi only</string>
+    <string name="settings_index_wifi_detail">Reading your chats uses a little data; on mobile data it waits for Wi-Fi</string>
+    <string name="settings_index_battery">Wait while the battery is low</string>
+    <string name="settings_index_battery_detail">Indexing pauses below about 15% battery, unless charging</string>
+    <string name="settings_background">Keep playing in the background</string>
+    <string name="settings_background_detail">With the screen off or another app open, the sound continues; controls in the notification and on the lock screen</string>
+    <string name="player_waiting_network">No connection. Playback continues when you\'re back online.</string>
+    <string name="untitled_title">Files without a title</string>
+    <string name="untitled_intro">No title could be found for these files, from Telegram or the file name, and they have no poster, so Home and the library leave them out. Open one to play it, or use Fix match to give it the right title.</string>
+    <plurals name="status_untitled">
+        <item quantity="one">%d file without a title</item>
+        <item quantity="other">%d files without a title</item>
+    </plurals>
+    <string name="filter_playable_only">Playable only</string>
+    <string name="caption_removed">Removed</string>
+    <string name="details_removed">Removed from Telegram: every file of this title was deleted from your chats. Your progress is kept.</string>
+    <string name="details_not_matched">Not matched with an online catalogue: the details come from the file name. Use Fix match to choose the right title.</string>
+    <string name="details_on_device">On this device</string>
+
+    <!-- First run -->
+    <string name="first_run_step">Step %1$d of %2$d</string>
+    <string name="first_run_skip">Skip</string>
+    <string name="first_run_back">Back</string>
+    <string name="first_run_next">Next</string>
+    <string name="first_run_start">Get started</string>
+    <string name="first_run_not_now">Not now</string>
+    <string name="first_run_finish">Start watching</string>
+    <string name="first_run_welcome_title">Welcome to YourStream</string>
+    <string name="first_run_welcome_body">Watch the movies and series you keep in your Telegram chats, with posters, episodes and resume, on this device.</string>
+    <string name="first_run_privacy_title">What stays private</string>
+    <string name="first_run_privacy_files">Your videos stay in Telegram. Nothing is uploaded anywhere else.</string>
+    <string name="first_run_privacy_metadata">To find posters and details, only a title and year are sent to a movie database. Your messages are never sent.</string>
+    <string name="first_run_privacy_signout">Signing out removes your account\'s data from this device.</string>
+    <string name="first_run_telegram_title">Connect Telegram</string>
+    <string name="first_run_telegram_body">YourStream signs in with your own Telegram account, the same way the Telegram app does.</string>
+    <string name="first_run_telegram_how">Use your phone number and the code Telegram sends you, or scan a QR code from Telegram on another device.</string>
+    <string name="first_run_telegram_connect">Connect Telegram</string>
+    <string name="first_run_telegram_connected">Connected</string>
+    <string name="first_run_telegram_connected_as">Connected as %1$s</string>
+    <string name="first_run_telegram_starting">Getting Telegram ready…</string>
+    <string name="first_run_telegram_unavailable">Telegram sign-in is not available in this build of the app.</string>
+    <string name="first_run_sources_title">Choose your chats</string>
+    <string name="first_run_sources_body">Pick the channels, groups or chats where your videos are. Only those are read, and you can change them any time in Settings.</string>
+    <string name="first_run_sources_sign_in_first">Connect Telegram first to see your chats.</string>
+    <string name="first_run_sources_none">No chats chosen yet</string>
+    <string name="first_run_sources_choose">Choose chats</string>
+    <string name="first_run_sources_change">Change chats</string>
+    <plurals name="first_run_sources_chosen">
+        <item quantity="one">%1$d chat chosen</item>
+        <item quantity="other">%1$d chats chosen</item>
+    </plurals>
+    <string name="first_run_indexing_title">Building your library</string>
+    <string name="first_run_indexing_body">YourStream looks through the chosen chats for video files and recognises movies and series from their names.</string>
+    <plurals name="first_run_indexing_found">
+        <item quantity="one">%1$s video found so far</item>
+        <item quantity="other">%1$s videos found so far</item>
+    </plurals>
+    <plurals name="first_run_indexing_done">
+        <item quantity="one">%1$s video found</item>
+        <item quantity="other">%1$s videos found</item>
+    </plurals>
+    <string name="first_run_indexing_background">This carries on in the background. You can keep going.</string>
+    <string name="first_run_indexing_no_sources">Nothing to look through yet: choose chats first.</string>
+    <string name="first_run_indexing_waiting">Waiting to start. It begins when the device is online.</string>
+    <string name="first_run_indexing_controls">It waits when the battery is low and continues where it stopped. Pause it, or limit it to Wi-Fi, in Library status and Settings → Content.</string>
+    <string name="first_run_library_title">Finding things to watch</string>
+    <string name="first_run_library_body">The tabs at the bottom of the screen:</string>
+    <string name="first_run_tab_home">Home: continue watching, what was added recently, and suggestions.</string>
+    <string name="first_run_tab_movies">Movies and series: Home\'s rows (\"See all\"), with posters, filters and sorting.</string>
+    <string name="first_run_tab_search">Search: titles and file names, even with typos.</string>
+    <string name="first_run_tab_library">Library: the titles you add. Long-press a poster and choose Add to library.</string>
+    <string name="first_run_tab_settings">Settings: your account, chats, look and playback.</string>
+    <string name="first_run_playback_title">Playback basics</string>
+    <string name="first_run_playback_body">Tap a title, then Play. Videos stream from Telegram; nothing needs to be downloaded first.</string>
+    <string name="first_run_playback_resume">Stopped halfway? Play picks up where you left off.</string>
+    <string name="first_run_playback_seek">Double-tap the left or right side to skip back or forward.</string>
+    <string name="first_run_playback_swipe">Swipe up or down on the left for brightness, on the right for volume. Press and hold for 2× speed.</string>
+    <string name="first_run_playback_tracks">Audio language and subtitles: the buttons in the player\'s controls.</string>
+    <string name="first_run_playback_background">Audio keeps playing with the screen off, with controls on the lock screen.</string>
+
+    <!-- Storage -->
+    <string name="storage_title">Storage</string>
+    <string name="storage_measuring">Measuring…</string>
+    <string name="storage_total">YourStream uses %1$s for caches</string>
+    <string name="storage_free">%1$s free on this device</string>
+    <string name="storage_clear">Clear</string>
+    <string name="storage_clearing">Clearing…</string>
+    <string name="storage_cleared">%1$s cleared.</string>
+    <string name="storage_failed">%1$s not cleared: %2$s</string>
+    <string name="storage_telegram">Telegram videos</string>
+    <string name="storage_telegram_detail">Parts of videos you streamed (trimmed above 2 GB), and videos you saved to this device</string>
+    <string name="storage_web">Add-on streams</string>
+    <string name="storage_web_detail">Up to 512 MB, oldest removed first</string>
+    <string name="storage_torrents">Torrents</string>
+    <string name="storage_torrents_detail">Removed a few minutes after a torrent stops playing</string>
+    <string name="storage_images">Posters and thumbnails</string>
+    <string name="storage_images_detail">Up to 300 MB; they download again when needed</string>
+    <string name="storage_note">Clearing never touches your library, watch history or anything in Telegram itself. Nothing is cleared while a video plays.</string>
+    <string name="storage_telegram_confirm_title">Clear Telegram videos?</string>
+    <string name="storage_telegram_confirm">This also removes videos you saved to this device. They stay in Telegram and stream again when you play them.</string>
+    <string name="storage_busy">a video is playing. Stop it and try again.</string>
+
+    <!-- Files on this device -->
+    <string name="settings_local_files">Files on this device</string>
+    <string name="settings_local_files_detail">Folders with videos on this phone or tablet</string>
+    <string name="local_title">Files on this device</string>
+    <string name="local_intro">Add folders with movies and series stored on this device. They join your library next to your Telegram videos, with posters, episodes and resume.</string>
+    <string name="local_signed_out">Folders are scanned while you are signed in to Telegram: your library belongs to your account.</string>
+    <string name="local_none">No folders yet</string>
+    <string name="local_add_folder">Add a folder</string>
+    <string name="local_add_device">Add all videos on this device</string>
+    <string name="local_add_device_detail">Asks for permission to read your videos, including camera clips. Choosing folders needs no permission.</string>
+    <string name="local_device_videos">All videos on this device</string>
+    <string name="local_rescan">Scan again</string>
+    <string name="local_remove">Remove %1$s</string>
+    <string name="local_scanning">Scanning…</string>
+    <string name="local_not_scanned">Not scanned yet</string>
+    <plurals name="local_videos">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <string name="local_privacy">Files are read on this device and never uploaded. Only the title and year found in a file name are looked up for posters, as for Telegram videos. Removing a folder removes its videos from the library, not from the device.</string>
+
+    <!-- Offline downloads -->
+    <string name="details_download">Download</string>
+    <string name="details_download_cancel">Cancel</string>
+    <string name="details_download_remove">Remove download</string>
+    <string name="details_downloading">Downloading %1$d%%</string>
 </resources>

@@ -54,6 +54,8 @@ import dev.yourstream.ui.screens.settings.SourcesRoute as SourcesScreenRoute
 private const val MOTION_MS = 300
 private const val OUT_MS = 90
 private const val PLAYER_FADE_MS = 200
+/** Reduced motion: every change is a short cross-fade; nothing slides or zooms. */
+private const val REDUCED_FADE_MS = 120
 
 private fun NavDestination.isTopLevel() = TopLevel.entries.any { hasRoute(it.route::class) }
 private fun NavDestination.isPlayer() = hasRoute(PlayerRoute::class) || hasRoute(StreamPlayerRoute::class)
@@ -72,36 +74,37 @@ private inline fun <reified T : Any> NavGraphBuilder.page(noinline content: @Com
 /**
  * The whole graph. Each destination wires its screen's callbacks to the [AppNavigator].
  * Tabs fade through; pages move along the horizontal axis (back reverses it); the player fades,
- * since it also leaves the navigation chrome.
+ * since it also leaves the navigation chrome. With reduced motion everything only cross-fades.
  */
 @Composable
 fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: String?, modifier: Modifier = Modifier) {
     val back: () -> Unit = { navigator.back() }
+    val reduced = dev.yourstream.ui.core.LocalReducedMotion.current
     NavHost(
         nav, startDestination = HomeRoute, modifier = modifier,
         enterTransition = {
-            when {
+            if (reduced) fadeIn(tween(REDUCED_FADE_MS)) else when {
                 player() -> fadeIn(tween(PLAYER_FADE_MS))
                 tabs() -> fadeInAfterOut() + scaleIn(tween(MOTION_MS - OUT_MS, delayMillis = OUT_MS, easing = motion), initialScale = 0.96f)
                 else -> fadeInAfterOut() + slideInHorizontally(tween(MOTION_MS, easing = motion)) { axisOffset(it) }
             }
         },
         exitTransition = {
-            when {
+            if (reduced) fadeOut(tween(REDUCED_FADE_MS)) else when {
                 player() -> fadeOut(tween(PLAYER_FADE_MS))
                 tabs() -> quickFadeOut()
                 else -> quickFadeOut() + slideOutHorizontally(tween(MOTION_MS, easing = motion)) { -axisOffset(it) }
             }
         },
         popEnterTransition = {
-            when {
+            if (reduced) fadeIn(tween(REDUCED_FADE_MS)) else when {
                 player() -> fadeIn(tween(PLAYER_FADE_MS))
                 tabs() -> fadeInAfterOut() + scaleIn(tween(MOTION_MS - OUT_MS, delayMillis = OUT_MS, easing = motion), initialScale = 0.96f)
                 else -> fadeInAfterOut() + slideInHorizontally(tween(MOTION_MS, easing = motion)) { -axisOffset(it) }
             }
         },
         popExitTransition = {
-            when {
+            if (reduced) fadeOut(tween(REDUCED_FADE_MS)) else when {
                 player() -> fadeOut(tween(PLAYER_FADE_MS))
                 tabs() -> quickFadeOut()
                 else -> quickFadeOut() + slideOutHorizontally(tween(MOTION_MS, easing = motion)) { axisOffset(it) }
@@ -124,13 +127,20 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
                 onReview = navigator::review,
             )
         }
+        page<LocalFilesRoute> { dev.yourstream.ui.screens.settings.LocalFilesRoute(onBack = back) }
+        page<StorageRoute> { dev.yourstream.ui.screens.settings.StorageRoute(onBack = back) }
+        page<FirstRunRoute> {
+            dev.yourstream.ui.screens.firstrun.FirstRunRoute(
+                onConnectTelegram = navigator::account, onChooseChats = navigator::sources, onDone = navigator::finishFirstRun,
+            )
+        }
         page<LibraryRoute> { LibraryScreenRoute(navigator::open) }
         page<MoviesRoute> { MoviesScreenRoute(navigator::open) }
         page<SeriesRoute> { SeriesScreenRoute(navigator::open) }
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
-        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb)
+        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb, navigator::firstRun, navigator::storage, navigator::localFiles)
         page<SettingsRoute> {
             SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, onPage = navigator::settingsPage)
         }
@@ -145,7 +155,8 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<AccountRoute> { AccountScreenRoute(back) }
         page<SourcesRoute> { SourcesScreenRoute(back) }
         page<LanguagesRoute> { LanguagesScreenRoute(back) }
-        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back) }
+        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back, onUntitled = navigator::untitledFiles) }
+        page<UntitledFilesRoute> { dev.yourstream.ui.screens.browse.UntitledRoute(navigator::open, back) }
         page<MatchReviewRoute> { MatchReviewDestination(back) }
         page<FixMatchRoute> { FixMatchDestination(back) }
         page<StatsRoute> { StatsDestination(back) }

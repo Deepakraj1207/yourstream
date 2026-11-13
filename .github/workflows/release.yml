@@ -7,9 +7,10 @@
 # Like every Telegram client, anything in an APK can be extracted from it; the secrets keep the
 # values out of git.
 #
-# Optional, so updates install over earlier releases: repository secrets RELEASE_KEYSTORE_BASE64,
-# RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD. Without them the APK is signed
-# with a throwaway debug key (installing a newer release then needs uninstalling the old one).
+# Required, so updates install over earlier releases: repository secrets RELEASE_KEYSTORE_BASE64,
+# RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD. A release signed with any other
+# key could not be installed over the previous version, so the workflow stops instead, and it
+# checks the signed APK's certificate against RELEASE_CERT_SHA256 below.
 name: Release APK
 
 on:
@@ -20,15 +21,47 @@ on:
       version:
         description: 'Version tag to create, e.g. v0.2.0'
         required: true
+      minify:
+        description: 'Shrink with R8 (only after a minified build passed docs/RELEASE_R8.md on a device)'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Pre-release: on the Releases page, but not offered by the in-app updater until marked latest'
+        type: boolean
+        default: false
+      promote:
+        description: 'Only promote the existing release "version" (a pre-release) to latest: nothing is built'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 env:
   TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  # SHA-256 of the release signing certificate (public; from apksigner verify --print-certs).
+  RELEASE_CERT_SHA256: 35249306d50c7079e8c6d8cd0a9ba6d99ab77204d934f544de2f9911e79907b2
 
 jobs:
+  # "promote": an already published pre-release becomes the latest release, which the in-app
+  # updater offers to everyone (docs/RELEASE.md). The APKs are not rebuilt.
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.promote == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mark the release as latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft
+          gh release edit "$TAG" --prerelease=false --latest
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft
+          echo "OK: $TAG is the latest release"
+
   apk:
+    if: github.event_name != 'workflow_dispatch' || inputs.promote != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -48,20 +81,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Release signing key (optional)
+      - name: Release signing key
         env:
           KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$KEYSTORE" ]; then
-            echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          else
-            echo "::warning::No release key: signing with a throwaway debug key"
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::Set the RELEASE_KEYSTORE_BASE64 secret (and its passwords): without the release key, the APK could not update earlier releases"
+            exit 1
           fi
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Version
         run: |
           case "$TAG" in v[0-9]*) ;; *) echo "::error::Version must look like v0.2.0, got '$TAG'"; exit 1 ;; esac
+
+      # The same checks as CI: nothing is published from a commit whose tests fail.
+      - name: Tests
+        run: ./gradlew --continue test
 
       - name: Build APK
         env:
@@ -76,6 +113,8 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          # R8 only when chosen in "Run workflow" (tag pushes build without it).
+          MINIFY: ${{ inputs.minify == true && 'true' || 'false' }}
         run: |
           if [ -z "$TELEGRAM_API_ID" ] || [ -z "$TELEGRAM_API_HASH" ]; then
             echo "::error::Set the repository secrets TELEGRAM_API_ID and TELEGRAM_API_HASH (my.telegram.org -> API development tools)"
@@ -85,7 +124,7 @@ jobs:
           # A release is built from scratch: no outputs reused from the shared build cache.
           # Hilt/KSP occasionally misses a module on a cold build; one full retry fixes it.
           export SPLIT_APKS=true
-          ./gradlew --no-daemon --no-build-cache assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks assembleRelease
+          ./gradlew --no-daemon --no-build-cache -Pyourstream.minify=$MINIFY assembleRelease || ./gradlew --no-daemon --no-build-cache --rerun-tasks -Pyourstream.minify=$MINIFY assembleRelease
           # The universal APK (any device; what earlier versions' updater downloads) and one per
           # CPU type (what the in-app updater picks: a much smaller download).
           mkdir -p dist dist-abi
@@ -95,6 +134,17 @@ jobs:
           done
           (cd dist && sha256sum *.apk; cd ../dist-abi && sha256sum *.apk) > dist/SHA256SUMS.txt
           ls -la dist dist-abi
+
+      - name: Check the signing certificate
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          for apk in dist/*.apk dist-abi/*.apk; do
+            CERT=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+            if [ "$CERT" != "$RELEASE_CERT_SHA256" ]; then
+              echo "::error::$apk is signed with $CERT, not the release key $RELEASE_CERT_SHA256"; exit 1
+            fi
+          done
+          echo "OK: every APK is signed with the release key"
 
       - name: Check that the Telegram credentials are built in
         run: |
@@ -107,11 +157,13 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # The in-app updater reads /releases/latest, which never returns a pre-release.
+          PRERELEASE: ${{ inputs.prerelease == true && '--prerelease' || '' }}
         run: |
           # The universal APK goes up first: updaters before 0.8 take the first .apk they see.
           gh release create "$TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "YourStream $TAG" \
             --notes-file .github/release-notes.md \
-            --generate-notes
+            --generate-notes $PRERELEASE
           gh release upload "$TAG" dist-abi/*

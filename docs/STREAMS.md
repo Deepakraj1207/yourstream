@@ -40,7 +40,9 @@ plus `behaviorHints.filename` / `videoSize`.
 
 ## Torrent streams (`:playback:torrent`)
 
-Built on libtorrent 2.0 (libtorrent4j, MIT). Can be switched off in Settings → Streaming.
+Built on libtorrent 2.0 (libtorrent4j, MIT). **Off by default** (since 0.11): turning it on in
+Settings → Playback → Streaming, or tapping a torrent result while it is off, first explains that
+peers see the device's IP address (`TorrentConsentDialog`); turning it off never asks.
 
 1. **Session**: started with the first torrent stream, stopped 2 minutes after the last one;
    DHT, LSD, UPnP on; seeds are not disconnected when every wanted piece is present. Storage

@@ -103,9 +103,11 @@ class IndexingEngine @Inject constructor(
         if (chat == null || !chat.enabled) {
             return@withPermit IndexRunResult(chatId, mode, Outcome.FAILED, 0, 0, 0, 0, 0, "Chat is not enabled for indexing")
         }
+        // Paused while this run waited: nothing to do, the state stays PAUSED.
+        if (chat.paused) return@withPermit IndexRunResult(chatId, mode, Outcome.CANCELLED, 0, 0, 0, 0, 0, "Paused")
         val run = Run(chatId, chat.title, mode, deadline = clock.nowMillis() + timeBudget.inWholeMilliseconds)
         val runId = store.startRun(chatId, mode)
-        store.setState(chatId, IndexState.RUNNING)
+        store.setState(chatId, IndexState.SCANNING)
         run.publish()
         logger.i(TAG, "run $mode for chat $chatId")
 
@@ -115,11 +117,15 @@ class IndexingEngine @Inject constructor(
                 if (config.parallelFilters) coroutineScope { config.filters.map { f -> async { scanFilter(run, f) } }.awaitAll() }
                 else for (filter in config.filters) scanFilter(run, filter)
                 // Files indexed before titles were read from the posts above them (or whose lookup failed).
-                if (config.contextLookups) backfillTitles(run, config.titleBackfillPerRun)
+                if (config.contextLookups) {
+                    store.setState(chatId, IndexState.PROCESSING)
+                    backfillTitles(run, config.titleBackfillPerRun)
+                }
             }
             val verifyDue = mode == IndexMode.VERIFY || chat.verifyCursor > 0 ||
                 clock.nowMillis() - (chat.lastVerifiedAt ?: 0L) >= config.verifyInterval.inWholeMilliseconds
             if (verifyDue) {
+                store.setState(chatId, IndexState.SCANNING)
                 verify(run, if (mode == IndexMode.VERIFY) Int.MAX_VALUE else config.verifyMaxPerIncrementalRun)
             }
             run.result(Outcome.COMPLETED)
@@ -131,9 +137,19 @@ class IndexingEngine @Inject constructor(
             run.result(Outcome.FAILED, e.error.message)
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
-                val byUser = tracker.consumeCancelRequest(chatId)
-                val cancelled = run.result(Outcome.CANCELLED, if (byUser) "Cancelled" else "Stopped by the system")
-                finish(runId, cancelled, if (byUser) IndexState.CANCELLED else IndexState.PAUSED)
+                // The user cancelled or paused it; otherwise the system stopped it (lost Wi-Fi, low
+                // battery, a policy change): WorkManager runs it again, so it is only waiting.
+                val reason = tracker.consumeStopRequest(chatId)
+                val cancelled = run.result(Outcome.CANCELLED, when (reason) {
+                    IndexProgressTracker.StopReason.CANCEL -> "Cancelled"
+                    IndexProgressTracker.StopReason.PAUSE -> "Paused"
+                    null -> "Stopped by the system"
+                })
+                finish(runId, cancelled, when (reason) {
+                    IndexProgressTracker.StopReason.CANCEL -> IndexState.CANCELLED
+                    IndexProgressTracker.StopReason.PAUSE -> IndexState.PAUSED
+                    null -> IndexState.QUEUED
+                })
             }
             throw e
         }
@@ -143,8 +159,11 @@ class IndexingEngine @Inject constructor(
             result,
             when (result.outcome) {
                 Outcome.COMPLETED -> IndexState.COMPLETED
-                Outcome.MORE_WORK -> IndexState.PAUSED
-                Outcome.RETRY, Outcome.FAILED -> IndexState.FAILED
+                // A long scan continues in the next run (queued by the worker).
+                Outcome.MORE_WORK -> IndexState.QUEUED
+                // Retried with backoff by WorkManager (the worker marks FAILED when retries run out).
+                Outcome.RETRY -> IndexState.RECOVERING
+                Outcome.FAILED -> IndexState.FAILED
                 Outcome.CANCELLED -> IndexState.CANCELLED
             },
         )
@@ -155,7 +174,7 @@ class IndexingEngine @Inject constructor(
     private suspend fun finish(runId: Long, result: IndexRunResult, state: IndexState) {
         store.finishRun(runId, result)
         if (result.outcome == Outcome.COMPLETED) store.markIndexed(result.chatId)
-        store.setState(result.chatId, state, result.error.takeIf { state == IndexState.FAILED || state == IndexState.CANCELLED })
+        store.setState(result.chatId, state, result.error.takeIf { state == IndexState.FAILED || state == IndexState.RECOVERING })
         tracker.clear(result.chatId)
         if (result.mediaAdded + result.mediaUpdated + result.mediaDeleted > 0) listeners.forEach { it.onIndexChanged() }
     }

@@ -254,6 +254,85 @@ bytes served and downloaded with request count, time spent waiting for data, and
 native heap. Buttons: play/pause, −10 s, +30 s, → 01:20:00, 5 random seeks, retry, fast-seek
 toggle, stop.
 
+## 9a. Background playback and the media session (since 0.11)
+
+- `ActivePlayback` (`playback:media3`) holds the one player that plays: the library player
+  (`PlayerViewModel`) and the add-on/torrent player (`StreamPlayerViewModel`) register theirs with
+  a title and subtitle, and unregister before releasing it.
+- `PlaybackService` (app, a Media3 `MediaSessionService`) publishes it as a media session through
+  `TitledPlayer` (the media items carry Telegram ids and URLs, not titles). That gives the media
+  notification, lock-screen controls, headset/Bluetooth buttons, and a foreground service
+  (`mediaPlayback`) while playing, so Android keeps the app alive with the screen off.
+- **Keep playing in the background** (Settings → Playback, on by default): leaving the app or
+  turning the screen off keeps playing; off: playback pauses on leaving (the earlier behaviour).
+- The service is not exported and accepts only the media notification, trusted system controllers
+  and this app (`onConnect`): other apps cannot read what plays. Removing the app from recent apps
+  stops playback (`onTaskRemoved` → `pauseAllPlayersAndStopSelf`).
+- The service starts when a player registers (the app is then in the foreground), and stops when
+  it unregisters.
+- Tests (`ActivePlaybackTest`, Robolectric): registration rules, and a real `MediaController`
+  connected to a real `MediaSession` sees the title/subtitle and its play/pause reach the player.
+  The service itself (foreground notification, lock screen, task removal) runs only on a device.
+
+## 9c. Offline downloads (Phase 9)
+
+A title's version row has **Download** (Telegram files only; files from a folder on the device
+have nothing to download). `VideoDownloads` resolves the current Telegram file id through the
+resolver and asks TDLib for the whole file at priority 1, below playback, so a video that is
+playing always downloads first. While it runs the row shows "Downloading 42%" and **Cancel**;
+when TDLib reports the file complete the library marks the version "On this device" and it
+plays without a connection (the resolver's offline path uses the stored file id).
+**Remove download** deletes the copy; the video stays in Telegram.
+
+* Files the user downloaded are remembered by Telegram's stable unique id (`downloads`
+  preferences) and never trimmed by `StreamCache`, even when played while still downloading.
+* Settings → Storage → Telegram videos clears them too (it says so before clearing). Sign-out
+  removes them (TDLib deletes its files on log-out; the list is cleared with the account data).
+* Downloads run while the app runs (no foreground service). One interrupted by the app closing
+  continues from where it stopped when Download is tapped again (TDLib keeps the partial file).
+* Fixed on the way: "On this device" compared the stored state with `COMPLETED`, but the index
+  stores `COMPLETE`, so it never showed (Phase 5 bug; its test bypassed the mapping, the new
+  `MappingTest` goes through it).
+
+## 9d. Resume for add-on streams (Phase 9)
+
+Web and torrent streams from add-ons remember where the user stopped (`StreamProgressStore`,
+table `stream_progress`, schema v15), per catalog title and episode: the IMDb id when the add-on
+gives one, so a different stream (another add-on, another quality) of the same episode resumes
+too. The library's rules apply (`CompletionPolicy`): nothing under 30 s; past 90 % or into the
+credits counts as finished and the next play starts over. Saved every 10 s while playing, on
+pause and when the player closes, and only once the stream has played (a stream that fails to
+load never overwrites a good position). The player shows "Resumed from 12:34 · Start over".
+Watch-history data: wiped on sign-out; the newest 500 entries are kept.
+
+## 9b. Real-device validation checklist
+
+Nothing below is proven by the JVM tests (they use a simulated Telegram). Run it on a phone with
+a signed-in account and a chat that holds: a large MKV (> 2 GB), a file with several audio tracks
+and embedded subtitles, an MP4 whose index is at the end, and an episode with a next episode.
+Record device, Android version, network and result in `docs/IMPLEMENTATION_PROGRESS.md`.
+
+| # | Check | Expected |
+|---|---|---|
+| 1 | Open a title and press Play | Picture within a few seconds on Wi-Fi; spinner while preparing |
+| 2 | Seek forward 30 min in the large MKV | Plays from there after a short buffer; no restart from 0 |
+| 3 | Seek back to an already played part | Immediate (cached) |
+| 4 | Audio/subtitle menu on the multi-track file | All tracks listed with languages; switching keeps position; preference remembered next time |
+| 5 | Lip-sync after 10 min and after seeks | In sync (also with FFmpeg audio for AC-3/DTS) |
+| 6 | MP4 with the index at the end | Starts (the tail is fetched first) |
+| 7 | Airplane mode for 30 s while playing | "No connection. Playback continues when you're back online."; continues by itself |
+| 8 | Switch Wi-Fi → mobile data while playing | Continues after a short buffer |
+| 9 | Home button while playing | Sound continues; media notification with title, play/pause, seek |
+| 10 | Screen off while playing | Sound continues; lock-screen controls work |
+| 11 | Bluetooth headset / earphone button | Play/pause work; unplugging pauses |
+| 12 | Turn **Keep playing in the background** off, press Home | Playback pauses |
+| 13 | Swipe the app away from recent apps while playing | Playback stops; notification gone |
+| 14 | Tap the notification | Returns to the player at the current position |
+| 15 | Developer options → "Don't keep activities", leave and return | Player resumes at the same position |
+| 16 | `adb shell am kill dev.yourstream` while paused in the background, reopen | Offers to resume from the saved position |
+| 17 | Let an episode end | Next-episode countdown; next episode plays |
+| 18 | Delete the message of a playing file from another device, reopen it | "File unavailable" (or another version plays) |
+
 ## 10. Limitations
 
 - **No device or emulator run.** This environment has no Android device and no KVM. Every

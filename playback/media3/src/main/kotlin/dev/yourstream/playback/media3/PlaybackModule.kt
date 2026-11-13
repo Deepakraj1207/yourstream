@@ -60,6 +60,8 @@ class TelegramPlaybackControllerFactory @Inject constructor(
     private val episodes: EpisodeRepository,
     private val settings: PlaybackSettings,
     private val tracks: TrackSupport,
+    /** Saving progress and releasing files outlive the player screen; failures are logged here, not fatal. */
+    @PlaybackScope private val background: kotlinx.coroutines.CoroutineScope,
 ) {
     fun create(config: PlaybackConfig = PlaybackConfig()) = TelegramPlaybackController(
         context = context,
@@ -74,6 +76,7 @@ class TelegramPlaybackControllerFactory @Inject constructor(
             AdaptivePlayback(AdaptiveStreaming(streamer, governor, monitor, BufferManager(deviceProfile(context), settings.buffer), scope, prefetch), next)
         },
         trackSupport = tracks,
+        backgroundScope = background,
     )
 }
 
@@ -82,12 +85,14 @@ class TelegramPlaybackControllerFactory @Inject constructor(
 abstract class PlaybackModule {
 
     @Binds abstract fun resolver(impl: LibraryMediaSourceResolver): MediaSourceResolver
+    @Binds abstract fun localFileCheck(impl: AndroidLocalFileCheck): LocalFileCheck
 
     @Binds abstract fun trackPreferences(impl: RoomTrackPreferenceStore): dev.yourstream.playback.tracks.TrackPreferenceStore
 
     companion object {
         @Provides @Singleton
-        fun streamCache(files: TelegramFileRepository) = StreamCache(files)
+        fun streamCache(files: TelegramFileRepository, downloads: dagger.Lazy<VideoDownloads>) =
+            StreamCache(files, keep = { downloads.get().isKept(it.remoteUniqueId) })
 
         @Provides @Singleton @PlaybackScope
         fun playbackScope(logger: Logger): CoroutineScope =

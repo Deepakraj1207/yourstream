@@ -25,6 +25,8 @@ sealed interface TileCaption {
     data object Resume : TileCaption
     /** A catalog title that is also in the user's Telegram library. */
     data object InLibrary : TileCaption
+    /** Every file of the title was deleted from Telegram (kept for its progress or "My library"). */
+    data object Removed : TileCaption
 }
 
 /**
@@ -62,6 +64,8 @@ object Presentation {
                 watched = watched,
             ),
             OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched, inLibrary = s.inLibrary,
+            // Opens its details (never plays): they say what happened.
+            caption = TileCaption.Removed.takeIf { !s.isAvailable },
         )
     }
 

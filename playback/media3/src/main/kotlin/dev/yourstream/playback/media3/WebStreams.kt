@@ -99,6 +99,11 @@ class WebStreams @Inject constructor(@ApplicationContext private val context: Co
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
 
+    /** Deletes what was cached of web streams (signing out, clearing storage). Not while one plays. */
+    fun clearCache() {
+        cache.keys.toList().forEach { key -> runCatching { cache.removeResource(key) } }
+    }
+
     /** Starts after 1.5 s (3 s after a stall); buffers up to [aheadMs] (Settings → Playback → Buffer). */
     fun loadControl(aheadMs: Int = 120_000): LoadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(minOf(30_000, aheadMs), aheadMs.coerceAtLeast(15_000), 1_500, 3_000)
