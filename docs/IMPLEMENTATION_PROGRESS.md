@@ -18,7 +18,7 @@ For a new conversation: read this file and `docs/PRODUCT_AUDIT.md` first; they a
 | 7. Performance and security | NEEDS REAL-DEVICE TESTING |
 | 8. Local media | NEEDS REAL-DEVICE TESTING |
 | 9. Advanced features | NEEDS REAL-DEVICE TESTING |
-| 10. Release readiness | NOT STARTED |
+| 10. Release readiness | NEEDS REAL-DEVICE TESTING (v0.11.0 published as a pre-release) |
 
 Decisions taken (user said "proceed" on the audit's recommendations, 11 Nov 2026):
 add-ons and torrents stay as optional extras, torrents off by default. Phase 6 (user said "Yes",
@@ -629,3 +629,29 @@ not downloadable from the Episodes screen yet; downloads stop when Android ends 
 **Real-device checks:** download a movie, turn on airplane mode, play it; cancel midway and
 resume; remove the download and check Settings → Storage drops; play an add-on stream for a few
 minutes, close, reopen the same episode from another add-on: it resumes; Start over.
+
+
+---
+
+## Phase 10 — Release readiness · NEEDS REAL-DEVICE TESTING
+
+**Objective:** a full test pass, a safe upgrade from the last release, current documentation and a
+signed release; check that it installs over the previous version.
+
+| Item | Status | Detail |
+|---|---|---|
+| Full test pass | COMPLETED | `./gradlew --continue --rerun-tasks :app:assembleDebug test :app:lintDebug` (nothing reused): pass, 608 JVM tests, 0 failures; lint 0 errors, 15 warnings. CI push run 43 and pull-request run 44 passed on `31bb326`, including the minified release build |
+| Database upgrade from v0.10.0 | COMPLETED (JVM-verified) | v0.10.0 shipped schema v12. New `MigrationTest.upgradeFromTheV0_10_0ReleaseKeepsTheUsersData`: a v12 database with a chat, a file, a title, progress and a favorite goes through 13 → 14 → 15 and is opened by the app's code with everything intact |
+| Settings upgrade | COMPLETED (JVM-verified) | Bug found: 0.10 wrote `torrents = true` (then the default) whenever any setting was saved, so the Phase 1 consent rule would not have applied to updating users. A one-time settings upgrade turns torrents off; turning them on again goes through the consent dialog (`SettingsUpgradeTest`, 3 cases). Stated in the release notes |
+| Documentation | COMPLETED | README rewritten for the current app (it still described "Stage 1 debug screens"); `docs/RELEASE.md` (checklist, pre-release, promotion); release notes "What's new in 0.11" |
+| Signed release | COMPLETED | Release workflow run 15 on `31bb326`: tests, universal + 4 per-CPU APKs, release-key certificate check, Telegram credentials check, `SHA256SUMS.txt`. Published [v0.11.0](https://github.com/Deepakraj1207/yourstream/releases/tag/v0.11.0) **as a pre-release** (new workflow option): GitHub's "latest" is still v0.10.0, so the in-app updater does not offer 0.11 until it is promoted. R8 off |
+| Installs over v0.10.0 | COMPLETED statically; NEEDS REAL-DEVICE TESTING | Downloaded both arm64 APKs: same package `dev.yourstream`; versionCode 15 > 14; identical signing certificate (SHA-256 `35249306…07b2`), both verify (v2); the download matches `SHA256SUMS.txt`. Not installed on a device (no device or emulator here) |
+
+**To finish (owner, on a phone):** `docs/RELEASE.md` "After publishing a pre-release": install
+0.11 over 0.10, run the key device checks, confirm the old library and progress survived, then
+mark the release latest so the in-app updater offers it.
+
+**Overall state after the ten phases:** every phase's code is in, tested on the JVM and in CI.
+What remains is real-device verification (Phases 2–4 and 6–10, checklists in this file and in
+`docs/TELEGRAM_SETUP.md`, `docs/PLAYBACK.md` §9b, `docs/LOCAL_MEDIA.md`, `docs/RELEASE_R8.md`)
+and the deferred Phase 9 items.
