@@ -25,6 +25,10 @@ on:
         description: 'Shrink with R8 (only after a minified build passed docs/RELEASE_R8.md on a device)'
         type: boolean
         default: false
+      prerelease:
+        description: 'Pre-release: on the Releases page, but not offered by the in-app updater until marked latest'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -131,11 +135,13 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # The in-app updater reads /releases/latest, which never returns a pre-release.
+          PRERELEASE: ${{ inputs.prerelease == true && '--prerelease' || '' }}
         run: |
           # The universal APK goes up first: updaters before 0.8 take the first .apk they see.
           gh release create "$TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "YourStream $TAG" \
             --notes-file .github/release-notes.md \
-            --generate-notes
+            --generate-notes $PRERELEASE
           gh release upload "$TAG" dist-abi/*

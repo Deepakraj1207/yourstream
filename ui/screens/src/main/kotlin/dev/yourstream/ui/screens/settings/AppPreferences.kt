@@ -97,7 +97,7 @@ val LocalAppSettings = staticCompositionLocalOf { AppSettings() }
 
 @Singleton
 class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
-    private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).also(::upgrade)
     private val _settings = MutableStateFlow(load().also(::apply))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
@@ -145,6 +145,22 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .apply()
         apply(s)
         _settings.value = s
+    }
+
+    /**
+     * Settings files from before 0.11 (no format number): torrents are turned off. Those versions
+     * wrote `torrents = true` (then the default) whenever any setting was saved, so the stored
+     * value does not mean the user chose torrents; turning them on now goes through the consent
+     * dialog (peers see the device's IP address).
+     */
+    private fun upgrade(p: android.content.SharedPreferences) {
+        if (p.getInt(KEY_FORMAT, 0) >= FORMAT) return
+        p.edit().putBoolean("torrents", false).putInt(KEY_FORMAT, FORMAT).commit()
+    }
+
+    private companion object {
+        const val KEY_FORMAT = "settings_format"
+        const val FORMAT = 2
     }
 
     private fun load() = AppSettings(

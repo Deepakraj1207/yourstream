@@ -246,4 +246,38 @@ class MigrationTest {
             close()
         }
     }
+
+    /**
+     * What a v0.10.0 user's database (v12) goes through on the update to 0.11: every step at once,
+     * then opened by the app's own code. Their chats, files, titles, progress and favorites stay.
+     */
+    @Test
+    fun upgradeFromTheV0_10_0ReleaseKeepsTheUsersData() = runTest {
+        helper.createDatabase(name, 12).apply {
+            execSQL("INSERT INTO indexed_chat (chat_id, title, category, enabled, state, last_error, last_indexed_at, last_verified_at, verify_cursor, added_at, updated_at) VALUES (1, 'Tamil Movies', 'CHANNEL', 1, 'COMPLETED', NULL, 5, NULL, 0, 1, 2)")
+            execSQL(v1Media.format(9, 90, 9, 9))
+            execSQL("INSERT INTO library_item (id, kind, match_key, title, sort_title, normalized_title, year, search_text, title_confidence, locked, hidden, added_at, updated_at, available_count, latest_added_at, max_resolution, total_size, season_count, episode_count, watched_count, last_watched_at) VALUES (1, 'MOVIE', 'movie:vikram', 'Vikram', 'vikram', 'vikram', 2022, 'vikram', 0.9, 0, 0, 0, 0, 1, 0, NULL, 0, 0, 0, 0, 5)")
+            execSQL("INSERT INTO media_link (media_id, item_id, episode_id, method, signature, linked_at) VALUES (9, 1, NULL, 'AUTO', 's', 0)")
+            execSQL("INSERT INTO watch_state (item_id, episode_key, position_ms, duration_ms, completed, play_count, last_watched_at) VALUES (1, 0, 600000, 6000000, 0, 1, 5)")
+            execSQL("INSERT INTO favorite (item_id, added_at) VALUES (1, 3)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 15, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), YourStreamDatabase::class.java, name)
+            .allowMainThreadQueries().addCallback(YourStreamDatabase.CALLBACK).build()
+        val chat = db.indexedChatDao().get(1)!!
+        assertEquals("Tamil Movies", chat.title)
+        assertEquals("TELEGRAM", chat.source, "existing chats are Telegram chats")
+        assertEquals(false, chat.paused)
+        val media = db.mediaDao().getWithParsed(9)!!.media
+        assertEquals("Doraemon.S01E09.mkv", media.fileName)
+        assertNull(media.locator, "Telegram files have no local address")
+        val row = db.watchIntelligenceDao().items(listOf(1L)).single()
+        assertEquals(600000L, row.positionMs, "progress survives")
+        assertEquals(3L, row.favoriteAt, "favorite survives")
+        assertEquals(1, db.libraryDao().versions(1, null, false).size, "the title still has its file")
+        assertNull(db.streamProgressDao().get("movie:tt1"), "the new table starts empty")
+        db.close()
+    }
 }
