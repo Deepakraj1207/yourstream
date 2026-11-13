@@ -192,27 +192,27 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
 }
 
 /**
- * The phone's navigation: a Material 3 navigation bar with the six main tabs. Each item is a
+ * The phone's navigation, with the [MAIN_TABS]: the manga style's printed strip
+ * ([MangaNavigationBar]), or a Material 3 navigation bar in the classic style. Each item is a
  * full-height tab ("tab" role, selected state for screen readers). Tab names show under every
  * icon, or only under the selected one (Settings → Appearance → Tab names); the names stay in the
- * accessibility tree either way. Manga style adds an ink rule along the top.
+ * accessibility tree either way.
  *
- * Built from M3's own container colours, elevation, insets and [NavigationBarItem]s, but without
- * the 8 dp gaps `NavigationBar` puts between items: with six tabs those gaps leave each tab under
- * 48 dp wide on 320 dp screens (small phones, or large display-size settings). Without them every
- * tab is at least 53 dp wide there.
+ * The classic bar is built from M3's own container colours, elevation, insets and
+ * [NavigationBarItem]s, without the 8 dp gaps `NavigationBar` puts between items (with six tabs
+ * they made tabs under 48 dp wide on 320 dp screens; kept for narrow screens and large fonts).
  */
 @Composable
 fun MainNavigationBar(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier) {
     val labels = dev.yourstream.ui.screens.settings.LocalAppSettings.current.dockLabels
-    val manga = dev.yourstream.ui.core.LocalMangaStyle.current
-    val ink = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+    if (dev.yourstream.ui.core.LocalMangaStyle.current) {
+        MangaNavigationBar(current, onSelect, labels, modifier)
+        return
+    }
     Surface(
         color = androidx.compose.material3.NavigationBarDefaults.containerColor,
         tonalElevation = androidx.compose.material3.NavigationBarDefaults.Elevation,
-        modifier = modifier
-            .then(if (manga) Modifier.drawWithContent { drawContent(); drawRect(ink, size = androidx.compose.ui.geometry.Size(size.width, 2.dp.toPx())) } else Modifier)
-            .testTag("nav:bar"),
+        modifier = modifier.testTag("nav:bar"),
     ) {
         Row(
             Modifier.fillMaxWidth()

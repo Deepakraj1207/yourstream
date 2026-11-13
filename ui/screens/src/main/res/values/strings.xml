@@ -626,7 +626,7 @@
     <string name="first_run_library_title">Finding things to watch</string>
     <string name="first_run_library_body">The tabs at the bottom of the screen:</string>
     <string name="first_run_tab_home">Home: continue watching, what was added recently, and suggestions.</string>
-    <string name="first_run_tab_movies">Movies and Series: everything found, with posters, filters and sorting.</string>
+    <string name="first_run_tab_movies">Movies and series: Home\'s rows (\"See all\"), with posters, filters and sorting.</string>
     <string name="first_run_tab_search">Search: titles and file names, even with typos.</string>
     <string name="first_run_tab_library">Library: the titles you add. Long-press a poster and choose Add to library.</string>
     <string name="first_run_tab_settings">Settings: your account, chats, look and playback.</string>

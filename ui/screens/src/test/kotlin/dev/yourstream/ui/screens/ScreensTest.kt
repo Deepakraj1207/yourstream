@@ -472,16 +472,18 @@ class ScreensTest {
         val selected = mutableListOf<TopLevel>()
         var layout by androidx.compose.runtime.mutableStateOf(WindowLayout.COMPACT)
         set { AdaptiveShell(layout, TopLevel.HOME, { selected += it }) { m -> Text("content", m) } }
-        // Phone: a Material 3 navigation bar with the six main tabs.
+        // Phone: a navigation bar with the four main tabs (Movies and Series open from Home and Library).
         compose.onNodeWithTag("nav:bar").assertExists()
         for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
         compose.onNodeWithTag("nav:CONTINUE").assertDoesNotExist()
+        compose.onNodeWithTag("nav:MOVIES").assertDoesNotExist()
+        compose.onNodeWithTag("nav:SERIES").assertDoesNotExist()
         compose.onNodeWithTag("nav:HOME").assertIsSelected()
         assertTouchTargets()
         compose.onNodeWithTag("nav:SEARCH").performClick()
-        compose.onNodeWithTag("nav:MOVIES").performClick()
-        assertEquals(listOf(TopLevel.SEARCH, TopLevel.MOVIES), selected)
-        // Tablet rail, large-screen drawer, TV drawer: the same six.
+        compose.onNodeWithTag("nav:LIBRARY").performClick()
+        assertEquals(listOf(TopLevel.SEARCH, TopLevel.LIBRARY), selected)
+        // Tablet rail, large-screen drawer, TV drawer: the same four.
         for ((l, tag) in listOf(WindowLayout.MEDIUM to "nav:rail", WindowLayout.EXPANDED to "nav:drawer", WindowLayout.TV to "nav:tv")) {
             layout = l
             compose.onNodeWithTag(tag).assertExists()
@@ -491,9 +493,29 @@ class ScreensTest {
     }
 
     @Test
-    fun continueAndRecentPagesShowHomeAsTheSelectedTab() {
-        set { AdaptiveShell(WindowLayout.COMPACT, TopLevel.RECENT, {}) { m -> Text("content", m) } }
+    fun pagesOpenedFromHomeShowHomeAsTheSelectedTab() {
+        for (page in listOf(TopLevel.RECENT, TopLevel.MOVIES, TopLevel.SERIES)) {
+            assertEquals(TopLevel.HOME, page.tab, "$page")
+        }
+        set { AdaptiveShell(WindowLayout.COMPACT, TopLevel.MOVIES, {}) { m -> Text("content", m) } }
         compose.onNodeWithTag("nav:HOME").assertIsSelected()
+    }
+
+    @Test
+    fun theMangaBarIsTabsWithNamesAndTouchTargets() {
+        val selected = mutableListOf<TopLevel>()
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT, darkTheme = true, manga = true) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalMangaStyle provides true) {
+                    MainNavigationBar(TopLevel.LIBRARY, { selected += it })
+                }
+            }
+        }
+        compose.onNodeWithTag("nav:LIBRARY").assertIsSelected()
+        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
+        assertTouchTargets()
+        compose.onNodeWithTag("nav:SETTINGS").performClick()
+        assertEquals(listOf(TopLevel.SETTINGS), selected)
     }
 
     @Test

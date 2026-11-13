@@ -35,7 +35,9 @@ internal object Preprocessor {
     private val NOISE: List<Pair<Regex, String>> = listOf(
         Regex("https?://\\S+", IGNORE) to " ",
         Regex("\\bt\\.me/\\S+", IGNORE) to " ",
-        Regex("(^|\\s|[._(\\[-])@[A-Za-z0-9_]{3,}") to "$1 ",
+        // Site brands written into names: "Toonworld4all", "Movies4u", "Filmy4wap".
+        // Underscores count as separators here: "Toonworld4all_Naruto".
+        Regex("(?<![A-Za-z0-9])[A-Za-z]{3,}4(?:all|u|you|wap|web|free)(?![A-Za-z0-9])", IGNORE) to " ",
         Regex("\\bwww\\.[\\w-]+(\\.[\\w-]+)+", IGNORE) to " ",
         Regex("\\b[\\w-]{2,}\\.($TLDS)\\b", IGNORE) to " ",
         Regex("\\b\\d+(?:[.,]\\d+)?\\s?(?:GB|MB|GiB|MiB|KB)\\b", IGNORE) to " ",
@@ -44,6 +46,36 @@ internal object Preprocessor {
     private val SYMBOLS = Regex("[^\\p{L}\\p{N}\\p{M}\\s._\\-+&'()\\[\\]{}|~,;:!?]")
     private val SEPARATORS = Regex("[._\\[\\](){}|~,;:【】]+")
     private val SPACES = Regex("\\s+")
+
+    private val HANDLE = Regex("(^|\\s|[._(\\[-])@([A-Za-z0-9_]{3,})")
+    private val YEAR_OR_TECH = Regex("^(19[2-9]\\d|20\\d{2}|\\d{3,4}p|[Ss]\\d{1,2}([Ee]\\d+)?|x26[45]|hevc|web|hdrip|bluray|brrip|bdrip|dvdrip|ep|e\\d+)$", IGNORE)
+    /** Telegram usernames are at most 32 characters. */
+    private const val MAX_USERNAME = 32
+
+    /**
+     * Removes "@channel" handles. With spaces around it a handle is one word ("@TamilMovies Vikram").
+     * In names glued with underscores ("@SPEEDY_LinkZ_Nowhere_2023_1080p") the run after "@" is the
+     * whole name: then only the first segment and the brand words right after it ("LinkZ", "Movies")
+     * are the handle, and the rest is the name (pure; tested).
+     */
+    internal fun stripHandles(input: String, removed: MutableList<String>): String = HANDLE.replace(input) { m ->
+        val run = m.groupValues[2]
+        val segments = run.split('_').filter { it.isNotEmpty() }
+        val wholeName = run.length > MAX_USERNAME || segments.drop(1).any { YEAR_OR_TECH.matches(it) }
+        if (!wholeName || segments.size < 2) {
+            removed += "@$run"
+            return@replace m.groupValues[1] + " "
+        }
+        var n = 1
+        while (n < segments.size - 1 && isBrandSegment(segments[n])) n++
+        removed += "@" + segments.take(n).joinToString("_")
+        m.groupValues[1] + " " + segments.drop(n).joinToString("_")
+    }
+
+    private fun isBrandSegment(word: String): Boolean {
+        val w = word.lowercase()
+        return w in Vocabulary.CHANNEL_BRAND_WORDS || w.startsWith("link") || w == "tg"
+    }
 
     fun prepare(input: String, isFileName: Boolean): Prepared {
         val original = input
@@ -59,6 +91,7 @@ internal object Preprocessor {
         }
 
         val removed = mutableListOf<String>()
+        s = stripHandles(s, removed)
         // Links/handles first: a leading "[www.site.com]" is noise, not a release group.
         for ((regex, replacement) in NOISE) {
             regex.findAll(s).forEach { removed += it.value.trim() }

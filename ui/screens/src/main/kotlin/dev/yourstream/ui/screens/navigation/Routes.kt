@@ -83,8 +83,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * Top-level destinations: pages that open without a back arrow and keep their state when another
- * tab is chosen. [MAIN_TABS] are the ones in the navigation (bar, rail, drawer, TV drawer);
- * Continue watching and Recently added open from Home's "See all" and count as Home ([tab]).
+ * tab is chosen. [MAIN_TABS] are the ones in the navigation (bar, rail, drawer, TV drawer); the
+ * others open from Home's "See all" or the Library and count as Home ([tab]).
  */
 enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: ImageVector) {
     HOME(HomeRoute, R.string.nav_home, Icons.Filled.Home),
@@ -98,13 +98,18 @@ enum class TopLevel(val route: Route, @StringRes val label: Int, val icon: Image
 
     /** The navigation item shown as selected on this destination. */
     val tab: TopLevel get() = when (this) {
-        CONTINUE, RECENT -> HOME
+        // Opened from Home's rows ("See all") and the Library's filters, not from the navigation.
+        CONTINUE, RECENT, MOVIES, SERIES -> HOME
         else -> this
     }
 }
 
-/** The navigation's items, in order, on every layout (phone bar, tablet rail, drawer, TV). */
-val MAIN_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.MOVIES, TopLevel.SERIES, TopLevel.SEARCH, TopLevel.LIBRARY, TopLevel.SETTINGS)
+/**
+ * The navigation's items, in order, on every layout (phone bar, tablet rail, drawer, TV). Movies
+ * and Series are not tabs (user's choice, 13 Nov 2026): Home's rows and the Library's filters
+ * open them.
+ */
+val MAIN_TABS: List<TopLevel> = listOf(TopLevel.HOME, TopLevel.SEARCH, TopLevel.LIBRARY, TopLevel.SETTINGS)
 
 /** What tapping a card opens. Decided by the ViewModel's mapping, executed by the navigator. */
 sealed interface OpenTarget {

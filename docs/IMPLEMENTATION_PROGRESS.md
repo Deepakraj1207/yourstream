@@ -655,3 +655,24 @@ mark the release latest so the in-app updater offers it.
 What remains is real-device verification (Phases 2–4 and 6–10, checklists in this file and in
 `docs/TELEGRAM_SETUP.md`, `docs/PLAYBACK.md` §9b, `docs/LOCAL_MEDIA.md`, `docs/RELEASE_R8.md`)
 and the deferred Phase 9 items.
+
+
+---
+
+## After v0.11.0: fixes from device feedback (13 Nov 2026)
+
+First real-device report (screenshots from the owner's phone).
+
+| Report | Cause | Fix |
+|---|---|---|
+| Many movies grouped as one title "Tel" | `@SPEEDY_LinkZ_Nowhere_2023_…_Tam_+_Tel.mkv`: the `@handle` rule allowed underscores, so it removed the whole underscore-joined name; only "+ Tel" was left | A run after "@" longer than a Telegram username (32) or holding a year/quality is a whole name: only its first segment and following brand words ("LinkZ", "Movies") are the handle (`Preprocessor.stripHandles`) |
+| "Scam 2003 …" shown as "Link to this message" | Same: nothing left of the name, so the post above the file was used, whose text was "Link to this message" | Same fix; link phrases ("Link to this message", "Click here", "Join us") are never a title; `S02_EP_01_05` reads as episodes 1–5 |
+| "Toonworld4all Naruto" | Site brand in the name | Words like `Toonworld4all`, `Movies4u`, `Filmy4wap` are brands, not titles |
+| Movies / Series in the navigation | User's choice | Removed from `MAIN_TABS` (Home, Search, Library, Settings); still opened from Home and the Library |
+| Navigation look | User's reference (manga store app) | `MangaNavigationBar`: printed strip, stamped-panel selected tab with hard shadow and press-down, paper panel in light mode; classic style keeps Material 3 |
+
+Parser version 5 → 6: libraries already indexed are re-parsed after the update and regrouped
+(existing `ReparseWorker` + library sync by signature). Tests: `UnderscoreHandleNamesTest` (6,
+the reported names plus guards: "World War Z", spaced handles, "E05 10 bit"), navigation tests
+for four tabs and the manga bar (names, selection, 48 dp). Full gate: pass; lint 0 errors,
+15 warnings. Needs a device check: open the library after updating and confirm the titles.

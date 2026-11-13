@@ -41,7 +41,9 @@ internal object Detectors {
 
     // ------------------------------------------------------------------ episodes
 
-    private val SXXEYY = rx("${B}S(\\d{1,2})\\s?[-]?\\s?EP?\\s?(\\d{1,4})((?:\\s?-?\\s?EP?\\s?\\d{1,4})*)(?:\\s?-\\s?(\\d{1,4})(?![\\dpi]))?$E")
+    // The range end may follow a dash ("E01-05") or, in names glued with underscores, a space
+    // ("S02_EP_01_05" → "S02 EP 01 05"): then both are two digits, and "E05 10 bit" stays one episode.
+    private val SXXEYY = rx("${B}S(\\d{1,2})\\s?[-]?\\s?EP?\\s?(\\d{1,4})((?:\\s?-?\\s?EP?\\s?\\d{1,4})*)(?:\\s?-\\s?(\\d{1,4})(?![\\dpi])|\\s(\\d{2})(?!\\s?(?:bit|ch|fps|mb|gb|kbps)\\b)(?=\\s|$))?$E")
     private val NXNN = rx("${B}(\\d{1,2})x(\\d{2,3})(?:\\s?-\\s?(?:\\d{1,2}x)?(\\d{2,3}))?$E")
     private val SEASON_EPISODE_WORDS = rx("${B}Season\\s?(\\d{1,2})\\s?-?\\s?(?:Episode|Epi|Ep|E)\\s?(\\d{1,4})(?:\\s?(?:-|to|&)\\s?(\\d{1,4}))?$E")
     private val SEASON_RANGE = rx("${B}S(\\d{1,2})\\s?-\\s?S(\\d{1,2})$E")
@@ -54,7 +56,7 @@ internal object Detectors {
         scan.firstFree(SXXEYY)?.let { m ->
             val episode = m.groupValues[2].toInt()
             val chained = TRAILING_EPISODES.findAll(m.groupValues[3]).map { it.groupValues[1].toInt() }.lastOrNull()
-            val end = (chained ?: m.groupValues[4].toIntOrNull())?.takeIf { it > episode }
+            val end = (chained ?: m.groupValues[4].toIntOrNull() ?: m.groupValues[5].toIntOrNull())?.takeIf { it > episode }
             scan.add(Kind.SEASON, m.groupValues[1].toInt(), m, 0.98f)
             scan.add(Kind.EPISODE, episode, m.range, 0.98f, m.value, end?.let { mapOf("end" to it) } ?: emptyMap(), claim = false)
             return

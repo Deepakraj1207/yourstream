@@ -91,7 +91,7 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 | Destination | Route | Reached from |
 |---|---|---|
 | Home | `HomeRoute` (start) | main tab |
-| Movies / Series | `MoviesRoute` / `SeriesRoute` | main tabs; Home → "See all" |
+| Movies / Series | `MoviesRoute` / `SeriesRoute` | Home → "See all"; Library filters (Home shows as the selected tab) |
 | Search | `SearchRoute` | main tab |
 | Library | `LibraryRoute` | main tab |
 | Settings | `SettingsRoute` | main tab |
@@ -107,16 +107,22 @@ TelegramAuthManager, MediaIndexer, TelegramPlaybackControllerFactory, TrackPrefe
 
 ### Main navigation and indexing status
 
-Every layout has the same six items, `MAIN_TABS`: Home, Movies, Series, Search, Library and
-Settings. Phones use a plain Material 3 navigation bar under the content (Phase 6 replaced the
-floating glass dock: six tabs did not fit it, and the brief asks for plain Material 3 without
-glass effects). It shows on the main tabs only; other pages use the whole screen. It is M3's
-container, elevation, insets and `NavigationBarItem`s without the 8 dp gaps `NavigationBar` puts
-between items: with them six tabs are 46–47 dp wide on a 320 dp screen (small phones, large
-display size); without them at least 53 dp (tested at 320 dp). Items are full-height tabs ("tab"
-role, selected state). Settings → Appearance → Tab names
-off shows only the selected tab's name; screen readers still get every name (tested). Manga style
-adds an ink rule along the top. Nothing floats over the lists, so `LocalBottomClearance` is 0.
+Every layout has the same four items, `MAIN_TABS`: Home, Search, Library and Settings. Movies and
+Series are not tabs (the user's choice, 13 Nov 2026): Home's rows ("See all") and the Library's
+filters open them, and their pages show Home as the selected tab.
+
+Phones show the bar under the content, on the main tabs only; other pages use the whole screen.
+
+* **Manga style** (`MangaNavigationBar`): a printed strip with an ink rule along the top; each
+  tab an icon over its name in bold; the current tab a stamped panel with a hard offset shadow
+  (dark: a cream block on a black shadow; light: a paper panel with an ink border and shadow,
+  like the manga cards). Pressing a tab pushes its panel down onto its shadow; with reduced
+  motion it does not move.
+* **Classic style**: a Material 3 navigation bar (M3 container, elevation, insets and
+  `NavigationBarItem`s, without the 8 dp item gaps).
+
+Items are full-height tabs ("tab" role, selected state, ≥ 48 dp; tested). Settings → Appearance
+→ Tab names off shows only the selected tab's name; screen readers still get every name.
 
 ### First run
 
@@ -229,10 +235,10 @@ speed labels are pure functions in `PlayerViewModel` (tested).
 
 | Layout | When | Navigation | Cards |
 |---|---|---|---|
-| COMPACT | < 600 dp | Material 3 navigation bar (the six `MAIN_TABS`) | see `Dimens` |
-| MEDIUM | 600–839 dp | navigation rail (the same six) | see `Dimens` |
-| EXPANDED | ≥ 840 dp | permanent drawer (the same six) | see `Dimens` |
-| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus; the same six) | 48 dp overscan gutter, always dark |
+| COMPACT | < 600 dp | navigation bar (the four `MAIN_TABS`; manga strip or Material 3) | see `Dimens` |
+| MEDIUM | 600–839 dp | navigation rail (the same four) | see `Dimens` |
+| EXPANDED | ≥ 840 dp | permanent drawer (the same four) | see `Dimens` |
+| TV | leanback / TV UI mode | Compose for TV `NavigationDrawer` (expands on focus; the same four) | 48 dp overscan gutter, always dark |
 
 * **Rotation and size changes:** `MainActivity` handles them in place, so the player keeps
   playing.
