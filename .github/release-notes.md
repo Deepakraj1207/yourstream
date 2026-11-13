@@ -1,6 +1,15 @@
+## What's new in 0.11.1
+
+- **Titles fixed for names joined with underscores** ("@Channel_LinkZ_Movie_2023_…"): such files
+  were grouped under one wrong title ("Tel") or named after the post above them ("Link to this
+  message"). Site brands like "Toonworld4all" are no longer part of titles, and "S02_EP_01_05"
+  is read as episodes 1–5. Your library is re-read and regrouped once after the update.
+- **Navigation:** Home, Search, Library, Settings (Movies and Series open from Home and the
+  Library), and a new manga-style navigation bar.
+
 ## What's new in 0.11
 
-- **Guided first run** and a simpler navigation: Home, Movies, Series, Search, Library, Settings.
+- **Guided first run** and a simpler navigation.
 - **Files on this device**: add folders (no permission needed) or all videos; they join the library.
 - **Offline downloads** of Telegram videos, and **resume for add-on streams**.
 - **Background playback** with lock-screen and headset controls.
