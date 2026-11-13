@@ -676,3 +676,7 @@ Parser version 5 → 6: libraries already indexed are re-parsed after the update
 the reported names plus guards: "World War Z", spaced handles, "E05 10 bit"), navigation tests
 for four tabs and the manga bar (names, selection, 48 dp). Full gate: pass; lint 0 errors,
 15 warnings. Needs a device check: open the library after updating and confirm the titles.
+
+**Released:** [v0.11.1](https://github.com/Deepakraj1207/yourstream/releases/tag/v0.11.1) as a
+pre-release (release run 16 on `c148c7a`): versionCode 16, same release certificate
+(`35249306…07b2`), arm64 APK matches `SHA256SUMS.txt`; GitHub's "latest" is still v0.10.0.
