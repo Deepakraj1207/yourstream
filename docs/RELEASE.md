@@ -33,8 +33,9 @@ writes `SHA256SUMS.txt` (the in-app updater checks downloads against it) and pub
 3. Check the old data survived: library, continue watching, favorites, settings (torrents are
    off after updating from 0.10: expected).
 4. Promote: on the release page, Edit → untick "Set as a pre-release", tick "Set as the latest
-   release" (or `gh release edit v0.11.0 --prerelease=false --latest`). From then on the in-app
-   updater offers it.
+   release" (or `gh release edit v0.11.0 --prerelease=false --latest`, or Actions → Release APK →
+   Run workflow with the version and **promote** ticked: nothing is rebuilt). From then on the
+   in-app updater offers it.
 
 A problem found before promotion costs nothing: fix, and publish the next version (a release
 tag cannot be reused).

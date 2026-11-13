@@ -29,6 +29,10 @@ on:
         description: 'Pre-release: on the Releases page, but not offered by the in-app updater until marked latest'
         type: boolean
         default: false
+      promote:
+        description: 'Only promote the existing release "version" (a pre-release) to latest: nothing is built'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -39,7 +43,25 @@ env:
   RELEASE_CERT_SHA256: 35249306d50c7079e8c6d8cd0a9ba6d99ab77204d934f544de2f9911e79907b2
 
 jobs:
+  # "promote": an already published pre-release becomes the latest release, which the in-app
+  # updater offers to everyone (docs/RELEASE.md). The APKs are not rebuilt.
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.promote == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mark the release as latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft
+          gh release edit "$TAG" --prerelease=false --latest
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft
+          echo "OK: $TAG is the latest release"
+
   apk:
+    if: github.event_name != 'workflow_dispatch' || inputs.promote != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
