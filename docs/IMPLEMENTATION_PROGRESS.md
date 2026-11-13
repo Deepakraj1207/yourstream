@@ -680,3 +680,5 @@ for four tabs and the manga bar (names, selection, 48 dp). Full gate: pass; lint
 **Released:** [v0.11.1](https://github.com/Deepakraj1207/yourstream/releases/tag/v0.11.1) as a
 pre-release (release run 16 on `c148c7a`): versionCode 16, same release certificate
 (`35249306…07b2`), arm64 APK matches `SHA256SUMS.txt`; GitHub's "latest" is still v0.10.0.
+**Promoted:** v0.11.1 marked latest on 13 Nov 2026 (release workflow, promote mode; nothing
+rebuilt). The in-app updater now offers it.
