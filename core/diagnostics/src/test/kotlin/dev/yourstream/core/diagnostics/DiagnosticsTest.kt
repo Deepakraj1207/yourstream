@@ -89,12 +89,19 @@ class DiagnosticsTest {
         store.clear()
         guard.markStable()
         assertFalse(guard.begin(emptyList()).safeMode)
-        // Starts that die before becoming stable (native crash, kill) are counted too.
-        assertEquals(1, guard.begin(emptyList()).earlyDeaths)
-        assertEquals(2, guard.begin(emptyList()).earlyDeaths)
-        assertTrue(guard.begin(emptyList()).safeMode)
+        // Starts that crash before becoming stable (Android reports a crash, native ones too) are counted.
+        assertEquals(1, guard.begin(emptyList(), previousExitCrashed = true).earlyDeaths)
+        assertEquals(2, guard.begin(emptyList(), previousExitCrashed = true).earlyDeaths)
+        assertTrue(guard.begin(emptyList(), previousExitCrashed = true).safeMode)
         guard.markStable()
         assertFalse(guard.begin(emptyList()).safeMode)
+        // Ending early without a crash (swiped away, updated, memory reclaimed) is not counted:
+        // counting it put users in safe mode, where Telegram never started (sign-in loaded forever).
+        repeat(5) { assertEquals(0, guard.begin(emptyList(), previousExitCrashed = false).earlyDeaths) }
+        assertFalse(guard.begin(emptyList(), previousExitCrashed = false).safeMode)
+        // Unknown (Android 10 and older): only an early end that left a crash report counts.
+        repeat(5) { assertEquals(0, guard.begin(emptyList(), previousExitCrashed = null).earlyDeaths) }
+        guard.markStable()
         guard.markStable()
         guard.forceSafeMode(true)
         assertTrue(guard.begin(emptyList()).let { it.safeMode && it.forcedSafeMode })

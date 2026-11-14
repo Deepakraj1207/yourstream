@@ -308,7 +308,7 @@ class StremioCatalogProvider(
 
     companion object {
         private val IMDB = Regex("tt\\d{5,}")
-        const val NUVIO_PLUGINS = "This is a Nuvio plugin repository (scripts that scrape streaming websites). YourStream doesn't run plugins. " +
-            "Add-ons work: paste a Stremio or Nuvio add-on link (it ends in manifest.json)."
+        const val NUVIO_PLUGINS = "This is a Nuvio plugin repository, which YourStream doesn't use. " +
+            "Paste a Stremio or Nuvio add-on link instead (it ends in manifest.json)."
     }
 }

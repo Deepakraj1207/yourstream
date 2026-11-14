@@ -153,11 +153,6 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {})
     }
 
-    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneAddonsPlugins() = shot("phone-addons-plugins", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
-        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {}, initialTab = dev.yourstream.ui.screens.settings.AddonsTab.PLUGINS)
-    }
-
     private fun addonsState() = dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
         dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true),
         dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false), 12, true),
@@ -395,7 +390,7 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.search.SearchScreen(
             dev.yourstream.ui.screens.search.SearchUiState(
                 "unwatched tamil movies", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(null, emptyList(), 0)),
-                brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched Tamil movies.", listOf("language Tamil", "unwatched", "movies"), tiles, 4),
+                brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched action movies.", listOf("genre action", "unwatched", "movies"), tiles, 4),
             ), {}, {},
         )
     }

@@ -74,7 +74,7 @@ import javax.inject.Inject
 data class AddonRow(val addon: CatalogAddon, val catalogs: Int? = null, val reachable: Boolean? = null, val streams: Boolean = false, val details: Boolean = false)
 
 /** The Add-ons page's sections. */
-enum class AddonsTab { STREMIO, NUVIO, PLUGINS }
+enum class AddonsTab { STREMIO, NUVIO }
 
 data class AddonsUiState(
     val addons: List<AddonRow> = emptyList(),
@@ -83,13 +83,10 @@ data class AddonsUiState(
     val error: String? = null,
     /** Name of the add-on just added (confirmation). */
     val added: String? = null,
-    /** The last link was a Nuvio plugin repository, not an add-on. */
-    val pluginLink: Boolean = false,
 ) {
     fun rows(tab: AddonsTab): List<AddonRow> = when (tab) {
         AddonsTab.STREMIO -> addons.filter { it.addon.source != AddonSource.NUVIO }
         AddonsTab.NUVIO -> addons.filter { it.addon.source == AddonSource.NUVIO }
-        AddonsTab.PLUGINS -> emptyList()
     }
 }
 
@@ -113,10 +110,11 @@ class AddonsViewModel @Inject constructor(private val store: CatalogAddons) : Vi
     fun onAction(action: AddonsAction) {
         when (action) {
             is AddonsAction.Add -> viewModelScope.launch {
-                ui.value = ui.value.copy(adding = true, error = null, added = null, pluginLink = false)
+                ui.value = ui.value.copy(adding = true, error = null, added = null)
                 ui.value = when (val r = store.add(action.link, action.source)) {
                     is AppResult.Ok -> AddonsUiState(added = r.value.name)
-                    is AppResult.Err -> AddonsUiState(error = r.error.message, pluginLink = (r.error as? AppError.InvalidInput)?.reason == "NUVIO_PLUGINS")
+                    // A Nuvio plugin-repository link gets a short explanation here, like any other error.
+                    is AppResult.Err -> AddonsUiState(error = r.error.message)
                 }
                 refreshStatus()
             }
@@ -146,8 +144,6 @@ fun AddonsDestination(onBack: () -> Unit, vm: AddonsViewModel = hiltViewModel())
 @Composable
 fun AddonsScreen(state: AddonsUiState, onAction: (AddonsAction) -> Unit, onBack: () -> Unit, initialTab: AddonsTab = AddonsTab.STREMIO) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
-    // A plugin link pasted anywhere: show where plugins stand.
-    LaunchedEffect(state.pluginLink) { if (state.pluginLink) tab = AddonsTab.PLUGINS }
     val rows = state.rows(tab)
     ScreenScaffold(stringResource(R.string.settings_addons), onBack = onBack) {
         LazyColumn(
@@ -160,26 +156,20 @@ fun AddonsScreen(state: AddonsUiState, onAction: (AddonsAction) -> Unit, onBack:
                     listOf(
                         ChipOption(AddonsTab.STREMIO, stringResource(R.string.addons_tab_stremio, state.rows(AddonsTab.STREMIO).size)),
                         ChipOption(AddonsTab.NUVIO, stringResource(R.string.addons_tab_nuvio, state.rows(AddonsTab.NUVIO).size)),
-                        ChipOption(AddonsTab.PLUGINS, stringResource(R.string.addons_tab_plugins)),
                     ),
                     tab, { tab = it }, Modifier.testTag("addons-tabs"),
                 )
             }
-            when (tab) {
-                AddonsTab.PLUGINS -> item { PluginsNote(state.pluginLink) { tab = AddonsTab.NUVIO } }
-                else -> {
-                    item { Intro(if (tab == AddonsTab.NUVIO) R.string.addons_intro_nuvio else R.string.addons_intro) }
-                    item { Padded { AddBox(state, if (tab == AddonsTab.NUVIO) AddonSource.NUVIO else AddonSource.STREMIO, onAction) } }
-                    item {
-                        Text(
-                            stringResource(R.string.addons_installed), style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(start = LocalDimens.current.gutter, top = 12.dp).semantics { heading() },
-                        )
-                    }
-                    if (rows.isEmpty()) item { Intro(if (tab == AddonsTab.NUVIO) R.string.addons_none_nuvio else R.string.addons_none) }
-                    items(rows, key = { it.addon.id }) { row -> Padded { AddonCard(row, onAction) } }
-                }
+            item { Intro(if (tab == AddonsTab.NUVIO) R.string.addons_intro_nuvio else R.string.addons_intro) }
+            item { Padded { AddBox(state, if (tab == AddonsTab.NUVIO) AddonSource.NUVIO else AddonSource.STREMIO, onAction) } }
+            item {
+                Text(
+                    stringResource(R.string.addons_installed), style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = LocalDimens.current.gutter, top = 12.dp).semantics { heading() },
+                )
             }
+            if (rows.isEmpty()) item { Intro(if (tab == AddonsTab.NUVIO) R.string.addons_none_nuvio else R.string.addons_none) }
+            items(rows, key = { it.addon.id }) { row -> Padded { AddonCard(row, onAction) } }
         }
     }
 }
@@ -267,24 +257,3 @@ private fun Badge(text: String, strong: Boolean = false, error: Boolean = false)
     ) { Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)) }
 }
 
-/** Where Nuvio plugins stand: not run here, and what to use instead. */
-@Composable
-private fun PluginsNote(fromLink: Boolean, onNuvioAddons: () -> Unit) {
-    Padded {
-        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxWidth().padding(end = 4.dp, bottom = 4.dp).inkPanel(MaterialTheme.shapes.large).testTag("addons-plugins")) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.tertiary)
-                    Text(stringResource(R.string.addons_plugins_title), style = MaterialTheme.typography.titleLarge)
-                }
-                if (fromLink) Text(stringResource(R.string.addons_plugins_link), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                Text(stringResource(R.string.addons_plugins_body), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.addons_plugins_instead), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onNuvioAddons, modifier = Modifier.focusHighlight().testTag("addons-to-nuvio")) {
-                    Text(stringResource(R.string.addons_plugins_go))
-                }
-            }
-        }
-    }
-}

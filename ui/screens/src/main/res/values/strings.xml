@@ -61,10 +61,10 @@
     <string name="episodes_title">Episodes</string>
     <string name="episode_unavailable">Not available</string>
 
-    <string name="search_hint">Search or ask: “unwatched Tamil movies”</string>
+    <string name="search_hint">Search or ask: “unwatched action movies”</string>
     <string name="search_clear">Clear search</string>
     <string name="search_examples">Type a title in any spelling, or ask for what you want. Requests are understood on this device.</string>
-    <string name="search_example_1">tamil comedy</string>
+    <string name="search_example_1">comedy movies</string>
     <string name="search_example_2">unwatched movies from 2023</string>
     <string name="search_example_3">s2e5</string>
     <string name="search_example_4">what should I watch</string>
@@ -302,16 +302,10 @@
     <string name="addons_add_label_nuvio">Nuvio add-on link</string>
     <string name="addons_tab_stremio">Stremio · %1$d</string>
     <string name="addons_tab_nuvio">Nuvio · %1$d</string>
-    <string name="addons_tab_plugins">Nuvio plugins</string>
     <string name="addons_none">No add-ons here yet.</string>
     <string name="addons_none_nuvio">No Nuvio add-ons yet. Paste a link above.</string>
     <string name="addons_badge_streams">Streams</string>
     <string name="addons_badge_details">Details</string>
-    <string name="addons_plugins_title">Nuvio plugins aren\'t supported</string>
-    <string name="addons_plugins_link">The link you pasted is a Nuvio plugin repository, not an add-on.</string>
-    <string name="addons_plugins_body">Nuvio plugins are scripts that scrape streaming websites. YourStream doesn\'t run them: those sites usually don\'t have the rights to what they show.</string>
-    <string name="addons_plugins_instead">Nuvio add-ons are different: they use the Stremio format and work here, like any Stremio add-on.</string>
-    <string name="addons_plugins_go">Add Nuvio add-ons</string>
     <string name="addons_add_hint">https://…/manifest.json or stremio://…</string>
     <string name="addons_add">Add</string>
     <string name="addons_added">%1$s added</string>
@@ -686,4 +680,12 @@
     <string name="details_download_cancel">Cancel</string>
     <string name="details_download_remove">Remove download</string>
     <string name="details_downloading">Downloading %1$d%%</string>
+
+    <!-- Sign-in when Telegram is not ready -->
+    <string name="account_start_title">Telegram isn\'t ready</string>
+    <string name="account_start_not_running">Telegram isn\'t running. The app may have started in safe mode after a problem. Start it to sign in.</string>
+    <string name="account_start_slow">Telegram is taking longer than usual to start. Check your connection, then try again.</string>
+    <string name="account_start_failed">Telegram could not start: %1$s</string>
+    <string name="account_start_button">Start Telegram</string>
+    <string name="account_start_retry">Try again</string>
 </resources>

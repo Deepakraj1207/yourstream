@@ -183,6 +183,66 @@ class ViewModelTest {
         assertNull(vm.state.value.results)
     }
 
+    private fun fakeTelegram(status: MutableStateFlow<dev.yourstream.telegram.api.model.TelegramStatus>, calls: MutableList<String>) =
+        stub<dev.yourstream.telegram.api.TelegramManager> { name, _ ->
+            when (name) {
+                "getStatus" -> status
+                "start" -> { calls += "start"; AppResult.Ok(Unit) }
+                "restart" -> { calls += "restart"; AppResult.Ok(Unit) }
+                else -> error(name)
+            }
+        }
+
+    /**
+     * Reported from a device: sign-in loaded forever. Telegram had not started (safe mode after
+     * "early exits" that were ordinary closes), and the screen only showed a spinner.
+     */
+    @Test
+    fun signInNeverSpinsForeverWhenTelegramIsNotReady() = runTest(dispatcher) {
+        val starting = MutableStateFlow<AuthState>(AuthState.Unknown)
+        val status = MutableStateFlow<dev.yourstream.telegram.api.model.TelegramStatus>(dev.yourstream.telegram.api.model.TelegramStatus.Stopped)
+        val calls = mutableListOf<String>()
+        val authManager = stub<TelegramAuthManager> { name, _ -> if (name == "getState") starting else error(name) }
+        val noData = object : dev.yourstream.ui.screens.settings.AccountDataStore {
+            override suspend fun hasAccountData() = false
+            override suspend fun wipe() = Unit
+            override var signedOutNotice = false
+        }
+        val vm = AccountViewModel(
+            authManager,
+            stub<TelegramUserRepository> { name, _ -> if (name == "getCurrentUser") MutableStateFlow(null) else error(name) },
+            dev.yourstream.ui.screens.settings.AccountSession(authManager, noData, dev.yourstream.core.common.NoOpLogger),
+            fakeTelegram(status, calls),
+        )
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        // Not running (safe mode or stopped): said at once, with a button that starts it.
+        assertEquals(dev.yourstream.ui.screens.settings.StartProblem.NotRunning, vm.state.value.startProblem)
+        vm.onAction(AccountAction.StartTelegram); advanceUntilIdle()
+        assertEquals(listOf("start"), calls)
+
+        // Running but not getting ready: a normal spinner first, then "taking longer" and a retry.
+        status.value = dev.yourstream.telegram.api.model.TelegramStatus.Running
+        advanceTimeBy(1_000)
+        assertNull(vm.state.value.startProblem, "starting normally: just the spinner")
+        advanceTimeBy(AccountViewModel.SLOW_START_MS)
+        assertEquals(dev.yourstream.ui.screens.settings.StartProblem.Slow, vm.state.value.startProblem)
+        vm.onAction(AccountAction.StartTelegram); advanceUntilIdle()
+        assertEquals(listOf("start", "restart"), calls, "a stuck running instance is restarted")
+
+        // Telegram gets ready: the phone-number step, no problem shown.
+        starting.value = AuthState.WaitPhoneNumber
+        advanceUntilIdle()
+        assertEquals(dev.yourstream.ui.screens.settings.AccountStep.Phone, vm.state.value.step)
+        assertNull(vm.state.value.startProblem)
+
+        // A failure is said in words.
+        assertEquals(
+            dev.yourstream.ui.screens.settings.StartProblem.Failed("no TDLib"),
+            AccountViewModel.startProblem(dev.yourstream.telegram.api.model.TelegramStatus.Failed(AppError.Unknown("no TDLib")), slow = false),
+        )
+    }
+
     @Test
     fun accountSubmitsToTheRightAuthCallAndShowsErrors() = runTest(dispatcher) {
         val calls = mutableListOf<String>()
@@ -203,6 +263,7 @@ class ViewModelTest {
             authManager,
             stub<TelegramUserRepository> { name, _ -> if (name == "getCurrentUser") MutableStateFlow(null) else error(name) },
             dev.yourstream.ui.screens.settings.AccountSession(authManager, noData, dev.yourstream.core.common.NoOpLogger),
+            fakeTelegram(MutableStateFlow(dev.yourstream.telegram.api.model.TelegramStatus.Running), mutableListOf()),
         )
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()

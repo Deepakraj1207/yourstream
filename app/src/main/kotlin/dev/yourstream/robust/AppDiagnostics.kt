@@ -26,10 +26,21 @@ class AppDiagnostics private constructor(context: Context) {
     val crashes = CrashStore(File(dir, "crashes"), clock)
     val guard = StartupGuard(dir, clock)
     val playbackSession = PlaybackSessionStore(File(dir, "playback-session.properties"))
-    val startup: StartupGuard.Startup = guard.begin(crashes.list())
+    val startup: StartupGuard.Startup = guard.begin(crashes.list(), previousExitCrashed(context))
     val safeMode: Boolean get() = startup.safeMode
     val lowRamDevice: Boolean = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
     @Volatile var lastTrimLevel: Int? = null
+
+    /** How Android says the previous run ended (Android 11+): a crash or ANR, or not; null when unknown. */
+    private fun previousExitCrashed(context: Context): Boolean? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return null
+        val last = runCatching { am.getHistoricalProcessExitReasons(context.packageName, 0, 1).firstOrNull() }.getOrNull() ?: return null
+        return last.reason in setOf(
+            android.app.ApplicationExitInfo.REASON_CRASH, android.app.ApplicationExitInfo.REASON_CRASH_NATIVE,
+            android.app.ApplicationExitInfo.REASON_ANR, android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE,
+        )
+    }
 
     fun deviceInfo(): Map<String, String> = linkedMapOf(
         "app" to "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) ${if (BuildConfig.DEBUG) "debug" else "release"}",

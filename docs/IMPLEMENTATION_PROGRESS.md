@@ -682,3 +682,22 @@ pre-release (release run 16 on `c148c7a`): versionCode 16, same release certific
 (`35249306…07b2`), arm64 APK matches `SHA256SUMS.txt`; GitHub's "latest" is still v0.10.0.
 **Promoted:** v0.11.1 marked latest on 13 Nov 2026 (release workflow, promote mode; nothing
 rebuilt). The in-app updater now offers it.
+
+
+## Device report 2 (14 Nov 2026): sign-in loading forever
+
+**Cause (found in code):** the crash-loop guard counted every run that ended within 30 s as an
+"early death" (swiping the app away, installing an update, Android reclaiming memory). Three in a
+row started the app in safe mode, where Telegram is never started, and the sign-in screen showed
+only a spinner, which made users close the app again, feeding the loop.
+
+**Fixes:** early ends count only when Android reports a crash or ANR for the previous run
+(`ApplicationExitInfo`, Android 11+; older versions: only the app's own crash reports); the
+sign-in screen never spins forever: Telegram not running, failed, or still starting after 20 s
+is said plainly with Start Telegram / Try again (`StartProblem`); the first run keeps its
+Connect button while Telegram starts. Tests: `DiagnosticsTest` (rule changed, with the reason),
+`ViewModelTest.signInNeverSpinsForeverWhenTelegramIsNotReady`, `FirstRunTest`. Needs a device
+check: open the app after updating; sign-in opens (or explains why not).
+
+Also: the Nuvio plugins tab was removed (a pasted plugin link still gets a one-line message);
+example texts no longer say "Tamil" ("unwatched action movies", "comedy movies").

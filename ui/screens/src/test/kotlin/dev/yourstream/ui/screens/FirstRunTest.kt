@@ -132,11 +132,12 @@ class FirstRunTest {
     }
 
     @Test
-    fun telegramStepWhileStartingOrUnavailableOffersNoSignIn() {
+    fun telegramStepWhileStartingKeepsTheWayOnAndUnavailableOffersNoSignIn() {
         var state by mutableStateOf(FirstRunUiState(starting = true))
         compose.setContent { YourStreamTheme(WindowLayout.COMPACT) { FirstRunScreen(state, {}, {}, {}, initialStep = FirstRunStep.TELEGRAM) } }
         compose.onNodeWithText("Getting Telegram ready…").assertExists()
-        compose.onNodeWithTag("first-run-connect").assertDoesNotExist()
+        // The way on stays open while Telegram starts: the sign-in screen explains a start that hangs.
+        compose.onNodeWithTag("first-run-connect").assertExists()
         // No API ids, error codes or provider reasons: one plain sentence.
         state = FirstRunUiState(starting = false, unavailable = true)
         compose.onNodeWithText("Telegram sign-in is not available in this build of the app.").assertExists()
