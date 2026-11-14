@@ -669,7 +669,7 @@ First real-device report (screenshots from the owner's phone).
 | "Scam 2003 …" shown as "Link to this message" | Same: nothing left of the name, so the post above the file was used, whose text was "Link to this message" | Same fix; link phrases ("Link to this message", "Click here", "Join us") are never a title; `S02_EP_01_05` reads as episodes 1–5 |
 | "Toonworld4all Naruto" | Site brand in the name | Words like `Toonworld4all`, `Movies4u`, `Filmy4wap` are brands, not titles |
 | Movies / Series in the navigation | User's choice | Removed from `MAIN_TABS` (Home, Search, Library, Settings); still opened from Home and the Library |
-| Navigation look | User's reference (manga store app) | `MangaNavigationBar`: printed strip, stamped-panel selected tab with hard shadow and press-down, paper panel in light mode; classic style keeps Material 3 |
+| Navigation look | User's reference (manga store app); on 14 Nov 2026 the user picked option 5 "Panel Grid" from seven mockups | `MangaNavigationBar`: slanted inked comic panels with gutters, the current one filled with ink; classic style keeps Material 3 |
 
 Parser version 5 → 6: libraries already indexed are re-parsed after the update and regrouped
 (existing `ReparseWorker` + library sync by signature). Tests: `UnderscoreHandleNamesTest` (6,
@@ -701,3 +701,17 @@ check: open the app after updating; sign-in opens (or explains why not).
 
 Also: the Nuvio plugins tab was removed (a pasted plugin link still gets a one-line message);
 example texts no longer say "Tamil" ("unwatched action movies", "comedy movies").
+
+## v0.11.2 release and Panel Grid navigation (14 Nov 2026)
+
+* **v0.11.2 published as the latest release** (the user said "Publish"). Checked on the published
+  files: `releases/latest` is v0.11.2 and not a pre-release; the arm64 APK's SHA-256 matches
+  `SHA256SUMS.txt`; `aapt2` shows versionCode 19, versionName 0.11.2; `apksigner` shows the pinned
+  release certificate (`35249306…07b2`). Status: NEEDS REAL-DEVICE TESTING (the sign-in fix in
+  particular).
+* **Manga navigation: Panel Grid.** Reason: the user picked option 5 from a page of seven mockups.
+  `MangaNavigationBar` now draws each tab as a slanted, inked comic panel with gutters; the current
+  panel is filled with ink (same rule in dark and light, from the theme's `onSurface`/`surface`).
+  The tab semantics (role, selected state, names for screen readers with tab names off) are
+  unchanged. New test: `theMangaPanelGridKeepsTouchTargetsOnTheNarrowestPhones` (320 dp, light).
+  Status: NEEDS REAL-DEVICE TESTING (look on real screens, press feedback, TalkBack).

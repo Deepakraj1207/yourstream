@@ -113,11 +113,12 @@ filters open them, and their pages show Home as the selected tab.
 
 Phones show the bar under the content, on the main tabs only; other pages use the whole screen.
 
-* **Manga style** (`MangaNavigationBar`): a printed strip with an ink rule along the top; each
-  tab an icon over its name in bold; the current tab a stamped panel with a hard offset shadow
-  (dark: a cream block on a black shadow; light: a paper panel with an ink border and shadow,
-  like the manga cards). Pressing a tab pushes its panel down onto its shadow; with reduced
-  motion it does not move.
+* **Manga style** (`MangaNavigationBar`), the "Panel Grid" the user picked (14 Nov 2026) from
+  seven mockups: a thick ink rule along the top; each tab a slanted comic panel (about 8°) with
+  an inked border and gutters between panels, nudged slightly off the line like a hand-drawn
+  page. The current tab's panel is filled with ink and its icon and name are printed in the
+  paper colour; pressing a tab tints its panel. Only the outline slants; icon and name stay
+  upright. Colours change instantly with reduced motion. Tested at 320 dp width (≥ 48 dp tabs).
 * **Classic style**: a Material 3 navigation bar (M3 container, elevation, insets and
   `NavigationBarItem`s, without the 8 dp item gaps).
 

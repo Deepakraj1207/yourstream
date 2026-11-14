@@ -1,5 +1,7 @@
 package dev.yourstream.ui.screens
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -516,6 +518,24 @@ class ScreensTest {
         assertTouchTargets()
         compose.onNodeWithTag("nav:SETTINGS").performClick()
         assertEquals(listOf(TopLevel.SETTINGS), selected)
+    }
+
+    @Test
+    fun theMangaPanelGridKeepsTouchTargetsOnTheNarrowestPhones() {
+        // The panel grid adds side margins and gutters between panels; on a 320 dp wide screen
+        // every panel must still be a 48 dp touch target, in the light theme too.
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT, darkTheme = false, manga = true) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalMangaStyle provides true) {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.width(320.dp)) {
+                        MainNavigationBar(TopLevel.HOME, {})
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+        for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+        assertTouchTargets()
     }
 
     @Test
