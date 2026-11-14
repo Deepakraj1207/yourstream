@@ -35,23 +35,26 @@ class AppLogger @Inject constructor(private val diagnostics: AppDiagnostics) : L
 
     private val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
+    // Logcat gets the same redacted text as the stored log: other apps with READ_LOGS (adb,
+    // OEM tools, bug reports) must never see a phone number, code or key. Release builds also
+    // leave out stack traces (their exception messages can carry URLs or ids).
     override fun d(tag: String, message: String) {
-        if (BuildConfig.DEBUG) Log.d(PREFIX + tag, message)
+        if (BuildConfig.DEBUG) Log.d(PREFIX + tag, forLogcat(message, null, debug = true))
         record("D", tag, message, null)
     }
 
     override fun i(tag: String, message: String) {
-        Log.i(PREFIX + tag, message)
+        Log.i(PREFIX + tag, forLogcat(message, null, BuildConfig.DEBUG))
         record("I", tag, message, null)
     }
 
     override fun w(tag: String, message: String, throwable: Throwable?) {
-        Log.w(PREFIX + tag, message, throwable)
+        Log.w(PREFIX + tag, forLogcat(message, throwable, BuildConfig.DEBUG), throwable?.takeIf { BuildConfig.DEBUG })
         record("W", tag, message, throwable)
     }
 
     override fun e(tag: String, message: String, throwable: Throwable?) {
-        Log.e(PREFIX + tag, message, throwable)
+        Log.e(PREFIX + tag, forLogcat(message, throwable, BuildConfig.DEBUG), throwable?.takeIf { BuildConfig.DEBUG })
         record("E", tag, message, throwable)
     }
 
@@ -82,8 +85,15 @@ class AppLogger @Inject constructor(private val diagnostics: AppDiagnostics) : L
         }
     }
 
-    private companion object {
-        const val PREFIX = "YS/"
-        const val MAX_LINES = 300
+    internal companion object {
+        /**
+         * The line logcat gets: redacted, and in release builds with the exception's type and
+         * redacted message appended (the stack trace itself is passed only in debug builds).
+         */
+        internal fun forLogcat(message: String, throwable: Throwable?, debug: Boolean): String =
+            Redactor.redact(if (throwable == null || debug) message else "$message (${throwable::class.simpleName}: ${throwable.message})")
+
+        private const val PREFIX = "YS/"
+        private const val MAX_LINES = 300
     }
 }

@@ -52,6 +52,7 @@ abstract class BrowseViewModel(
             kind = saved.get<String>(KIND)?.let { LibraryKind.valueOf(it) },
             sort = saved.get<String>(SORT)?.let { LibrarySort.valueOf(it) } ?: defaultSort,
             watch = saved.get<String>(WATCH)?.let { WatchFilter.valueOf(it) } ?: WatchFilter.ANY,
+            playableOnly = saved.get<Boolean>(PLAYABLE) ?: true,
         ),
     )
 
@@ -75,12 +76,13 @@ abstract class BrowseViewModel(
                 is BrowseAction.SetKind -> f.copy(kind = action.kind)
                 is BrowseAction.SetSort -> f.copy(sort = action.sort)
                 is BrowseAction.SetWatch -> f.copy(watch = action.watch)
+                is BrowseAction.SetPlayableOnly -> f.copy(playableOnly = action.playableOnly)
                 is BrowseAction.Tile -> f
-            }.also { n -> saved[KIND] = n.kind?.name; saved[SORT] = n.sort.name; saved[WATCH] = n.watch.name }
+            }.also { n -> saved[KIND] = n.kind?.name; saved[SORT] = n.sort.name; saved[WATCH] = n.watch.name; saved[PLAYABLE] = n.playableOnly }
         }
     }
 
-    private companion object { const val KIND = "kind"; const val SORT = "sort"; const val WATCH = "watch" }
+    private companion object { const val KIND = "kind"; const val SORT = "sort"; const val WATCH = "watch"; const val PLAYABLE = "playable" }
 }
 
 private val ALL = BrowseControls(kind = true, sort = true, watch = true)
@@ -88,7 +90,7 @@ private val FIXED_KIND = BrowseControls(kind = false, sort = true, watch = true)
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
-    BrowseViewModel(saved, null, ALL, LibrarySort.TITLE, media, actions, { media.search(it) }) {
+    BrowseViewModel(saved, null, ALL.copy(playable = true), LibrarySort.TITLE, media, actions, { media.search(it) }) {
     /** "My library": only what the user added (empty until they add a movie or series). */
     override fun query(f: BrowseFilters) = f.toQuery(null).copy(myLibraryOnly = true)
 }
@@ -107,4 +109,15 @@ class RecentlyAddedViewModel @Inject constructor(saved: SavedStateHandle, media:
     BrowseViewModel(saved, null, BrowseControls(kind = true, sort = false, watch = false), LibrarySort.RECENTLY_ADDED, media, actions,
         { q -> media.recentlyAdded(q.kinds) }) {
     override fun query(f: BrowseFilters) = LibraryQuery(kinds = setOfNotNull(f.kind), sort = LibrarySort.RECENTLY_ADDED)
+}
+
+/**
+ * Files browsing hides: no title found and no poster (Library status → Files without a title).
+ * Each opens its details, where it plays and its match can be fixed.
+ */
+@HiltViewModel
+class UntitledViewModel @Inject constructor(saved: SavedStateHandle, media: MediaRepository, actions: TileActionHandler) :
+    BrowseViewModel(saved, LibraryKind.VIDEO, BrowseControls(kind = false, sort = true, watch = true), LibrarySort.RECENTLY_ADDED, media, actions,
+        { media.search(it) }) {
+    override fun query(f: BrowseFilters) = f.toQuery(LibraryKind.VIDEO).copy(untitledOnly = true, includeUntitled = true)
 }

@@ -13,6 +13,8 @@ data class ChatRecord(
     /** Used as a last-resort title hint for generic file names. */
     val title: String?,
     val enabled: Boolean,
+    /** Paused by the user: runs end before scanning. */
+    val paused: Boolean = false,
     val verifyCursor: Long,
     val lastVerifiedAt: Long?,
 )

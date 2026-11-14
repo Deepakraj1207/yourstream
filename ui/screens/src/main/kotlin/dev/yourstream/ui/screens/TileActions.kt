@@ -65,6 +65,7 @@ fun tileCard(): (Tile) -> dev.yourstream.ui.core.MediaCardModel {
     val resume = stringResource(R.string.action_resume)
     val left = stringResource(R.string.caption_minutes_left)
     val inLibrary = stringResource(R.string.caption_in_library)
+    val removed = stringResource(R.string.caption_removed)
     return { t ->
         when (val c = t.caption) {
             null -> t.card
@@ -75,6 +76,7 @@ fun tileCard(): (Tile) -> dev.yourstream.ui.core.MediaCardModel {
             is TileCaption.Reason -> t.card.copy(caption = c.text)
             TileCaption.Resume -> t.card.copy(caption = resume)
             TileCaption.InLibrary -> t.card.copy(caption = inLibrary)
+            TileCaption.Removed -> t.card.copy(caption = removed, badge = removed)
         }
     }
 }

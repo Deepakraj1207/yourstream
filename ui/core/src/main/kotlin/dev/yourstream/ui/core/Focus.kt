@@ -25,7 +25,8 @@ fun Modifier.focusHighlight(shape: Shape? = null): Modifier = composed {
     val color = MaterialTheme.colorScheme.primary
     val s = shape ?: MaterialTheme.shapes.medium
     // Phones and small tablets never lift: no animation or extra layer per card while scrolling.
-    val scaled = if (lift == 1f) this else {
+    // Reduced motion: the border alone shows focus.
+    val scaled = if (lift == 1f || LocalReducedMotion.current) this else {
         val scale by animateFloatAsState(if (focused) lift else 1f, label = "focus-scale")
         this.graphicsLayer { scaleX = scale; scaleY = scale }
     }

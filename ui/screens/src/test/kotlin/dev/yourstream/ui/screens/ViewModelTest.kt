@@ -186,16 +186,23 @@ class ViewModelTest {
     @Test
     fun accountSubmitsToTheRightAuthCallAndShowsErrors() = runTest(dispatcher) {
         val calls = mutableListOf<String>()
+        val authManager = stub<TelegramAuthManager> { name, args ->
+            when (name) {
+                "getState" -> auth
+                "submitPhoneNumber" -> { calls += "phone:${args[0]}"; AppResult.Ok(Unit) }
+                "submitCode" -> { calls += "code:${args[0]}"; AppResult.Err(AppError.InvalidInput("PHONE_CODE_INVALID", "Wrong code")) }
+                else -> error(name)
+            }
+        }
+        val noData = object : dev.yourstream.ui.screens.settings.AccountDataStore {
+            override suspend fun hasAccountData() = false
+            override suspend fun wipe() = Unit
+            override var signedOutNotice = false
+        }
         val vm = AccountViewModel(
-            stub<TelegramAuthManager> { name, args ->
-                when (name) {
-                    "getState" -> auth
-                    "submitPhoneNumber" -> { calls += "phone:${args[0]}"; AppResult.Ok(Unit) }
-                    "submitCode" -> { calls += "code:${args[0]}"; AppResult.Err(AppError.InvalidInput("PHONE_CODE_INVALID", "Wrong code")) }
-                    else -> error(name)
-                }
-            },
+            authManager,
             stub<TelegramUserRepository> { name, _ -> if (name == "getCurrentUser") MutableStateFlow(null) else error(name) },
+            dev.yourstream.ui.screens.settings.AccountSession(authManager, noData, dev.yourstream.core.common.NoOpLogger),
         )
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
@@ -204,8 +211,7 @@ class ViewModelTest {
         advanceUntilIdle()
         vm.onAction(AccountAction.Submit("12345")); advanceUntilIdle()
         assertEquals(listOf("phone:+491701234567", "code:12345"), calls)
-        assertEquals(ErrorKind.INPUT, vm.state.value.error!!.kind)
-        assertEquals("Wrong code", vm.state.value.error!!.detail)
+        assertEquals(AppError.InvalidInput("PHONE_CODE_INVALID", "Wrong code"), vm.state.value.error)
     }
 
     @Test

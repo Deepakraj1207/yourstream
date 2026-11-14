@@ -12,15 +12,20 @@ data class BrowseFilters(
     val kind: LibraryKind? = null,
     val sort: LibrarySort = LibrarySort.RECENTLY_ADDED,
     val watch: WatchFilter = WatchFilter.ANY,
+    /**
+     * Only titles with a file still in Telegram. Off (Library tab): titles whose files were all
+     * deleted are listed too, marked "Removed" (kept for their progress and "My library").
+     */
+    val playableOnly: Boolean = true,
 ) {
     fun toQuery(fixedKind: LibraryKind?): LibraryQuery =
-        LibraryQuery(kinds = setOfNotNull(fixedKind ?: kind), sort = sort, watch = watch)
+        LibraryQuery(kinds = setOfNotNull(fixedKind ?: kind), sort = sort, watch = watch, includeUnavailable = !playableOnly)
 
-    val isFiltered: Boolean get() = kind != null || watch != WatchFilter.ANY
+    val isFiltered: Boolean get() = kind != null || watch != WatchFilter.ANY || !playableOnly
 }
 
 /** Which controls a browse screen shows. */
-data class BrowseControls(val kind: Boolean, val sort: Boolean, val watch: Boolean)
+data class BrowseControls(val kind: Boolean, val sort: Boolean, val watch: Boolean, val playable: Boolean = false)
 
 data class BrowseUiState(
     val filters: BrowseFilters = BrowseFilters(),
@@ -33,5 +38,6 @@ sealed interface BrowseAction {
     data class SetKind(val kind: LibraryKind?) : BrowseAction
     data class SetSort(val sort: LibrarySort) : BrowseAction
     data class SetWatch(val watch: WatchFilter) : BrowseAction
+    data class SetPlayableOnly(val playableOnly: Boolean) : BrowseAction
     data class Tile(val action: TileAction) : BrowseAction
 }

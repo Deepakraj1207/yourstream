@@ -1,53 +1,204 @@
-# YourStream
+<div align="center">
 
-An open-source Android media player for your own Telegram media, with a real media library:
-indexing, metadata matching, catalogs, smart playback, search and watch history.
+# 🎬 YourStream
 
-Status: **Phase 10 done**: Telegram connection layer, media indexing, a standalone filename
-parser, the local library (movies, series → seasons → episodes, versions, watch progress,
-favorites, tracks), provider-based external metadata (TMDB, Cinemeta) with confidence-scored
-matching, and optional Indian-language catalog providers (IndiaStreams, Indian Regional
-Catalog) for discovery, and Telegram media playback with Media3 that streams while downloading
-(seeking jumps the download to the new position) with network-aware adaptive buffering, smart
-seeking and next-episode prefetch under strict download limits, and preference-based audio/subtitle
-selection remembered per movie and series, and a fast offline library search (fuzzy, transliteration-aware,
-filters, sorting, paging) with an offline natural-language assistant ("show Telugu movies I haven't
-watched", "what should I watch next?") that needs no AI service, and watch intelligence (continue watching, automatic next episode, recently
-watched/added, favorites, abandoned content), all with plain debug screens and a minimal
-test player. Catalogs are information only; what you can watch is always your own Telegram media.
+**Your Telegram videos and the files on your phone, as one private movie & series library.**
 
-- Architecture, roadmap and interfaces: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- UI (design system, screens, navigation, states, layouts, TV/remote, accessibility): [docs/UI.md](docs/UI.md)
-- Advanced UX (library status, match review, Media Brain, recommendations, statistics, optional encrypted progress sync; privacy): [docs/UX.md](docs/UX.md)
-- Functional audit (checklist, bugs, performance, recommendations): [docs/AUDIT.md](docs/AUDIT.md) · interfaces: [docs/API.md](docs/API.md)
-- Robustness and diagnostics (failure handling, database safety, crash/safe mode, recovery, diagnostics screen): [docs/ROBUSTNESS.md](docs/ROBUSTNESS.md)
-- Watch intelligence (progress, next-episode rules, continue watching, abandonment): [docs/WATCH.md](docs/WATCH.md)
-- Local assistant (intents, entities, query plans, optional on-device model): [docs/ASSISTANT.md](docs/ASSISTANT.md)
-- Library search (matching, query interpretation, ranking, benchmark): [docs/SEARCH.md](docs/SEARCH.md)
-- Audio & subtitle tracks (detection, preferences, fallback, memory, external subtitles): [docs/TRACKS.md](docs/TRACKS.md)
-- Adaptive streaming (algorithms, trade-offs, benchmarks): [docs/ADAPTIVE_STREAMING.md](docs/ADAPTIVE_STREAMING.md)
-- Playback engine (Media3, Telegram streaming, seeking, buffering, errors, metrics): [docs/PLAYBACK.md](docs/PLAYBACK.md)
-- Catalog providers (architecture, languages, add-on integration, fallback, caching): [docs/CATALOGS.md](docs/CATALOGS.md)
-- Stream add-ons, torrent streaming, web-stream playback, FFmpeg audio, per-device APKs: [docs/STREAMS.md](docs/STREAMS.md)
-- External metadata (providers, matching, caching, failures): [docs/METADATA.md](docs/METADATA.md)
-- Library (relationships, indexes, queries, migrations): [docs/LIBRARY.md](docs/LIBRARY.md)
-- Filename parser (patterns, confidence, limitations): [docs/PARSER.md](docs/PARSER.md)
-- Media indexing design (schema, algorithm, duplicates, performance): [docs/INDEXING.md](docs/INDEXING.md)
-- Telegram API credentials, configuration and test steps: [docs/TELEGRAM_SETUP.md](docs/TELEGRAM_SETUP.md)
+Posters, episodes, resume and smart playback, streamed straight from Telegram. No uploads, no tracking.
 
-Quick start:
+[![Latest release](https://img.shields.io/github/v/release/Deepakraj1207/yourstream?style=for-the-badge&logo=github&label=release&color=e8e2d4&labelColor=161310)](https://github.com/Deepakraj1207/yourstream/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/Deepakraj1207/yourstream/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=161310)](https://github.com/Deepakraj1207/yourstream/actions/workflows/ci.yml)
+[![Downloads](https://img.shields.io/github/downloads/Deepakraj1207/yourstream/total?style=for-the-badge&logo=android&logoColor=white&color=e8e2d4&labelColor=161310)](https://github.com/Deepakraj1207/yourstream/releases)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-e8e2d4?style=for-the-badge&labelColor=161310)](LICENSE)
+
+![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)
+![Media3](https://img.shields.io/badge/Media3-ExoPlayer-FF6F00?style=flat-square&logo=youtube&logoColor=white)
+![TDLib](https://img.shields.io/badge/Telegram-TDLib-26A5E4?style=flat-square&logo=telegram&logoColor=white)
+![Android TV](https://img.shields.io/badge/Android%20TV-ready-000000?style=flat-square&logo=androidtv&logoColor=white)
+
+[📥 Download](https://github.com/Deepakraj1207/yourstream/releases/latest) ·
+[✨ Features](#-features) ·
+[📸 Screenshots](#-screenshots) ·
+[🔒 Privacy](#-privacy) ·
+[🛠️ Build](#️-build-from-source) ·
+[📚 Docs](#-documentation)
+
+</div>
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Home (dark) | Home (light) | Library | Details |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/home-dark.png" width="200" alt="Home in the manga style, dark"/> | <img src="docs/screenshots/home-light.png" width="200" alt="Home in the manga style, light"/> | <img src="docs/screenshots/library.png" width="200" alt="Library grid with filters"/> | <img src="docs/screenshots/details.png" width="200" alt="A title's page with resume"/> |
+| **Search** | **Settings** | **First run** | **Library status** |
+| <img src="docs/screenshots/search.png" width="200" alt="Search answering a plain-language question"/> | <img src="docs/screenshots/settings.png" width="200" alt="Settings hub"/> | <img src="docs/screenshots/first-run.png" width="200" alt="Guided first run"/> | <img src="docs/screenshots/library-status.png" width="200" alt="Indexing and matching progress"/> |
+
+| ▶️ Player | 📺 Android TV | 📱 Tablet |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/player.png" width="280" alt="Player with controls"/> | <img src="docs/screenshots/tv-home.png" width="280" alt="Home on Android TV"/> | <img src="docs/screenshots/tablet-home.png" width="280" alt="Home on a tablet"/> |
+
+<sub>Rendered from the app's own screens by its screenshot tests. Titles are sample data and artwork shows placeholders; on your device you see your own library with posters.</sub>
+
+</div>
+
+---
+
+## ✨ Features
+
+### 📚 A real library from your Telegram chats
+- 🔑 **Sign in with your own Telegram account**: phone number and code, or a QR code from Telegram on another device.
+- 📂 **Pick the channels, groups or chats** that hold your videos; YourStream indexes them in the background.
+- 🎞️ **Movies and series → seasons → episodes**, several versions of one title, duplicates recognised.
+- 🧠 **Smart file-name parsing**: titles, years, episodes, languages, quality, even from messy names like `@Channel_LinkZ_Movie_2023_1080p_Tam_+_Tel.mkv`.
+- ⏸️ **Indexing you control**: pause, resume, stop; Wi-Fi only; waits when the battery is low.
+
+### 📱 Files on this device
+- 📁 **Add folders** from your phone (no permission needed: only the folder you pick), or all videos on the device.
+- 🔗 The same film on Telegram and on your phone becomes **one title with two versions**.
+
+### 🖼️ Posters and details
+- 🎨 Posters, plots and ratings from **TMDB** or **Cinemeta**, matched from the title and year in the file name.
+- ✅ A **review screen** for unsure matches, and **Fix match** for anything wrong.
+
+### ▶️ Playback that just works
+- ⚡ **Streams while downloading**: seek anywhere without waiting for the whole file.
+- 🗣️ **Audio and subtitle languages by preference**, remembered per movie and series; FFmpeg audio for formats your phone lacks.
+- 🔒 **Background playback** with lock-screen and headset controls, picture-in-picture, next episode.
+- 📥 **Offline downloads**: save a version and watch without a connection.
+
+### 🍿 Watch tracking
+- ⏯️ Continue watching, next episode, recently added, favorites, statistics, all computed on the device.
+- 🔄 Optional **end-to-end encrypted progress sync** across your devices, stored in your own Saved Messages.
+
+### 🔎 Search that understands you
+- Offline, fuzzy, transliteration-aware search, plus plain-language questions such as *"Telugu movies I haven't watched"*.
+
+### 🧩 Optional extras
+- 🧭 **Stremio-protocol add-ons** for discovery catalogs and web streams (with resume).
+- 🧲 **Torrent streaming**: off by default; turning it on explains that peers see your IP address.
+
+### 🎨 Made to feel good
+- 🖌️ **Manga** and **Classic** styles, dark / light / AMOLED black.
+- 🧭 Simple navigation: **Home · Search · Library · Settings**.
+- 👋 A guided first run, **reduce motion** support, 48 dp touch targets, screen-reader labels.
+- 📺 Phone, tablet and **Android TV** layouts with full remote control.
+
+---
+
+## 🔒 Privacy
+
+> [!NOTE]
+> Your videos stay where they are: in Telegram or on your device. **Nothing is uploaded. No analytics, no ads.**
+
+| What | Where it goes |
+|---|---|
+| 🎬 Your videos and messages | Nowhere. Played from Telegram or from your device |
+| 🔤 Title + year from a file name | A movie database (TMDB / Cinemeta), to find posters. **Never** message text, chat names or file names |
+| 🖼️ Poster requests on blocked networks | Image proxies, **only** if your network blocks the poster server. Can be switched off |
+| 🌐 Host names on blocked networks | DNS over HTTPS (Cloudflare / Google), **only** if your network's DNS blocks a site. Can be switched off |
+| 👋 Signing out | Removes your account's data from the device |
+
+Full details: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
+
+---
+
+## 📥 Install
+
+1. Open the **[latest release](https://github.com/Deepakraj1207/yourstream/releases/latest)** (Android 8.0 or newer).
+2. Download the APK for your device:
+
+   | File | For |
+   |---|---|
+   | `YourStream-…-arm64-v8a.apk` | 📱 Almost every phone and tablet from recent years |
+   | `YourStream-…-armeabi-v7a.apk` | 📺 Older phones, many TV sticks and boxes |
+   | `YourStream-….apk` | 🤷 Any device (bigger). Not sure? Take this one |
+
+3. Open it and allow **"Install unknown apps"** when asked. On a TV: `adb install YourStream-*.apk`.
+
+🔄 **Updates come by themselves**: the app downloads only the APK for your device and checks it against the release's checksums before installing.
+
+---
+
+## 🛠️ Build from source
 
 ```bash
-cp secrets.properties.example secrets.properties   # then fill in your api_id / api_hash
-./gradlew test assembleDebug
+git clone https://github.com/Deepakraj1207/yourstream.git
+cd yourstream
+cp secrets.properties.example secrets.properties   # add your Telegram api_id / api_hash from my.telegram.org
+./gradlew test :app:assembleDebug
 ```
 
-Development happens in two stages: **Stage 1** builds all functionality behind plain debug
-screens; **Stage 2** builds the final UI/UX.
+📖 Credentials, sign-in and sign-out: [`docs/TELEGRAM_SETUP.md`](docs/TELEGRAM_SETUP.md) · 🚀 Releasing: [`docs/RELEASE.md`](docs/RELEASE.md)
 
-## License
+---
 
-YourStream is free software under the [GNU General Public License v3.0](LICENSE). It bundles
-components under their own licenses (listed in the app under Settings → About → Open-source
-licenses), among them the FFmpeg audio decoder for Media3 (Jellyfin build, GPL-3.0), which is why
-the app as a whole is GPL-3.0.
+## 🧱 Architecture
+
+```text
+ ┌──────────────────────────── app ────────────────────────────┐
+ │  ui:screens (Compose, Material 3, TV)  ·  ui:core (design)  │
+ ├──────────────┬──────────────┬──────────────┬────────────────┤
+ │ library      │ playback     │ search       │ watch · sync   │
+ │ metadata     │ (Media3,     │ assistant    │ catalog        │
+ │ (TMDB, …)    │  torrent)    │              │ (add-ons)      │
+ ├──────────────┴──────┬───────┴──────────────┴────────────────┤
+ │ media (indexer, file-name parser, local files)              │
+ ├─────────────────────┴───────────────────────────────────────┤
+ │ telegram (TDLib)  ·  core (Room database, network, common)  │
+ └─────────────────────────────────────────────────────────────┘
+```
+
+**Stack:** Kotlin · Jetpack Compose (Material 3, Compose for TV) · Hilt · Room · WorkManager · Media3 / ExoPlayer · TDLib · Coil · OkHttp · libtorrent4j · FFmpeg audio decoder.
+40 Gradle modules; details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## 🧪 Quality
+
+- ✅ **600+ JVM tests** (Robolectric, real Room databases, Media3 against simulated Telegram files), lint, a debug build and a minified release build on **every push**.
+- 🔐 Releases are **signed with one pinned key**, and CI checks every APK's certificate before publishing.
+- 📋 What still needs a real phone is listed, with step-by-step checks, in [`docs/IMPLEMENTATION_PROGRESS.md`](docs/IMPLEMENTATION_PROGRESS.md).
+
+---
+
+## 📚 Documentation
+
+| | Topic | Docs |
+|:---:|---|---|
+| 🗺️ | Plan, status, device checks | [IMPLEMENTATION_PROGRESS](docs/IMPLEMENTATION_PROGRESS.md) · [PRODUCT_AUDIT](docs/PRODUCT_AUDIT.md) |
+| 🧱 | Architecture and interfaces | [ARCHITECTURE](docs/ARCHITECTURE.md) · [API](docs/API.md) |
+| 🔒 | Security and privacy | [SECURITY_REVIEW](docs/SECURITY_REVIEW.md) |
+| 🔑 | Telegram sign-in and sign-out | [TELEGRAM_SETUP](docs/TELEGRAM_SETUP.md) |
+| 📂 | Indexing and file names | [INDEXING](docs/INDEXING.md) · [PARSER](docs/PARSER.md) · [LOCAL_MEDIA](docs/LOCAL_MEDIA.md) |
+| 🎞️ | Library, metadata, catalogs | [LIBRARY](docs/LIBRARY.md) · [METADATA](docs/METADATA.md) · [CATALOGS](docs/CATALOGS.md) |
+| ▶️ | Playback and streams | [PLAYBACK](docs/PLAYBACK.md) · [ADAPTIVE_STREAMING](docs/ADAPTIVE_STREAMING.md) · [TRACKS](docs/TRACKS.md) · [STREAMS](docs/STREAMS.md) |
+| 🔎 | Search, assistant, watch | [SEARCH](docs/SEARCH.md) · [ASSISTANT](docs/ASSISTANT.md) · [WATCH](docs/WATCH.md) |
+| 🎨 | UI, UX, accessibility | [UI](docs/UI.md) · [UX](docs/UX.md) |
+| 🛡️ | Robustness, releases | [ROBUSTNESS](docs/ROBUSTNESS.md) · [RELEASE](docs/RELEASE.md) · [RELEASE_R8](docs/RELEASE_R8.md) |
+
+---
+
+## 🤝 Contributing
+
+Bug reports and pull requests are welcome. 🐞 For a wrong title, please include the **file name**: they become test cases (`media/filename` already has over a hundred real ones). Run `./gradlew test :app:lintDebug` before opening a pull request.
+
+---
+
+## ⚖️ License
+
+YourStream is free software under the **[GNU General Public License v3.0](LICENSE)**. It bundles components under their own licenses (listed in the app under *Settings → About → Open-source licenses*), among them the FFmpeg audio decoder for Media3 (Jellyfin build, GPL-3.0), which is why the app as a whole is GPL-3.0.
+
+> [!IMPORTANT]
+> YourStream plays files you already have access to, in your own Telegram account or on your device. It hosts no content. You are responsible for what you watch with it.
+
+<div align="center">
+
+Made with ❤️ and Kotlin · ⭐ Star the repo if YourStream is useful to you
+
+</div>

@@ -449,7 +449,10 @@ class TelegramPlaybackTest {
         val file = long ?: add(2, TestMedia.SMALL_360P)
         if (long != null) sim.addFile(1, long)
         val id = if (long != null) 1 else 2
-        sim.bandwidthBytesPerSecond = 2 * mb
+        // The download must still be running at release. The 85-minute file (needs ffmpeg) never
+        // finishes in time; the 296 KB fallback would finish in 0.15 s at 2 MB/s on a fast machine
+        // (CI), leaving nothing to cancel, so it gets a speed that takes ~12 s for the whole file.
+        sim.bandwidthBytesPerSecond = if (long != null) 2 * mb else maxOf(8_000L, file.length() / 12)
         val c = controller()
         c.play(media(id, file))
         c.player.awaitState(Player.STATE_READY, 60_000)

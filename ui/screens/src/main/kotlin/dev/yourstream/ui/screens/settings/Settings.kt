@@ -93,7 +93,8 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(
             signedInAs = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
             signedIn = a == AuthState.Ready,
-            enabledSources = chats.count { it.enabled },
+            // Telegram chats only: folders on the device have their own row.
+            enabledSources = chats.count { it.enabled && !dev.yourstream.media.api.LocalSourceIds.isLocal(it.chatId) },
             languages = langs,
             reviewCount = r,
             syncOn = syncOn,
@@ -124,9 +125,10 @@ fun SettingsRoute(
     val prefsVm: AppPreferencesViewModel = hiltViewModel()
     val prefs by prefsVm.settings.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val cleared = stringResource(R.string.settings_cache_cleared)
     val resetDone = stringResource(R.string.settings_reset_done)
     val secured = androidx.compose.runtime.remember { dev.yourstream.core.network.SecureDns.securedHosts().sorted() }
+    val indexingVm: IndexingSettingsViewModel = hiltViewModel()
+    val indexing by indexingVm.policy.collectAsStateWithLifecycle()
     val host = SettingsHost(
         state, appVersion, prefs, { new -> prefsVm.update { new } }, onAccount, onSources, onLanguages, more,
         updateLine = dev.yourstream.ui.screens.update.updateSummary(updates.installedVersion, update),
@@ -138,13 +140,6 @@ fun SettingsRoute(
                 else -> updates.check()
             }
         },
-        onClearCache = {
-            runCatching {
-                val loader = coil3.SingletonImageLoader.get(context)
-                loader.memoryCache?.clear(); loader.diskCache?.clear()
-            }
-            android.widget.Toast.makeText(context, cleared, android.widget.Toast.LENGTH_SHORT).show()
-        },
         onSourceCode = {
             runCatching {
                 context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(SOURCE_URL)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -155,6 +150,8 @@ fun SettingsRoute(
             android.widget.Toast.makeText(context, resetDone, android.widget.Toast.LENGTH_SHORT).show()
         },
         securedHosts = secured,
+        indexing = indexing,
+        onIndexing = { indexingVm.set(it) },
     )
     if (page == null) SettingsScreen(host, onPage) else SettingsPageScreen(page, host, onBack)
 }
@@ -169,6 +166,12 @@ data class SettingsLinks(
     val sync: (() -> Unit)? = null,
     val addons: (() -> Unit)? = null,
     val tmdb: (() -> Unit)? = null,
+    /** The guided first run, opened again. */
+    val setupGuide: (() -> Unit)? = null,
+    /** Settings → Advanced → Storage. */
+    val storage: (() -> Unit)? = null,
+    /** Settings → Content → Files on this device. */
+    val localFiles: (() -> Unit)? = null,
 )
 
 /**
@@ -187,12 +190,21 @@ data class SettingsHost(
     /** "Version 0.4.0 · Up to date", "Update to 0.5.0"; null shows the plain version. */
     val updateLine: String? = null,
     val onUpdate: (() -> Unit)? = null,
-    val onClearCache: (() -> Unit)? = null,
     val onSourceCode: (() -> Unit)? = null,
     val onReset: (() -> Unit)? = null,
     /** Hosts resolved through DNS over HTTPS right now (Integrations → Secure DNS). */
     val securedHosts: List<String> = emptyList(),
+    /** When background indexing may run (Content & discovery → Indexing). */
+    val indexing: dev.yourstream.media.api.model.IndexingPolicy = dev.yourstream.media.api.model.IndexingPolicy(),
+    val onIndexing: (dev.yourstream.media.api.model.IndexingPolicy) -> Unit = {},
 )
+
+/** The indexing policy for Settings (it lives with the indexer: background workers read it). */
+@HiltViewModel
+class IndexingSettingsViewModel @Inject constructor(private val indexer: dev.yourstream.media.api.MediaIndexer) : ViewModel() {
+    val policy: StateFlow<dev.yourstream.media.api.model.IndexingPolicy> = indexer.policy
+    fun set(policy: dev.yourstream.media.api.model.IndexingPolicy) = viewModelScope.launch { runCatching { indexer.setPolicy(policy) } }
+}
 
 /**
  * Settings laid out like Nuvio's: a search field, the Telegram account as a profile card, then
@@ -325,6 +337,7 @@ private fun SettingsDialogs(dialog: SettingsDialog, host: SettingsHost, onClose:
             { onPrefs(prefs.copy(posterSize = it)) }, onClose)
         SettingsDialog.BUFFER -> Choose(stringResource(R.string.settings_buffer), AppSettings.BUFFER_OPTIONS.map { it to bufferLabel(it) }, prefs.streamBufferSeconds,
             { onPrefs(prefs.copy(streamBufferSeconds = it)) }, onClose)
+        SettingsDialog.TORRENT_CONSENT -> TorrentConsentDialog(onEnable = { onPrefs(prefs.copy(torrentStreaming = true)) }, onClose = onClose)
         SettingsDialog.RESET -> androidx.compose.material3.AlertDialog(
             onDismissRequest = onClose,
             title = { Text(stringResource(R.string.settings_reset_confirm_title)) },
@@ -421,4 +434,24 @@ internal fun SettingsGroup(title: String) {
         Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 2.dp).semantics { heading() })
     }
+}
+
+
+/**
+ * Asked before torrent streaming is turned on (Settings, or tapping a torrent result while it is
+ * off): what it does and that other people can see the device's IP address.
+ */
+@Composable
+fun TorrentConsentDialog(onEnable: () -> Unit, onClose: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(stringResource(R.string.torrent_consent_title)) },
+        text = { Text(stringResource(R.string.torrent_consent_text)) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onEnable(); onClose() }, modifier = Modifier.testTag("torrent-consent-enable")) {
+                Text(stringResource(R.string.torrent_consent_enable))
+            }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onClose, modifier = Modifier.testTag("torrent-consent-cancel")) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

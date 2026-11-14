@@ -144,7 +144,7 @@ class TelegramPlaybackController(
             scope = scope,
             clock = { System.nanoTime() / 1_000_000 },
             governor = a.streaming.governor,
-            onFocus = { media?.let { streamer.focus(it.fileId).size } ?: 0 },
+            onFocus = { media?.takeIf { !it.isLocal }?.let { streamer.focus(it.fileId).size } ?: 0 },
         )
     }
     private var trackSession: TrackSession? = null
@@ -261,12 +261,12 @@ class TelegramPlaybackController(
     fun play(media: PlayableMedia, startPositionMs: Long? = null, playWhenReady: Boolean = true) {
         check(!released) { "released" }
         val previous = this.media
-        if (previous != null && previous.fileId != media.fileId) releaseFile(previous)
+        if (previous != null && !previous.isLocal && previous.fileId != media.fileId) releaseFile(previous)
         this.media = media
         trackSession = trackSupport?.let { TrackSession(it.store, trackScopeOf(media), media.trackContext ?: FileContext(fileName = media.fileName)) }
         tracksKey = null; mappedTracks = null; _tracks.value = TrackState()
         this.adaptive?.let { a ->
-            a.prefetch?.onPlaying(media.fileId)
+            if (!media.isLocal) a.prefetch?.onPlaying(media.fileId)
             a.prefetch?.reset()
             a.next?.current = media
         }
@@ -535,7 +535,7 @@ class TelegramPlaybackController(
         val runtime = Runtime.getRuntime()
         val java = runtime.totalMemory() - runtime.freeMemory()
         val native = Debug.getNativeHeapAllocatedSize()
-        val stats = media?.let { streamer.stats(it.fileId) }
+        val stats = media?.takeIf { !it.isLocal }?.let { streamer.stats(it.fileId) }
         updateMetrics {
             it.copy(
                 peakJavaHeapBytes = maxOf(it.peakJavaHeapBytes, java),
@@ -553,7 +553,8 @@ class TelegramPlaybackController(
     /** Feeds the adaptive engine; its policy drives the load control (read live) and the download window. */
     private fun adaptiveSample() {
         val a = this.adaptive ?: return
-        val m = media ?: return
+        // A file on this device is read directly: there is no download window to steer.
+        val m = media?.takeIf { !it.isLocal } ?: return
         val now = ticker.nanos()
         val elapsedSec = if (lastSampleNanos == 0L) 0.0 else (now - lastSampleNanos) / 1e9
         val dropRate = if (elapsedSec > 0) (droppedFrames - droppedAtLastSample) / elapsedSec else 0.0
@@ -605,6 +606,7 @@ class TelegramPlaybackController(
     }
 
     private fun releaseFile(m: PlayableMedia) {
+        if (m.isLocal) return
         backgroundScope.launch { streamer.release(m.fileId, cancelDownload = true) }
     }
 

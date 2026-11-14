@@ -30,7 +30,8 @@ public object MediaFilenameParser {
     /** 3: random file names (hashes, UUIDs, Telegram ids) count as generic; their tokens never become titles. */
     /** 4: language tags ("Tel+Hin") and channel brands ("TR Movies") are not titles; the post above the file is. */
     /** 5: sizes and resolutions next to tags ("Tel + Hin 450MB") keep them tags. */
-    public const val VERSION: Int = 5
+    /** 6: "@Handle_LinkZ_Title_2023" (underscores) keeps the title; site brands ("Toonworld4all") and link phrases are not titles; "EP_01_05" is a range. */
+    public const val VERSION: Int = 6
 
     private val GENERIC_NAME = Regex(
         "^(video|vid|file|movie|document|doc|telegram|tg|img|mov|clip|media|untitled|new|downloaded|download|v|output|record(ing)?|screen\\s?recording)?" +
@@ -159,10 +160,19 @@ public object MediaFilenameParser {
         return a.copy(title = t.copy(value = kept.joinToString(" ")))
     }
 
+    /** Lines a channel adds around files that are never a title ("Link to this message", "Click here", "Join us"). */
+    private val LINK_PHRASE = Regex(
+        "^\\W*(link\\s+to\\s+this\\s+(message|post|file|video)|click\\s+here|download(\\s+(link|now|here))?|watch\\s+(online|now|here)" +
+            "|join(\\s+(us|now|our|here|channel))?|share(\\s+(this|with))?|subscribe|follow\\s+us|forwarded\\s+from|direct\\s+link|fast\\s+download)\\b.*$",
+        RegexOption.IGNORE_CASE,
+    )
+
     private fun captionLine(caption: String?): String? = caption
         ?.lineSequence()
         ?.map { it.trim() }
-        ?.firstOrNull { line -> line.count(Char::isLetter) >= 2 && !line.startsWith("#") && !line.startsWith("http") && !line.startsWith("@") }
+        ?.firstOrNull { line ->
+            line.count(Char::isLetter) >= 2 && !line.startsWith("#") && !line.startsWith("http") && !line.startsWith("@") && !LINK_PHRASE.matches(line)
+        }
 
     private fun chatTitle(chatTitle: String?): String? {
         if (chatTitle.isNullOrBlank()) return null

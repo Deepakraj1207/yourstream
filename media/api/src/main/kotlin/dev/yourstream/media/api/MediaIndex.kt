@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.media.api.model.ChatIndexStatus
 import dev.yourstream.media.api.model.IndexMode
+import dev.yourstream.media.api.model.IndexingPolicy
 import dev.yourstream.media.api.model.IndexedMedia
 import dev.yourstream.media.api.model.MediaQuery
 import dev.yourstream.media.api.model.MediaSummary
@@ -36,6 +37,25 @@ interface MediaIndexer {
     /** Queues an incremental run for every enabled chat. */
     suspend fun scheduleAll()
 
-    /** Cancels queued and running work for the chat; progress so far is kept. */
+    /**
+     * Stops the current run of the chat; progress so far is kept and the next sync (or
+     * [schedule]) continues from it.
+     */
     suspend fun cancel(chatId: Long)
+
+    /** Stops indexing the chat until [resume]: nothing is scanned, progress so far is kept. */
+    suspend fun pause(chatId: Long)
+
+    /** Lifts [pause] and continues from where the chat stopped (nothing is scanned twice). */
+    suspend fun resume(chatId: Long)
+
+    /** [pause] / [resume] for every enabled chat. */
+    suspend fun pauseAll()
+    suspend fun resumeAll()
+
+    /** When background indexing may run (Wi-Fi only, not on a low battery). */
+    val policy: kotlinx.coroutines.flow.StateFlow<IndexingPolicy>
+
+    /** Changes [policy]; queued work is rescheduled under the new conditions. */
+    suspend fun setPolicy(policy: IndexingPolicy)
 }

@@ -66,6 +66,16 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                             Text(listOfNotNull(c.year?.toString(), c.languages.joinToString(", ").ifEmpty { null }, if (c.percent > 0) "${c.percent}%" else null).joinToString(" · "),
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (c.percent in 1..99) ProgressLine(c.percent / 100f, Modifier.fillMaxWidth(), trackColor = MaterialTheme.colorScheme.surfaceVariant)
+                            // Why there is no Play button, and where the details come from.
+                            if (!c.available) {
+                                Text(stringResource(R.string.details_removed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.testTag("details-removed"))
+                            }
+                            when (c.matched) {
+                                false -> Text(stringResource(R.string.details_not_matched), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("details-not-matched"))
+                                else -> Unit
+                            }
                             // Wraps on narrow phones instead of pushing buttons off-screen.
                             androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 c.primary?.let { p ->
@@ -98,11 +108,35 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
                 }
                 if (c.versions.size > 1 || (c.versions.isNotEmpty() && c.seasons.isEmpty())) {
                     item { SectionHeader(stringResource(R.string.details_versions)) }
-                    items(c.versions, key = { "v${it.mediaId}" }) { v -> ListRow(v.name, supporting = v.detail, onClick = { onOpen(v.target) }) }
+                    items(c.versions, key = { "v${it.mediaId}" }) { v ->
+                        val onDevice = stringResource(R.string.details_on_device)
+                        val progress = state.downloading[v.mediaId]
+                        val supporting = when {
+                            progress != null -> "${v.detail} · " + stringResource(R.string.details_downloading, (progress * 100).toInt())
+                            v.onDevice && !v.isLocal -> "${v.detail} · $onDevice"
+                            else -> v.detail
+                        }
+                        ListRow(v.name, supporting = supporting, onClick = { onOpen(v.target) },
+                            trailing = if (v.isLocal) null else { { DownloadButton(v, progress, onAction) } },
+                            modifier = Modifier.testTag("version:${v.mediaId}"))
+                    }
                 }
             }
             // Remote users land on the main action.
             LaunchedEffect(c.itemId) { if (c.primary != null) runCatching { primaryFocus.requestFocus() } }
         }
+    }
+}
+
+/** Download a Telegram version for offline viewing, cancel it while it runs, or free its space. */
+@Composable
+private fun DownloadButton(v: VersionRow, progress: Float?, onAction: (DetailsAction) -> Unit) {
+    val (label, action, tag) = when {
+        progress != null -> Triple(R.string.details_download_cancel, DetailsAction.CancelDownload(v.mediaId), "download-cancel:${v.mediaId}")
+        v.onDevice -> Triple(R.string.details_download_remove, DetailsAction.RemoveDownload(v.mediaId), "download-remove:${v.mediaId}")
+        else -> Triple(R.string.details_download, DetailsAction.Download(v.mediaId), "download:${v.mediaId}")
+    }
+    androidx.compose.material3.TextButton(onClick = { onAction(action) }, modifier = Modifier.focusHighlight().testTag(tag)) {
+        androidx.compose.material3.Text(stringResource(label))
     }
 }

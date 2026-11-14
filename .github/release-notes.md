@@ -1,3 +1,27 @@
+## What's new in 0.11.1
+
+- **Titles fixed for names joined with underscores** ("@Channel_LinkZ_Movie_2023_…"): such files
+  were grouped under one wrong title ("Tel") or named after the post above them ("Link to this
+  message"). Site brands like "Toonworld4all" are no longer part of titles, and "S02_EP_01_05"
+  is read as episodes 1–5. Your library is re-read and regrouped once after the update.
+- **Navigation:** Home, Search, Library, Settings (Movies and Series open from Home and the
+  Library), and a new manga-style navigation bar.
+
+## What's new in 0.11
+
+- **Guided first run** and a simpler navigation.
+- **Files on this device**: add folders (no permission needed) or all videos; they join the library.
+- **Offline downloads** of Telegram videos, and **resume for add-on streams**.
+- **Background playback** with lock-screen and headset controls.
+- **Indexing controls**: pause, resume, stop; Wi-Fi only; waits on a low battery.
+- **Storage** page: see and clear each cache.
+- **Signing out removes the account's data** from the device.
+- Privacy: image proxies and DNS over HTTPS are explained and can be turned off; your TMDB key is
+  stored encrypted; updates are checked against the release's checksums.
+- **Torrents are off** after this update, even if they were on. Turn them on again in
+  Settings → Playback if you use them (peers see your IP address).
+- Reduce motion option; many fixes.
+
 ## Install
 
 1. Download the APK for your device below (Android 8.0 or newer):

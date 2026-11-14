@@ -119,10 +119,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: PlayerViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    // Leaving the screen visibly (home button, another app) pauses playback.
+    // Leaving the screen visibly (home button, another app, screen off) pauses playback, unless
+    // background playback is on (Settings → Playback): then the media notification takes over.
     val owner = LocalLifecycleOwner.current
+    val background by androidx.compose.runtime.rememberUpdatedState(dev.yourstream.ui.screens.settings.LocalAppSettings.current.backgroundPlayback)
     DisposableEffect(owner) {
-        val observer = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_STOP) vm.onAction(PlayerAction.Pause) }
+        val observer = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_STOP && !background) vm.onAction(PlayerAction.Pause) }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
@@ -343,7 +345,9 @@ fun PlayerScreen(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = if (controls) 88.dp else 24.dp)
                     .semantics { liveRegion = LiveRegionMode.Polite },
             ) {
-                Text(r, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("recovery"))
+                // The controller's wording is technical; the common case gets a plain sentence.
+                val text = if (r == "waiting for network") stringResource(R.string.player_waiting_network) else r
+                Text(text, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("recovery"))
             }
         }
 
@@ -453,7 +457,7 @@ private fun Controls(
             }
         }
 
-        state.resumedFromMs?.let { r -> ResumeChip(r, onAction, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
+        state.resumedFromMs?.let { r -> ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
 
         // Centre: large touch transport (phones and tablets).
         if (!tv) {
@@ -541,12 +545,12 @@ private fun BarIcon(icon: ImageVector, label: String, tag: String, onClick: () -
 }
 
 @Composable
-private fun ResumeChip(fromMs: Long, onAction: (PlayerAction) -> Unit, modifier: Modifier) {
-    LaunchedEffect(fromMs) { delay(10_000); onAction(PlayerAction.DismissResume) }
+internal fun ResumeChip(fromMs: Long, onStartOver: () -> Unit, onDismiss: () -> Unit, modifier: Modifier) {
+    LaunchedEffect(fromMs) { delay(10_000); onDismiss() }
     Surface(shape = MaterialTheme.shapes.medium, color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White, modifier = modifier.testTag("resume-chip")) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.player_resumed, timeLabel(fromMs)), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { onAction(PlayerAction.StartOver) }, modifier = Modifier.focusHighlight().testTag("start-over")) {
+            TextButton(onClick = onStartOver, modifier = Modifier.focusHighlight().testTag("start-over")) {
                 Text(stringResource(R.string.player_start_over))
             }
         }

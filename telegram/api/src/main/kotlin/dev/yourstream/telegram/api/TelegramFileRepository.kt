@@ -40,4 +40,8 @@ public interface TelegramFileRepository {
 
     /** Deletes the local copy (complete or partial) of a file. The remote file is untouched. */
     public suspend fun deleteLocalCopy(fileId: Int): AppResult<Unit>
+
+    /** Deletes the local copies of every file (Settings → Storage). The remote files are untouched. */
+    public suspend fun deleteAllLocalCopies(): AppResult<Unit> =
+        AppResult.Err(dev.yourstream.core.common.AppError.InvalidState("Not supported"))
 }

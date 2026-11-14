@@ -71,10 +71,38 @@ Running and background work:
   - A FLOOD_WAIT of up to 120 s is waited out. A longer one ends the run with `RETRY`, and WorkManager backs off.
   - Not authorised, or chat inaccessible: `FAILED`, with the error stored in `indexed_chat.last_error`.
   - There is a 200 ms pause between pages to stay clear of flood limits.
-- **Cancellation**:
-  - Cursors are saved per page, so cancelling loses at most the page in flight.
-  - User cancel → state `CANCELLED`. System stop (WorkManager constraints or timeout) → `PAUSED`, and WorkManager resumes it.
-  - A process killed mid-run leaves `RUNNING` behind; it is reset to `PAUSED` at the next start.
+- **Stopping**: cursors are saved per page, so any stop loses at most the page in flight, and the
+  next run continues from the cursors (nothing is scanned twice).
+
+### States and controls (since 0.11)
+
+| State | Meaning |
+|---|---|
+| `IDLE` | Never ran, or nothing pending |
+| `QUEUED` | Waiting: its turn, the network (or Wi-Fi), the battery, or the next part of a long scan (8-minute budget used) |
+| `CONNECTING` | A run started and waits for Telegram to be signed in and connected |
+| `SCANNING` | Reading messages: new ones, the older backlog, or re-checking known files |
+| `PROCESSING` | Reading titles from the posts above untitled files |
+| `COMPLETED` | Up to date |
+| `PAUSED` | Paused by the user (`indexed_chat.paused`, v13): nothing runs until resumed |
+| `FAILED` | Stopped on an error with no automatic retry left (`last_error` says why) |
+| `CANCELLED` | The user stopped this run; the next sync continues from where it stopped |
+| `RECOVERING` | Interrupted (network error, app killed): WorkManager runs it again from the cursors |
+
+- **Pause / Resume** (per chat, or all, in Library status): pause sets the flag and stops queued and
+  running work; `schedule`, `scheduleAll` (periodic sync, "Sync now") and the worker skip paused
+  chats. Resume clears the flag and queues an incremental run. Live updates still apply to paused
+  chats (they read nothing).
+- **Stop** (`cancel`): ends the current run (`CANCELLED`); the next sync picks the chat up again.
+- A system stop (constraints no longer met, policy change) ends in `QUEUED`; a time-budget stop
+  too, with its continuation queued. A network error ends in `RECOVERING` (with the reason); the
+  worker marks `FAILED` only when its retries run out.
+- At start, active states left by a killed process (and `RUNNING` from before v13) become
+  `RECOVERING`; `PAUSED` without the flag (the old meaning: time budget) becomes `QUEUED`.
+- **When indexing may run** (Settings → Content & discovery → Indexing; stored by `IndexScheduler`,
+  a device setting): *Index on Wi-Fi only* (`NetworkType.UNMETERED`, off by default) and *Wait while
+  the battery is low* (`requiresBatteryNotLow`, on by default). Changing them reschedules waiting
+  and running work under the new conditions. The periodic sync never runs on a low battery.
 
 ## Titles from the post above a file
 
@@ -123,13 +151,18 @@ A duplicate group is a star:
 - **Rows store compact lists** as comma-joined text; the parser output is a separate 1:1 table so it can be recomputed (`parser_version`).
 - **List queries read a narrow projection** (`MediaSummaryRow`); the full record is fetched only when one item is opened.
 
-## Manual test path (debug app)
+## Manual test path (real device)
 
-1. Log in (see [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)). In the **Telegram** tab, open a channel or group that has videos or files.
-2. Under **Media index**, tap **Start indexing**. The status line moves from QUEUED to RUNNING (phase, filter, pages, messages, +added) to COMPLETED.
-3. Open the **Index & search** tab. The chat is listed with its media count and "history complete".
-4. Type part of a title, e.g. `vikr`. Results update as you type. Filter by VIDEO, AUDIO or SUBTITLE, or tap a chat to limit the search to it.
-5. Tap a result to see the full record: Telegram ids, size, duration, dimensions, codec, download state, duplicate group and parsed fields.
-6. Post a new file in that chat from another device. With the app open, it appears in search at once (live update). Otherwise **Index new** finds it with one request per filter.
-7. Delete a message, then tap **Check deleted**. The record shows as DELETED, and only appears in search with the `deleted` toggle on.
-8. Start a large chat and tap **Cancel**: state CANCELLED. Tap **Index new**: it resumes from the saved cursor.
+1. Sign in, then **Settings → Content & discovery → Telegram sources**: choose a chat with videos.
+2. **Settings → Content & discovery → Library status**: the chat shows "Connecting to Telegram…",
+   then "N files found so far", then the time of the last sync.
+3. Tap **Pause** on a large chat while it scans: "Paused". Close and reopen the app, and wait for
+   the next periodic sync: it stays paused. Tap **Resume**: it continues, and the file count only
+   grows by files it had not seen.
+4. Tap **Stop** while it scans: "Stopped — continues at the next sync". **Sync now** continues it.
+5. Turn on **Index on Wi-Fi only**, switch to mobile data, tap **Sync now**: "Waiting for Wi-Fi".
+   Connect to Wi-Fi: it starts by itself.
+6. Airplane mode during a scan: "Interrupted — continuing soon"; it continues when back online.
+7. Force-stop the app during a scan, reopen: "Interrupted — continuing soon", then it continues.
+8. Post a new file in the chat from another device: with the app open it appears at once (live
+   update), even while the chat is paused.

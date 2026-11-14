@@ -296,7 +296,7 @@ interface LibraryDao {
     @Query(
         """SELECT m.id AS media_id, m.chat_id, m.message_id, m.file_name, m.size_bytes, m.duration_seconds, p.resolution,
                p.source AS quality, COALESCE(m.video_codec, p.video_codec) AS video_codec, p.languages, m.is_deleted,
-               (m.canonical_media_id IS NOT NULL) AS is_duplicate, l.episode_id, l.method, m.download_state
+               (m.canonical_media_id IS NOT NULL) AS is_duplicate, l.episode_id, l.method, m.download_state, m.locator
         FROM media_link l JOIN media m ON m.id = l.media_id LEFT JOIN media_parsed p ON p.media_id = m.id
         WHERE l.item_id = :itemId AND (:episodeId IS NULL OR l.episode_id = :episodeId)
           AND (:includeUnavailable OR (m.is_deleted = 0 AND l.method != 'EXCLUDED'))

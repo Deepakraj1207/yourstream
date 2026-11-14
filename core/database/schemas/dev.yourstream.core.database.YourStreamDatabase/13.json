@@ -1,0 +1,3090 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 13,
+    "identityHash": "b31f23358d9fcbde57bc9cd6942a1f14",
+    "entities": [
+      {
+        "tableName": "indexed_chat",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`chat_id` INTEGER NOT NULL, `title` TEXT NOT NULL, `category` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `state` TEXT NOT NULL, `last_error` TEXT, `last_indexed_at` INTEGER, `last_verified_at` INTEGER, `verify_cursor` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `paused` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`chat_id`))",
+        "fields": [
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "last_error",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastIndexedAt",
+            "columnName": "last_indexed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastVerifiedAt",
+            "columnName": "last_verified_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "verifyCursor",
+            "columnName": "verify_cursor",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paused",
+            "columnName": "paused",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "chat_id"
+          ]
+        }
+      },
+      {
+        "tableName": "scan_cursor",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`chat_id` INTEGER NOT NULL, `filter` TEXT NOT NULL, `newest_message_id` INTEGER NOT NULL, `backfill_from_message_id` INTEGER NOT NULL, `backfill_complete` INTEGER NOT NULL, `estimated_total` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`chat_id`, `filter`), FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filter",
+            "columnName": "filter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "newestMessageId",
+            "columnName": "newest_message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backfillFromMessageId",
+            "columnName": "backfill_from_message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backfillComplete",
+            "columnName": "backfill_complete",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estimatedTotal",
+            "columnName": "estimated_total",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "chat_id",
+            "filter"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chat_id` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `album_id` INTEGER NOT NULL, `message_date` INTEGER NOT NULL, `edit_date` INTEGER NOT NULL, `file_id` INTEGER NOT NULL, `file_unique_id` TEXT NOT NULL, `remote_file_id` TEXT NOT NULL, `file_name` TEXT NOT NULL, `mime_type` TEXT NOT NULL, `extension` TEXT, `size_bytes` INTEGER NOT NULL, `duration_seconds` INTEGER, `width` INTEGER, `height` INTEGER, `video_codec` TEXT, `audio_codecs` TEXT NOT NULL, `supports_streaming` INTEGER NOT NULL, `media_type` TEXT NOT NULL, `content_type` TEXT NOT NULL, `caption` TEXT NOT NULL, `audio_title` TEXT, `audio_performer` TEXT, `download_state` TEXT NOT NULL, `downloaded_bytes` INTEGER NOT NULL, `local_path` TEXT, `search_title` TEXT NOT NULL, `fingerprint` TEXT, `canonical_media_id` INTEGER, `duplicate_kind` TEXT, `is_deleted` INTEGER NOT NULL, `deleted_at` INTEGER, `indexed_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `last_seen_at` INTEGER NOT NULL, `context_caption` TEXT, FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "message_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "albumId",
+            "columnName": "album_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageDate",
+            "columnName": "message_date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "editDate",
+            "columnName": "edit_date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileId",
+            "columnName": "file_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileUniqueId",
+            "columnName": "file_unique_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteFileId",
+            "columnName": "remote_file_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileName",
+            "columnName": "file_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extension",
+            "columnName": "extension",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationSeconds",
+            "columnName": "duration_seconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "videoCodec",
+            "columnName": "video_codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioCodecs",
+            "columnName": "audio_codecs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supportsStreaming",
+            "columnName": "supports_streaming",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaType",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentType",
+            "columnName": "content_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioTitle",
+            "columnName": "audio_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioPerformer",
+            "columnName": "audio_performer",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "downloadState",
+            "columnName": "download_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedBytes",
+            "columnName": "downloaded_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localPath",
+            "columnName": "local_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "searchTitle",
+            "columnName": "search_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "canonicalMediaId",
+            "columnName": "canonical_media_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "duplicateKind",
+            "columnName": "duplicate_kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "is_deleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "indexedAt",
+            "columnName": "indexed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "last_seen_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contextCaption",
+            "columnName": "context_caption",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_chat_id_message_id",
+            "unique": true,
+            "columnNames": [
+              "chat_id",
+              "message_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_media_chat_id_message_id` ON `${TABLE_NAME}` (`chat_id`, `message_id`)"
+          },
+          {
+            "name": "index_media_chat_id_is_deleted",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "is_deleted"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_chat_id_is_deleted` ON `${TABLE_NAME}` (`chat_id`, `is_deleted`)"
+          },
+          {
+            "name": "index_media_chat_id_message_date",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "message_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_chat_id_message_date` ON `${TABLE_NAME}` (`chat_id`, `message_date`)"
+          },
+          {
+            "name": "index_media_message_date",
+            "unique": false,
+            "columnNames": [
+              "message_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_message_date` ON `${TABLE_NAME}` (`message_date`)"
+          },
+          {
+            "name": "index_media_file_unique_id",
+            "unique": false,
+            "columnNames": [
+              "file_unique_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_file_unique_id` ON `${TABLE_NAME}` (`file_unique_id`)"
+          },
+          {
+            "name": "index_media_fingerprint",
+            "unique": false,
+            "columnNames": [
+              "fingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_fingerprint` ON `${TABLE_NAME}` (`fingerprint`)"
+          },
+          {
+            "name": "index_media_canonical_media_id",
+            "unique": false,
+            "columnNames": [
+              "canonical_media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_canonical_media_id` ON `${TABLE_NAME}` (`canonical_media_id`)"
+          },
+          {
+            "name": "index_media_file_id",
+            "unique": false,
+            "columnNames": [
+              "file_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_file_id` ON `${TABLE_NAME}` (`file_id`)"
+          },
+          {
+            "name": "index_media_media_type",
+            "unique": false,
+            "columnNames": [
+              "media_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_media_type` ON `${TABLE_NAME}` (`media_type`)"
+          },
+          {
+            "name": "index_media_chat_id_album_id",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "album_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_chat_id_album_id` ON `${TABLE_NAME}` (`chat_id`, `album_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_parsed",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` INTEGER NOT NULL, `title` TEXT, `year` INTEGER, `season` INTEGER, `episode` INTEGER, `episode_end` INTEGER, `resolution` INTEGER, `source` TEXT, `video_codec` TEXT, `audio_codecs` TEXT NOT NULL, `hdr` TEXT, `languages` TEXT NOT NULL, `subtitle_languages` TEXT NOT NULL, `edition` TEXT, `release_group` TEXT, `part_number` INTEGER, `confidence` REAL NOT NULL, `parser_version` INTEGER NOT NULL, `normalized_title` TEXT, `alternative_title` TEXT, `season_end` INTEGER, `absolute_episode` INTEGER, `air_date` TEXT, `quality_tags` TEXT NOT NULL DEFAULT '', `streaming_service` TEXT, `bit_depth` INTEGER, `audio_channels` TEXT, `audio_bitrate_kbps` INTEGER, `dual_audio` INTEGER NOT NULL DEFAULT 0, `multi_audio` INTEGER NOT NULL DEFAULT 0, `dubbed` INTEGER NOT NULL DEFAULT 0, `subtitles_hardcoded` INTEGER, `flags` TEXT NOT NULL DEFAULT '', `kind` TEXT NOT NULL DEFAULT 'UNKNOWN', `field_confidence` TEXT NOT NULL DEFAULT '', `warnings` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`media_id`), FOREIGN KEY(`media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "season",
+            "columnName": "season",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episode",
+            "columnName": "episode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episodeEnd",
+            "columnName": "episode_end",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resolution",
+            "columnName": "resolution",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "quality",
+            "columnName": "source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "videoCodec",
+            "columnName": "video_codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioCodecs",
+            "columnName": "audio_codecs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hdr",
+            "columnName": "hdr",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "languages",
+            "columnName": "languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtitleLanguages",
+            "columnName": "subtitle_languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "edition",
+            "columnName": "edition",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "releaseGroup",
+            "columnName": "release_group",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "partNumber",
+            "columnName": "part_number",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parserVersion",
+            "columnName": "parser_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedTitle",
+            "columnName": "normalized_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "alternativeTitle",
+            "columnName": "alternative_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "seasonEnd",
+            "columnName": "season_end",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "absoluteEpisode",
+            "columnName": "absolute_episode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "airDate",
+            "columnName": "air_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qualityTags",
+            "columnName": "quality_tags",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "streamingService",
+            "columnName": "streaming_service",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bitDepth",
+            "columnName": "bit_depth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "audioChannels",
+            "columnName": "audio_channels",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "audioBitrateKbps",
+            "columnName": "audio_bitrate_kbps",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dualAudio",
+            "columnName": "dual_audio",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "multiAudio",
+            "columnName": "multi_audio",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "dubbed",
+            "columnName": "dubbed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "subtitlesHardcoded",
+            "columnName": "subtitles_hardcoded",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "flags",
+            "columnName": "flags",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNKNOWN'"
+          },
+          {
+            "fieldPath": "fieldConfidence",
+            "columnName": "field_confidence",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "warnings",
+            "columnName": "warnings",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_parsed_parser_version",
+            "unique": false,
+            "columnNames": [
+              "parser_version"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_parsed_parser_version` ON `${TABLE_NAME}` (`parser_version`)"
+          },
+          {
+            "name": "index_media_parsed_normalized_title",
+            "unique": false,
+            "columnNames": [
+              "normalized_title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_parsed_normalized_title` ON `${TABLE_NAME}` (`normalized_title`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`file_name` TEXT NOT NULL, `caption` TEXT NOT NULL, `search_title` TEXT NOT NULL, tokenize=unicode61, content=`media`)",
+        "fields": [
+          {
+            "fieldPath": "fileName",
+            "columnName": "file_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "caption",
+            "columnName": "caption",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchTitle",
+            "columnName": "search_title",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": []
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "unicode61",
+          "tokenizerArgs": [],
+          "contentTable": "media",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_BEFORE_UPDATE BEFORE UPDATE ON `media` BEGIN DELETE FROM `media_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_BEFORE_DELETE BEFORE DELETE ON `media` BEGIN DELETE FROM `media_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_AFTER_UPDATE AFTER UPDATE ON `media` BEGIN INSERT INTO `media_fts`(`docid`, `file_name`, `caption`, `search_title`) VALUES (NEW.`rowid`, NEW.`file_name`, NEW.`caption`, NEW.`search_title`); END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_media_fts_AFTER_INSERT AFTER INSERT ON `media` BEGIN INSERT INTO `media_fts`(`docid`, `file_name`, `caption`, `search_title`) VALUES (NEW.`rowid`, NEW.`file_name`, NEW.`caption`, NEW.`search_title`); END"
+        ]
+      },
+      {
+        "tableName": "index_run",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chat_id` INTEGER NOT NULL, `mode` TEXT NOT NULL, `started_at` INTEGER NOT NULL, `finished_at` INTEGER, `outcome` TEXT, `pages` INTEGER NOT NULL, `messages_seen` INTEGER NOT NULL, `media_added` INTEGER NOT NULL, `media_updated` INTEGER NOT NULL, `media_deleted` INTEGER NOT NULL, `error` TEXT, FOREIGN KEY(`chat_id`) REFERENCES `indexed_chat`(`chat_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chatId",
+            "columnName": "chat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "started_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finished_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pages",
+            "columnName": "pages",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messagesSeen",
+            "columnName": "messages_seen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaAdded",
+            "columnName": "media_added",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaUpdated",
+            "columnName": "media_updated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaDeleted",
+            "columnName": "media_deleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "error",
+            "columnName": "error",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_index_run_chat_id_started_at",
+            "unique": false,
+            "columnNames": [
+              "chat_id",
+              "started_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_index_run_chat_id_started_at` ON `${TABLE_NAME}` (`chat_id`, `started_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "indexed_chat",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chat_id"
+            ],
+            "referencedColumns": [
+              "chat_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "library_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `match_key` TEXT NOT NULL, `title` TEXT NOT NULL, `sort_title` TEXT NOT NULL, `normalized_title` TEXT NOT NULL, `year` INTEGER, `search_text` TEXT NOT NULL, `title_confidence` REAL NOT NULL, `locked` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `available_count` INTEGER NOT NULL, `latest_added_at` INTEGER, `max_resolution` INTEGER, `total_size` INTEGER NOT NULL, `season_count` INTEGER NOT NULL, `episode_count` INTEGER NOT NULL, `watched_count` INTEGER NOT NULL, `last_watched_at` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "matchKey",
+            "columnName": "match_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortTitle",
+            "columnName": "sort_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedTitle",
+            "columnName": "normalized_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "searchText",
+            "columnName": "search_text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "titleConfidence",
+            "columnName": "title_confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locked",
+            "columnName": "locked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hidden",
+            "columnName": "hidden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "availableCount",
+            "columnName": "available_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestAddedAt",
+            "columnName": "latest_added_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "maxResolution",
+            "columnName": "max_resolution",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "totalSize",
+            "columnName": "total_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasonCount",
+            "columnName": "season_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeCount",
+            "columnName": "episode_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "watchedCount",
+            "columnName": "watched_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastWatchedAt",
+            "columnName": "last_watched_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_library_item_match_key",
+            "unique": true,
+            "columnNames": [
+              "match_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_library_item_match_key` ON `${TABLE_NAME}` (`match_key`)"
+          },
+          {
+            "name": "index_library_item_kind_hidden_sort_title",
+            "unique": false,
+            "columnNames": [
+              "kind",
+              "hidden",
+              "sort_title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_kind_hidden_sort_title` ON `${TABLE_NAME}` (`kind`, `hidden`, `sort_title`)"
+          },
+          {
+            "name": "index_library_item_sort_title_id",
+            "unique": false,
+            "columnNames": [
+              "sort_title",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_sort_title_id` ON `${TABLE_NAME}` (`sort_title`, `id`)"
+          },
+          {
+            "name": "index_library_item_kind_latest_added_at",
+            "unique": false,
+            "columnNames": [
+              "kind",
+              "latest_added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_kind_latest_added_at` ON `${TABLE_NAME}` (`kind`, `latest_added_at`)"
+          },
+          {
+            "name": "index_library_item_latest_added_at",
+            "unique": false,
+            "columnNames": [
+              "latest_added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_latest_added_at` ON `${TABLE_NAME}` (`latest_added_at`)"
+          },
+          {
+            "name": "index_library_item_kind_year",
+            "unique": false,
+            "columnNames": [
+              "kind",
+              "year"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_kind_year` ON `${TABLE_NAME}` (`kind`, `year`)"
+          },
+          {
+            "name": "index_library_item_last_watched_at",
+            "unique": false,
+            "columnNames": [
+              "last_watched_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_last_watched_at` ON `${TABLE_NAME}` (`last_watched_at`)"
+          },
+          {
+            "name": "index_library_item_normalized_title",
+            "unique": false,
+            "columnNames": [
+              "normalized_title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_normalized_title` ON `${TABLE_NAME}` (`normalized_title`)"
+          }
+        ]
+      },
+      {
+        "tableName": "library_item_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`title` TEXT NOT NULL, `search_text` TEXT NOT NULL, tokenize=unicode61, content=`library_item`)",
+        "fields": [
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchText",
+            "columnName": "search_text",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": []
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "unicode61",
+          "tokenizerArgs": [],
+          "contentTable": "library_item",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_library_item_fts_BEFORE_UPDATE BEFORE UPDATE ON `library_item` BEGIN DELETE FROM `library_item_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_library_item_fts_BEFORE_DELETE BEFORE DELETE ON `library_item` BEGIN DELETE FROM `library_item_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_library_item_fts_AFTER_UPDATE AFTER UPDATE ON `library_item` BEGIN INSERT INTO `library_item_fts`(`docid`, `title`, `search_text`) VALUES (NEW.`rowid`, NEW.`title`, NEW.`search_text`); END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_library_item_fts_AFTER_INSERT AFTER INSERT ON `library_item` BEGIN INSERT INTO `library_item_fts`(`docid`, `title`, `search_text`) VALUES (NEW.`rowid`, NEW.`title`, NEW.`search_text`); END"
+        ]
+      },
+      {
+        "tableName": "library_alias",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`match_key` TEXT NOT NULL, `item_id` INTEGER NOT NULL, PRIMARY KEY(`match_key`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "matchKey",
+            "columnName": "match_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "match_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_library_alias_item_id",
+            "unique": false,
+            "columnNames": [
+              "item_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_alias_item_id` ON `${TABLE_NAME}` (`item_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "library_item_language",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `language` TEXT NOT NULL, PRIMARY KEY(`item_id`, `language`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id",
+            "language"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_library_item_language_language_item_id",
+            "unique": false,
+            "columnNames": [
+              "language",
+              "item_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_library_item_language_language_item_id` ON `${TABLE_NAME}` (`language`, `item_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "season",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `series_id` INTEGER NOT NULL, `number` INTEGER NOT NULL, `title` TEXT, `episode_count` INTEGER NOT NULL, FOREIGN KEY(`series_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "series_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "episodeCount",
+            "columnName": "episode_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_season_series_id_number",
+            "unique": true,
+            "columnNames": [
+              "series_id",
+              "number"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_season_series_id_number` ON `${TABLE_NAME}` (`series_id`, `number`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "series_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "episode",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `series_id` INTEGER NOT NULL, `season_id` INTEGER NOT NULL, `season_number` INTEGER NOT NULL, `number` INTEGER NOT NULL, `number_end` INTEGER, `absolute_number` INTEGER, `title` TEXT, `air_date` TEXT, `available_count` INTEGER NOT NULL, `latest_added_at` INTEGER, FOREIGN KEY(`series_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`season_id`) REFERENCES `season`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "series_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasonId",
+            "columnName": "season_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasonNumber",
+            "columnName": "season_number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "numberEnd",
+            "columnName": "number_end",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "absoluteNumber",
+            "columnName": "absolute_number",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "airDate",
+            "columnName": "air_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "availableCount",
+            "columnName": "available_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestAddedAt",
+            "columnName": "latest_added_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_episode_season_id_number",
+            "unique": true,
+            "columnNames": [
+              "season_id",
+              "number"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_episode_season_id_number` ON `${TABLE_NAME}` (`season_id`, `number`)"
+          },
+          {
+            "name": "index_episode_series_id_season_number_number",
+            "unique": false,
+            "columnNames": [
+              "series_id",
+              "season_number",
+              "number"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episode_series_id_season_number_number` ON `${TABLE_NAME}` (`series_id`, `season_number`, `number`)"
+          },
+          {
+            "name": "index_episode_series_id_latest_added_at",
+            "unique": false,
+            "columnNames": [
+              "series_id",
+              "latest_added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episode_series_id_latest_added_at` ON `${TABLE_NAME}` (`series_id`, `latest_added_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "series_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "season",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "season_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_link",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` INTEGER NOT NULL, `item_id` INTEGER NOT NULL, `episode_id` INTEGER, `method` TEXT NOT NULL, `signature` TEXT NOT NULL, `linked_at` INTEGER NOT NULL, PRIMARY KEY(`media_id`), FOREIGN KEY(`media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`episode_id`) REFERENCES `episode`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeId",
+            "columnName": "episode_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "method",
+            "columnName": "method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signature",
+            "columnName": "signature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "linkedAt",
+            "columnName": "linked_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_media_link_item_id",
+            "unique": false,
+            "columnNames": [
+              "item_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_link_item_id` ON `${TABLE_NAME}` (`item_id`)"
+          },
+          {
+            "name": "index_media_link_episode_id",
+            "unique": false,
+            "columnNames": [
+              "episode_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_media_link_episode_id` ON `${TABLE_NAME}` (`episode_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "episode",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "episode_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "library_pending",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`media_id` INTEGER NOT NULL, PRIMARY KEY(`media_id`))",
+        "fields": [
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "media_id"
+          ]
+        }
+      },
+      {
+        "tableName": "library_dirty_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, PRIMARY KEY(`item_id`))",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        }
+      },
+      {
+        "tableName": "favorite",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_favorite_added_at",
+            "unique": false,
+            "columnNames": [
+              "added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_favorite_added_at` ON `${TABLE_NAME}` (`added_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "watch_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `episode_key` INTEGER NOT NULL, `position_ms` INTEGER NOT NULL, `duration_ms` INTEGER NOT NULL, `completed` INTEGER NOT NULL, `completed_at` INTEGER, `play_count` INTEGER NOT NULL, `last_watched_at` INTEGER NOT NULL, `last_media_id` INTEGER, PRIMARY KEY(`item_id`, `episode_key`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeKey",
+            "columnName": "episode_key",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionMs",
+            "columnName": "position_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "playCount",
+            "columnName": "play_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastWatchedAt",
+            "columnName": "last_watched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastMediaId",
+            "columnName": "last_media_id",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id",
+            "episode_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_watch_state_completed_last_watched_at",
+            "unique": false,
+            "columnNames": [
+              "completed",
+              "last_watched_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_watch_state_completed_last_watched_at` ON `${TABLE_NAME}` (`completed`, `last_watched_at`)"
+          },
+          {
+            "name": "index_watch_state_last_watched_at",
+            "unique": false,
+            "columnNames": [
+              "last_watched_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_watch_state_last_watched_at` ON `${TABLE_NAME}` (`last_watched_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "watch_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `item_id` INTEGER NOT NULL, `episode_key` INTEGER NOT NULL, `media_id` INTEGER, `started_at` INTEGER NOT NULL, `watched_at` INTEGER NOT NULL, `position_ms` INTEGER NOT NULL, `duration_ms` INTEGER NOT NULL, `completed` INTEGER NOT NULL, FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeKey",
+            "columnName": "episode_key",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "started_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "watchedAt",
+            "columnName": "watched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionMs",
+            "columnName": "position_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_watch_history_watched_at",
+            "unique": false,
+            "columnNames": [
+              "watched_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_watch_history_watched_at` ON `${TABLE_NAME}` (`watched_at`)"
+          },
+          {
+            "name": "index_watch_history_item_id_episode_key_watched_at",
+            "unique": false,
+            "columnNames": [
+              "item_id",
+              "episode_key",
+              "watched_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_watch_history_item_id_episode_key_watched_at` ON `${TABLE_NAME}` (`item_id`, `episode_key`, `watched_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "track_preference",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `audio_language` TEXT, `subtitle_language` TEXT, `subtitles_enabled` INTEGER NOT NULL, `subtitle_offset_ms` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `audio_signature` TEXT, `subtitle_signature` TEXT, `scope` TEXT, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioLanguage",
+            "columnName": "audio_language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subtitleLanguage",
+            "columnName": "subtitle_language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subtitlesEnabled",
+            "columnName": "subtitles_enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtitleOffsetMs",
+            "columnName": "subtitle_offset_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioSignature",
+            "columnName": "audio_signature",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subtitleSignature",
+            "columnName": "subtitle_signature",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "scope",
+            "columnName": "scope",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "subtitle_track",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `item_id` INTEGER, `episode_id` INTEGER, `media_id` INTEGER, `for_media_id` INTEGER, `track_index` INTEGER, `source` TEXT NOT NULL, `language` TEXT, `label` TEXT, `format` TEXT, `forced` INTEGER NOT NULL, `sdh` INTEGER NOT NULL, `local_path` TEXT, `added_at` INTEGER NOT NULL, FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`episode_id`) REFERENCES `episode`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`for_media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episodeId",
+            "columnName": "episode_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "forMediaId",
+            "columnName": "for_media_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "trackIndex",
+            "columnName": "track_index",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "format",
+            "columnName": "format",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "forced",
+            "columnName": "forced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sdh",
+            "columnName": "sdh",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localPath",
+            "columnName": "local_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_subtitle_track_item_id_episode_id",
+            "unique": false,
+            "columnNames": [
+              "item_id",
+              "episode_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_subtitle_track_item_id_episode_id` ON `${TABLE_NAME}` (`item_id`, `episode_id`)"
+          },
+          {
+            "name": "index_subtitle_track_episode_id",
+            "unique": false,
+            "columnNames": [
+              "episode_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_subtitle_track_episode_id` ON `${TABLE_NAME}` (`episode_id`)"
+          },
+          {
+            "name": "index_subtitle_track_media_id",
+            "unique": true,
+            "columnNames": [
+              "media_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_subtitle_track_media_id` ON `${TABLE_NAME}` (`media_id`)"
+          },
+          {
+            "name": "index_subtitle_track_for_media_id_track_index",
+            "unique": false,
+            "columnNames": [
+              "for_media_id",
+              "track_index"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_subtitle_track_for_media_id_track_index` ON `${TABLE_NAME}` (`for_media_id`, `track_index`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "episode",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "episode_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "for_media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "audio_track",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `media_id` INTEGER NOT NULL, `track_index` INTEGER NOT NULL, `source` TEXT NOT NULL, `language` TEXT, `codec` TEXT, `channels` TEXT, `label` TEXT, `is_default` INTEGER NOT NULL, FOREIGN KEY(`media_id`) REFERENCES `media`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackIndex",
+            "columnName": "track_index",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "codec",
+            "columnName": "codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "channels",
+            "columnName": "channels",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isDefault",
+            "columnName": "is_default",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_audio_track_media_id_source_track_index",
+            "unique": true,
+            "columnNames": [
+              "media_id",
+              "source",
+              "track_index"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_audio_track_media_id_source_track_index` ON `${TABLE_NAME}` (`media_id`, `source`, `track_index`)"
+          },
+          {
+            "name": "index_audio_track_language",
+            "unique": false,
+            "columnNames": [
+              "language"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audio_track_language` ON `${TABLE_NAME}` (`language`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "media_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`provider` TEXT NOT NULL, `cache_key` TEXT NOT NULL, `payload` TEXT, `fetched_at` INTEGER NOT NULL, `expires_at` INTEGER NOT NULL, PRIMARY KEY(`provider`, `cache_key`))",
+        "fields": [
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cacheKey",
+            "columnName": "cache_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expires_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "provider",
+            "cache_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_metadata_cache_expires_at",
+            "unique": false,
+            "columnNames": [
+              "expires_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_metadata_cache_expires_at` ON `${TABLE_NAME}` (`expires_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_match",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `status` TEXT NOT NULL, `provider` TEXT, `external_id` TEXT, `external_type` TEXT, `imdb_id` TEXT, `confidence` REAL NOT NULL, `candidates` TEXT NOT NULL, `input_signature` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `matched_at` INTEGER, `updated_at` INTEGER NOT NULL, `next_attempt_at` INTEGER, `last_error` TEXT, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "externalId",
+            "columnName": "external_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "externalType",
+            "columnName": "external_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imdbId",
+            "columnName": "imdb_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidates",
+            "columnName": "candidates",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inputSignature",
+            "columnName": "input_signature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "matchedAt",
+            "columnName": "matched_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptAt",
+            "columnName": "next_attempt_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "last_error",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_metadata_match_status_next_attempt_at",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "next_attempt_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_metadata_match_status_next_attempt_at` ON `${TABLE_NAME}` (`status`, `next_attempt_at`)"
+          },
+          {
+            "name": "index_metadata_match_provider_external_id",
+            "unique": false,
+            "columnNames": [
+              "provider",
+              "external_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_metadata_match_provider_external_id` ON `${TABLE_NAME}` (`provider`, `external_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "item_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `provider` TEXT NOT NULL, `external_id` TEXT NOT NULL, `imdb_id` TEXT, `title` TEXT NOT NULL, `original_title` TEXT, `overview` TEXT, `poster_url` TEXT, `backdrop_url` TEXT, `genres` TEXT NOT NULL, `release_date` TEXT, `year` INTEGER, `original_language` TEXT, `runtime_minutes` INTEGER, `rating` REAL, `cast` TEXT NOT NULL, `directors` TEXT NOT NULL, `series_status` TEXT, `fetched_at` INTEGER NOT NULL, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalId",
+            "columnName": "external_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imdbId",
+            "columnName": "imdb_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalTitle",
+            "columnName": "original_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "overview",
+            "columnName": "overview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "posterUrl",
+            "columnName": "poster_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "backdropUrl",
+            "columnName": "backdrop_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "genres",
+            "columnName": "genres",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "releaseDate",
+            "columnName": "release_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "originalLanguage",
+            "columnName": "original_language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "runtimeMinutes",
+            "columnName": "runtime_minutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "cast",
+            "columnName": "cast",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "directors",
+            "columnName": "directors",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seriesStatus",
+            "columnName": "series_status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_item_metadata_imdb_id",
+            "unique": false,
+            "columnNames": [
+              "imdb_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_item_metadata_imdb_id` ON `${TABLE_NAME}` (`imdb_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "season_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`season_id` INTEGER NOT NULL, `name` TEXT, `overview` TEXT, `poster_url` TEXT, `air_date` TEXT, `fetched_at` INTEGER NOT NULL, PRIMARY KEY(`season_id`), FOREIGN KEY(`season_id`) REFERENCES `season`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "seasonId",
+            "columnName": "season_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "overview",
+            "columnName": "overview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "posterUrl",
+            "columnName": "poster_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "airDate",
+            "columnName": "air_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "season_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "season",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "season_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "episode_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`episode_id` INTEGER NOT NULL, `title` TEXT, `overview` TEXT, `still_url` TEXT, `air_date` TEXT, `runtime_minutes` INTEGER, `rating` REAL, `fetched_at` INTEGER NOT NULL, PRIMARY KEY(`episode_id`), FOREIGN KEY(`episode_id`) REFERENCES `episode`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "episodeId",
+            "columnName": "episode_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "overview",
+            "columnName": "overview",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stillUrl",
+            "columnName": "still_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "airDate",
+            "columnName": "air_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "runtimeMinutes",
+            "columnName": "runtime_minutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "episode_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "episode",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "episode_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "catalog_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`provider` TEXT NOT NULL, `cache_key` TEXT NOT NULL, `payload` TEXT, `fetched_at` INTEGER NOT NULL, `expires_at` INTEGER NOT NULL, PRIMARY KEY(`provider`, `cache_key`))",
+        "fields": [
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cacheKey",
+            "columnName": "cache_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expires_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "provider",
+            "cache_key"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_catalog_cache_expires_at",
+            "unique": false,
+            "columnNames": [
+              "expires_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_cache_expires_at` ON `${TABLE_NAME}` (`expires_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "language_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `audio_languages` TEXT NOT NULL, `subtitle_languages` TEXT NOT NULL, `fallback_language` TEXT, `subtitle_mode` TEXT NOT NULL, `avoid_commentary` INTEGER NOT NULL, `prefer_sdh` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioLanguages",
+            "columnName": "audio_languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtitleLanguages",
+            "columnName": "subtitle_languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fallbackLanguage",
+            "columnName": "fallback_language",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subtitleMode",
+            "columnName": "subtitle_mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avoidCommentary",
+            "columnName": "avoid_commentary",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "preferSdh",
+            "columnName": "prefer_sdh",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "search_doc",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `sort_title` TEXT NOT NULL, `year` INTEGER, `languages` TEXT NOT NULL, `genres` TEXT NOT NULL, `seasons` TEXT NOT NULL, `max_resolution` INTEGER, `qualities` TEXT NOT NULL, `chat_ids` TEXT NOT NULL, `providers` TEXT NOT NULL, `rating` REAL, `added_at` INTEGER NOT NULL, `latest_added_at` INTEGER, `available_count` INTEGER NOT NULL, `total_size` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, `text_title` TEXT NOT NULL, `text_alt` TEXT NOT NULL, `text_files` TEXT NOT NULL, `text_chats` TEXT NOT NULL, `text_extra` TEXT NOT NULL, `indexed_at` INTEGER NOT NULL, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortTitle",
+            "columnName": "sort_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "languages",
+            "columnName": "languages",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "genres",
+            "columnName": "genres",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seasons",
+            "columnName": "seasons",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxResolution",
+            "columnName": "max_resolution",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "qualities",
+            "columnName": "qualities",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chatIds",
+            "columnName": "chat_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providers",
+            "columnName": "providers",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestAddedAt",
+            "columnName": "latest_added_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "availableCount",
+            "columnName": "available_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalSize",
+            "columnName": "total_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hidden",
+            "columnName": "hidden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textTitle",
+            "columnName": "text_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textAlt",
+            "columnName": "text_alt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textFiles",
+            "columnName": "text_files",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textChats",
+            "columnName": "text_chats",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textExtra",
+            "columnName": "text_extra",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "indexedAt",
+            "columnName": "indexed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_search_doc_kind",
+            "unique": false,
+            "columnNames": [
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_doc_kind` ON `${TABLE_NAME}` (`kind`)"
+          },
+          {
+            "name": "index_search_doc_year",
+            "unique": false,
+            "columnNames": [
+              "year"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_doc_year` ON `${TABLE_NAME}` (`year`)"
+          },
+          {
+            "name": "index_search_doc_latest_added_at",
+            "unique": false,
+            "columnNames": [
+              "latest_added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_doc_latest_added_at` ON `${TABLE_NAME}` (`latest_added_at`)"
+          },
+          {
+            "name": "index_search_doc_sort_title",
+            "unique": false,
+            "columnNames": [
+              "sort_title"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_doc_sort_title` ON `${TABLE_NAME}` (`sort_title`)"
+          },
+          {
+            "name": "index_search_doc_rating",
+            "unique": false,
+            "columnNames": [
+              "rating"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_search_doc_rating` ON `${TABLE_NAME}` (`rating`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "search_fts",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`text_title` TEXT NOT NULL, `text_alt` TEXT NOT NULL, `text_files` TEXT NOT NULL, `text_chats` TEXT NOT NULL, `text_extra` TEXT NOT NULL, tokenize=unicode61, content=`search_doc`)",
+        "fields": [
+          {
+            "fieldPath": "textTitle",
+            "columnName": "text_title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textAlt",
+            "columnName": "text_alt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textFiles",
+            "columnName": "text_files",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textChats",
+            "columnName": "text_chats",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textExtra",
+            "columnName": "text_extra",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": []
+        },
+        "ftsVersion": "FTS4",
+        "ftsOptions": {
+          "tokenizer": "unicode61",
+          "tokenizerArgs": [],
+          "contentTable": "search_doc",
+          "languageIdColumnName": "",
+          "matchInfo": "FTS4",
+          "notIndexedColumns": [],
+          "prefixSizes": [],
+          "preferredOrder": "ASC"
+        },
+        "contentSyncTriggers": [
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_search_fts_BEFORE_UPDATE BEFORE UPDATE ON `search_doc` BEGIN DELETE FROM `search_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_search_fts_BEFORE_DELETE BEFORE DELETE ON `search_doc` BEGIN DELETE FROM `search_fts` WHERE `docid`=OLD.`rowid`; END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_search_fts_AFTER_UPDATE AFTER UPDATE ON `search_doc` BEGIN INSERT INTO `search_fts`(`docid`, `text_title`, `text_alt`, `text_files`, `text_chats`, `text_extra`) VALUES (NEW.`rowid`, NEW.`text_title`, NEW.`text_alt`, NEW.`text_files`, NEW.`text_chats`, NEW.`text_extra`); END",
+          "CREATE TRIGGER IF NOT EXISTS room_fts_content_sync_search_fts_AFTER_INSERT AFTER INSERT ON `search_doc` BEGIN INSERT INTO `search_fts`(`docid`, `text_title`, `text_alt`, `text_files`, `text_chats`, `text_extra`) VALUES (NEW.`rowid`, NEW.`text_title`, NEW.`text_alt`, NEW.`text_files`, NEW.`text_chats`, NEW.`text_extra`); END"
+        ]
+      },
+      {
+        "tableName": "search_dirty",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, PRIMARY KEY(`item_id`))",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        }
+      },
+      {
+        "tableName": "watch_dismissal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `dismissed_at` INTEGER NOT NULL, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dismissedAt",
+            "columnName": "dismissed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "user_library",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`item_id` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, PRIMARY KEY(`item_id`), FOREIGN KEY(`item_id`) REFERENCES `library_item`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "itemId",
+            "columnName": "item_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "item_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_user_library_added_at",
+            "unique": false,
+            "columnNames": [
+              "added_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_library_added_at` ON `${TABLE_NAME}` (`added_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "library_item",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "item_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b31f23358d9fcbde57bc9cd6942a1f14')"
+    ]
+  }
+}

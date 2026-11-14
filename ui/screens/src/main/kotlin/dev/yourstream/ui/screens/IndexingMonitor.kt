@@ -36,8 +36,9 @@ data class IndexingStatus(
         /** Pure mapping from the index (tested). */
         fun of(chats: List<ChatIndexStatus>): IndexingStatus {
             val enabled = chats.filter { it.enabled }
-            val running = enabled.filter { it.progress != null || it.state == IndexState.RUNNING }
-            val queued = enabled.count { it.progress == null && (it.state == IndexState.QUEUED || it.state == IndexState.PAUSED) }
+            val active = enabled.filter { !it.paused }
+            val running = active.filter { it.progress != null || it.state.isActive }
+            val queued = active.count { it.progress == null && (it.state == IndexState.QUEUED || it.state == IndexState.RECOVERING) }
             return IndexingStatus(
                 chats = running.size, queued = queued,
                 found = running.sumOf { c -> c.progress?.let { it.mediaAdded + it.mediaUpdated } ?: 0 },

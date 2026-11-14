@@ -54,7 +54,7 @@ enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int,
 }
 
 /** Choices that open a dialog. */
-enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, POSTER, BUFFER, RESET }
+enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, POSTER, BUFFER, RESET, TORRENT_CONSENT }
 
 /** What a setting's row works with: the settings bundle, and the dialogs it may open. */
 class SettingsRows internal constructor(val host: SettingsHost, internal val open: (SettingsDialog) -> Unit) {
@@ -129,6 +129,11 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(dockLabels = it))
         }
     })
+    add(entry("reduce-motion", ap, R.string.settings_group_accessibility, R.string.settings_reduce_motion, "animation motion accessibility still fade") {
+        SettingToggle(stringResource(R.string.settings_reduce_motion), stringResource(R.string.settings_reduce_motion_detail), AppIcons.Brightness, prefs.reduceMotion, "pref-reduce-motion") {
+            change(prefs.copy(reduceMotion = it))
+        }
+    })
 
     // ---- Layout
     val la = SettingsPage.LAYOUT
@@ -157,6 +162,19 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.settings_sources), pluralStringResource(R.plurals.settings_sources_count, state.enabledSources, state.enabledSources),
             Icons.AutoMirrored.Filled.List, tag = "settings-sources", onClick = host.onSources)
     })
+    add(entry("local-files", co, R.string.settings_group_sources, R.string.settings_local_files, "local device phone folder storage sd card mediastore offline files",
+        shown = { it.links.localFiles != null }) {
+        SettingRow(stringResource(R.string.settings_local_files), stringResource(R.string.settings_local_files_detail), Icons.AutoMirrored.Filled.List,
+            tag = "settings-local-files", onClick = host.links.localFiles)
+    })
+    add(entry("index-wifi", co, R.string.settings_group_indexing, R.string.settings_index_wifi, "wifi mobile data metered indexing") {
+        SettingToggle(stringResource(R.string.settings_index_wifi), stringResource(R.string.settings_index_wifi_detail), AppIcons.Update,
+            host.indexing.wifiOnly, "pref-index-wifi") { host.onIndexing(host.indexing.copy(wifiOnly = it)) }
+    })
+    add(entry("index-battery", co, R.string.settings_group_indexing, R.string.settings_index_battery, "battery power low indexing") {
+        SettingToggle(stringResource(R.string.settings_index_battery), stringResource(R.string.settings_index_battery_detail), AppIcons.Brightness,
+            host.indexing.batteryAware, "pref-index-battery") { host.onIndexing(host.indexing.copy(batteryAware = it)) }
+    })
     add(entry("library-status", co, R.string.settings_group_library, R.string.settings_status, "indexing sync matching progress", shown = { it.links.libraryStatus != null }) {
         SettingRow(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), AppIcons.Episodes, onClick = host.links.libraryStatus)
     })
@@ -179,6 +197,10 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingToggle(stringResource(R.string.settings_pip), stringResource(R.string.settings_pip_detail), AppIcons.Episodes, prefs.pictureInPicture, "pref-pip") {
             change(prefs.copy(pictureInPicture = it))
         }
+    })
+    add(entry("background", pl, R.string.settings_group_player, R.string.settings_background, "background audio screen off lock screen notification") {
+        SettingToggle(stringResource(R.string.settings_background), stringResource(R.string.settings_background_detail), AppIcons.Volume,
+            prefs.backgroundPlayback, "pref-background") { change(prefs.copy(backgroundPlayback = it)) }
     })
     add(entry("seek", pl, R.string.settings_group_controls, R.string.settings_seek, "skip forward back double tap") {
         SettingRow(stringResource(R.string.settings_seek), stringResource(R.string.settings_seconds, prefs.seekSeconds), AppIcons.FastForward, tag = "pref-seek") { open(SettingsDialog.SEEK) }
@@ -214,7 +236,8 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     })
     add(entry("torrents", pl, R.string.settings_group_streaming, R.string.settings_torrents, "p2p bittorrent magnet peers") {
         SettingToggle(stringResource(R.string.settings_torrents), stringResource(R.string.settings_torrents_detail), AppIcons.Update, prefs.torrentStreaming, "pref-torrents") {
-            change(prefs.copy(torrentStreaming = it))
+            // Turning on asks first (IP address visible to peers); turning off never does.
+            if (it) open(SettingsDialog.TORRENT_CONSENT) else change(prefs.copy(torrentStreaming = false))
         }
     })
 
@@ -224,13 +247,21 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.tmdb_title), stringResource(R.string.settings_tmdb_detail), AppIcons.Movie, tag = "settings-tmdb", onClick = host.links.tmdb)
     })
     add(entry("secure-dns", ig, R.string.settings_group_network, R.string.settings_secure_dns, "dns doh blocked network jio isp tmdb") {
-        val detail = when {
-            prefs.secureDns -> stringResource(R.string.settings_secure_dns_on)
-            host.securedHosts.isNotEmpty() -> stringResource(R.string.settings_secure_dns_auto) + "\n" +
-                stringResource(R.string.settings_secure_dns_now, host.securedHosts.take(3).joinToString(", "))
-            else -> stringResource(R.string.settings_secure_dns_auto)
-        }
+        val detail = if (prefs.secureDns) stringResource(R.string.settings_secure_dns_on) else stringResource(R.string.settings_secure_dns_off)
         SettingToggle(stringResource(R.string.settings_secure_dns), detail, Icons.Filled.Lock, prefs.secureDns, "pref-secure-dns") { change(prefs.copy(secureDns = it)) }
+    })
+    add(entry("secure-dns-fallback", ig, R.string.settings_group_network, R.string.settings_dns_fallback, "dns doh blocked network jio isp tmdb cloudflare google privacy",
+        shown = { !it.prefs.secureDns }) {
+        val detail = stringResource(R.string.settings_dns_fallback_detail) +
+            (if (prefs.secureDnsFallback && host.securedHosts.isNotEmpty()) "\n" + stringResource(R.string.settings_secure_dns_now, host.securedHosts.take(3).joinToString(", ")) else "")
+        SettingToggle(stringResource(R.string.settings_dns_fallback), detail, Icons.Filled.Lock, prefs.secureDnsFallback, "pref-dns-fallback") {
+            change(prefs.copy(secureDnsFallback = it))
+        }
+    })
+    add(entry("image-proxies", ig, R.string.settings_group_network, R.string.settings_image_proxies, "poster image proxy wsrv blocked tmdb privacy") {
+        SettingToggle(stringResource(R.string.settings_image_proxies), stringResource(R.string.settings_image_proxies_detail), Icons.Filled.Lock, prefs.imageProxies, "pref-image-proxies") {
+            change(prefs.copy(imageProxies = it))
+        }
     })
 
     // ---- Services (on the hub): progress sync, after the Integrations page
@@ -242,8 +273,8 @@ internal val SETTINGS: List<SettingEntry> = buildList {
 
     // ---- Advanced
     val ad = SettingsPage.ADVANCED
-    add(entry("clear-cache", ad, R.string.settings_group_maintenance, R.string.settings_clear_cache, "images posters storage space", shown = { it.onClearCache != null }) {
-        SettingRow(stringResource(R.string.settings_clear_cache), stringResource(R.string.settings_clear_cache_detail), Icons.Filled.Delete, onClick = host.onClearCache)
+    add(entry("storage", ad, R.string.settings_group_maintenance, R.string.settings_storage, "storage space cache clear images posters videos downloads torrents", shown = { it.links.storage != null }) {
+        SettingRow(stringResource(R.string.settings_storage), stringResource(R.string.settings_storage_detail), Icons.Filled.Delete, tag = "settings-storage", onClick = host.links.storage)
     })
     add(entry("reset", ad, R.string.settings_group_maintenance, R.string.settings_reset, "defaults restore", shown = { it.onReset != null }) {
         SettingRow(stringResource(R.string.settings_reset), stringResource(R.string.settings_reset_detail), Icons.Filled.Refresh, tag = "pref-reset") { open(SettingsDialog.RESET) }
@@ -256,6 +287,10 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     })
     add(entry("update", ab, R.string.settings_group_app, R.string.update_row, "update upgrade new version apk", shown = { it.onUpdate != null }) {
         SettingRow(stringResource(R.string.update_row), host.updateLine, AppIcons.Update, tag = "update-row", onClick = host.onUpdate)
+    })
+    add(entry("setup-guide", ab, R.string.settings_group_app, R.string.settings_setup_guide, "welcome first run setup guide tour help start",
+        shown = { it.links.setupGuide != null }) {
+        SettingRow(stringResource(R.string.settings_setup_guide), stringResource(R.string.settings_setup_guide_detail), Icons.Filled.Info, tag = "setup-guide", onClick = host.links.setupGuide)
     })
     add(entry("source", ab, R.string.settings_group_app, R.string.settings_source, "github open source code", shown = { it.onSourceCode != null }) {
         SettingRow(stringResource(R.string.settings_source), stringResource(R.string.settings_source_detail), Icons.Filled.Share, onClick = host.onSourceCode)

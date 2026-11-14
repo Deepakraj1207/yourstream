@@ -76,6 +76,15 @@ class EventJournal(
 
     fun errorCount() = errors.get()
 
+    /** Forgets every event, in memory and on disk (signing out: events can name chats and titles). */
+    fun clear() {
+        events.clear()
+        size.set(0)
+        counts.values.forEach { it.set(0) }
+        errors.set(0)
+        file?.clear()
+    }
+
     companion object {
         fun describe(t: Throwable): String {
             val root = generateSequence(t) { it.cause?.takeIf { c -> c !== it } }.last()

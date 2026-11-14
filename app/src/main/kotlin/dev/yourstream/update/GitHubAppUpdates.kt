@@ -72,6 +72,14 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
             val ok = withContext(Dispatchers.IO) { runCatching { download(r, file) } }
             if (ok.isFailure) { _state.value = UpdateState.Failed(ok.exceptionOrNull()?.message ?: "Download failed"); return }
         }
+        // The release's SHA256SUMS.txt must list this APK with the same checksum: a damaged or
+        // swapped file is deleted, never installed. (Android also checks the APK's signature.)
+        val verified = withContext(Dispatchers.IO) { runCatching { verify(r, file) } }
+        if (verified.isFailure) {
+            file.delete()
+            _state.value = UpdateState.Failed(verified.exceptionOrNull()?.message ?: "The update could not be checked. Nothing was installed.")
+            return
+        }
         install(r.version, file)
     }
 
@@ -169,7 +177,14 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
 
     private fun apkFile(version: String) = File(File(context.cacheDir, "updates"), "YourStream-$version.apk")
 
-    private data class Release(val version: String, val notes: String, val apkUrl: String, val size: Long)
+    private data class Release(val version: String, val notes: String, val apkUrl: String, val size: Long, val apkName: String, val sumsUrl: String?)
+
+    private fun verify(r: Release, file: File) {
+        val sumsUrl = r.sumsUrl ?: error("This release has no checksums, so the update was not installed.")
+        val sums = connect(sumsUrl).inputStream.bufferedReader().use { it.readText() }
+        val expected = parseChecksums(sums)[r.apkName] ?: error("This release's checksums do not list the update, so it was not installed.")
+        if (!sha256(file).equals(expected, ignoreCase = true)) error("The downloaded update is damaged or was changed. Nothing was installed. Try again.")
+    }
 
     private fun latestRelease(): Release? {
         val conn = connect("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest", "application/vnd.github+json")
@@ -179,7 +194,8 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
         val list = (0 until assets.length()).map { assets.getJSONObject(it) }
         val i = pickApk(list.map { it.optString("name") }, Build.SUPPORTED_ABIS.toList()) ?: return null
         val a = list[i]
-        return Release(tag.removePrefix("v"), json.optString("body"), a.getString("browser_download_url"), a.optLong("size"))
+        val sums = list.firstOrNull { it.optString("name") == CHECKSUMS }?.optString("browser_download_url")
+        return Release(tag.removePrefix("v"), json.optString("body"), a.getString("browser_download_url"), a.optLong("size"), a.optString("name"), sums)
     }
 
     /** Opens [url] with every header set before connecting (setting one afterwards throws). */
@@ -198,6 +214,24 @@ class GitHubAppUpdates @Inject constructor(@ApplicationContext private val conte
 
     companion object {
         private val ABI_SUFFIX = Regex("-(arm64-v8a|armeabi-v7a|x86_64|x86)\\.apk$")
+
+        /** The checksum file each release carries (written by .github/workflows/release.yml). */
+        const val CHECKSUMS = "SHA256SUMS.txt"
+
+        /** `sha256sum` output ("<64 hex>  <name>", "*" before the name in binary mode) → name to checksum (pure; tested). */
+        fun parseChecksums(text: String): Map<String, String> = text.lineSequence()
+            .mapNotNull { line -> Regex("^([0-9a-fA-F]{64})\\s+\\*?(\\S.*?)\\s*$").find(line.trim())?.destructured?.let { (hash, name) -> name to hash.lowercase() } }
+            .toMap()
+
+        /** Hex SHA-256 of [file]. */
+        fun sha256(file: File): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buf = ByteArray(64 * 1024)
+                while (true) { val n = input.read(buf); if (n < 0) break; digest.update(buf, 0, n) }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
 
         /**
          * Which release asset to install: the APK built for the device's preferred CPU type

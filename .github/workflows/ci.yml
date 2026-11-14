@@ -1,0 +1,99 @@
+# Builds and tests every push and pull request: unit tests (JVM and Robolectric), Android lint
+# and a debug APK. Releases (release.yml) run the same tests before publishing.
+#
+# No secrets are needed: the debug build works without the Telegram API credentials (sign-in
+# then reports that the app is not configured), and tests use made-up values.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Android SDK packages
+        run: |
+          SDKMANAGER=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Build first, then tests, then lint: compiling (Kotlin/KSP daemons, Hilt) never competes
+      # for the runner's memory with the test JVMs. Output kept for the failure summary.
+      - name: Debug APK
+        run: ./gradlew :app:assembleDebug 2>&1 | tee build-apk.log; exit ${PIPESTATUS[0]}
+
+      # Unit tests of every module (Android modules have only the debug variant).
+      - name: Tests
+        run: ./gradlew --continue test 2>&1 | tee build-test.log; exit ${PIPESTATUS[0]}
+
+      - name: Lint
+        run: ./gradlew :app:lintDebug 2>&1 | tee build-lint.log; exit ${PIPESTATUS[0]}
+
+      # The release with R8 must keep building (missing classes, broken keep rules). Whether it
+      # runs is checked on a device: docs/RELEASE_R8.md.
+      - name: Minified release (R8)
+        run: ./gradlew :app:assembleRelease -Pyourstream.minify=true 2>&1 | tee build-r8.log; exit ${PIPESTATUS[0]}
+
+      # Failures readable in the log itself: each failing test with its message, and (for the
+      # intermittent Hilt "missing binding" error) what the playback module generated and compiled.
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "== Failing tests"
+          for f in $(find . -path '*/build/test-results/*' -name '*.xml'); do
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          for case in ET.parse(sys.argv[1]).getroot().iter('testcase'):
+              for bad in list(case.findall('failure')) + list(case.findall('error')):
+                  print(f"{case.get('classname')} > {case.get('name')}: {(bad.get('message') or '')[:400]}")
+          PY
+          done
+          echo "== playback:media3 generated Hilt metadata"
+          find playback/media3/build/generated -path '*hilt_aggregated_deps*' 2>/dev/null || true
+          echo "== playback:media3 compiled hilt_aggregated_deps classes"
+          find playback/media3/build -path '*hilt_aggregated_deps*' -name '*.class' 2>/dev/null || true
+          echo "== playback:media3 generated sources count"
+          find playback/media3/build/generated -name '*.java' 2>/dev/null | wc -l
+          echo "== Daemons, memory (a crashed Kotlin/KSP daemon can leave a module half-compiled)"
+          grep -hiE "daemon|OutOfMemory|fallback strategy|Killed|exit code 137|GC overhead" build-*.log 2>/dev/null | sort | uniq -c | head -40 || true
+          sudo dmesg 2>/dev/null | grep -iE "out of memory|oom-kill|killed process" | tail -20 || true
+          free -m || true
+          echo "== KSP-generated Java files per module (0 for a module with Hilt modules = KSP produced nothing)"
+          for d in $(find . -path '*/build/generated/ksp/debug' -type d); do
+            echo "$d: $(find "$d" -name '*.java' | wc -l)"
+          done
+          echo "== Hilt metadata per library jar"
+          for jar in $(find . -path '*/build/intermediates/compile_library_classes_jar/debug/*' -name '*.jar'); do
+            echo "$jar: $(unzip -l "$jar" 2>/dev/null | grep -c hilt_aggregated_deps)"
+          done
+
+      - name: Reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+            app/build/reports/lint-results-debug.html
+          retention-days: 14

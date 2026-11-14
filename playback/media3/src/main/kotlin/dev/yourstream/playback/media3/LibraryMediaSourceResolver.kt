@@ -30,6 +30,7 @@ class LibraryMediaSourceResolver @Inject constructor(
     private val db: YourStreamDatabase,
     private val messages: TelegramMessageRepository,
     private val files: TelegramFileRepository,
+    private val localFiles: LocalFileCheck,
 ) : MediaSourceResolver {
 
     override suspend fun resolve(target: PlaybackTarget, mediaId: Long?): AppResult<PlayableMedia> {
@@ -68,6 +69,7 @@ class LibraryMediaSourceResolver @Inject constructor(
     }
 
     private suspend fun resolveVersion(target: PlaybackTarget, version: MediaVersion): AppResult<PlayableMedia> {
+        version.locator?.let { return resolveLocal(target, version, it) }
         if (version.isDeleted) return AppResult.Err(AppError.NotFound("The Telegram message of ${version.fileName} was deleted"))
 
         val (file, mime) = when (val r = currentFile(version)) {
@@ -84,6 +86,22 @@ class LibraryMediaSourceResolver @Inject constructor(
                 sizeBytes = file.size.takeIf { it > 0 } ?: version.sizeBytes, durationMs = version.durationSeconds?.let { it * 1000L },
                 mimeType = mime, width = null, height = version.resolution, alreadyDownloaded = file.isDownloadingCompleted,
                 target = target, mediaId = version.mediaId,
+            ),
+        )
+    }
+
+    /** A file on this device: played from its address if it can still be read (it may have been deleted or moved since the last scan). */
+    private suspend fun resolveLocal(target: PlaybackTarget, version: MediaVersion, uri: String): AppResult<PlayableMedia> {
+        if (version.isDeleted || !localFiles.readable(uri)) {
+            return AppResult.Err(AppError.NotFound("${version.fileName} is no longer on this device"))
+        }
+        val title = media.getItem(target.itemId)?.summary?.title ?: version.fileName
+        return AppResult.Ok(
+            PlayableMedia(
+                title = title, fileName = version.fileName, fileId = 0, remoteUniqueId = "media-${version.mediaId}",
+                sizeBytes = version.sizeBytes, durationMs = version.durationSeconds?.let { it * 1000L }, mimeType = null,
+                width = null, height = version.resolution, alreadyDownloaded = true, target = target, mediaId = version.mediaId,
+                localUri = uri,
             ),
         )
     }
@@ -112,5 +130,17 @@ class LibraryMediaSourceResolver @Inject constructor(
         fun rank(versions: List<MediaVersion>): List<MediaVersion> = versions
             .filter { !it.isDeleted && !it.isExcluded }
             .sortedWith(compareBy<MediaVersion> { it.isDuplicate }.thenByDescending { it.resolution ?: 0 }.thenByDescending { it.sizeBytes })
+    }
+}
+
+/** Whether a local file can still be opened (a deleted file or a lost folder permission cannot). */
+fun interface LocalFileCheck {
+    suspend fun readable(uri: String): Boolean
+}
+
+/** Opens the file for reading and closes it at once: the only reliable check across providers. */
+class AndroidLocalFileCheck @Inject constructor(@dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context) : LocalFileCheck {
+    override suspend fun readable(uri: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching { context.contentResolver.openFileDescriptor(android.net.Uri.parse(uri), "r")?.use { true } ?: false }.getOrDefault(false)
     }
 }

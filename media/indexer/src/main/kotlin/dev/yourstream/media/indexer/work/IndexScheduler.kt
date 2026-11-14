@@ -9,6 +9,10 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import dev.yourstream.media.api.model.IndexingPolicy
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import androidx.work.workDataOf
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.yourstream.media.api.model.IndexMode
@@ -25,7 +29,19 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
 
     private val workManager get() = WorkManager.getInstance(context)
 
-    private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    // When background indexing may run (a device setting: kept when the account changes). Stored
+    // here, not in the UI's settings, because workers in a fresh process schedule work too.
+    private val prefs = context.getSharedPreferences("indexing_policy", Context.MODE_PRIVATE)
+    private val _policy = MutableStateFlow(IndexingPolicy(prefs.getBoolean(KEY_WIFI, false), prefs.getBoolean(KEY_BATTERY, true)))
+    val policy: StateFlow<IndexingPolicy> = _policy.asStateFlow()
+
+    fun setPolicy(policy: IndexingPolicy) {
+        prefs.edit().putBoolean(KEY_WIFI, policy.wifiOnly).putBoolean(KEY_BATTERY, policy.batteryAware).apply()
+        _policy.value = policy
+        ensurePeriodicSync(ExistingPeriodicWorkPolicy.UPDATE)
+    }
+
+    private val constraints: Constraints get() = constraintsFor(_policy.value)
 
     /**
      * INCREMENTAL keeps an already queued/running run (asking twice does nothing); other modes
@@ -45,6 +61,11 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
         workManager.cancelUniqueWork(uniqueName(chatId))
     }
 
+    /** Queued or running work of the chat again under the current [policy] (a running run stops and continues). */
+    fun reschedule(chatId: Long) {
+        workManager.enqueueUniqueWork(uniqueName(chatId), ExistingWorkPolicy.REPLACE, request(chatId, IndexMode.INCREMENTAL))
+    }
+
     /** Re-parses stored names after a parser upgrade (no network needed). */
     fun scheduleReparse() {
         val request = OneTimeWorkRequestBuilder<ReparseWorker>()
@@ -56,14 +77,26 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
         workManager.enqueueUniqueWork(REPARSE_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    fun ensurePeriodicSync() {
+    fun ensurePeriodicSync(existing: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.KEEP) {
         val request = PeriodicWorkRequestBuilder<PeriodicSyncWorker>(6, TimeUnit.HOURS)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build())
+            // The periodic sync never runs on a low battery, whatever the policy says.
+            .setConstraints(constraintsFor(_policy.value.copy(batteryAware = true)))
             .build()
-        workManager.enqueueUniquePeriodicWork(PERIODIC_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        workManager.enqueueUniquePeriodicWork(PERIODIC_NAME, existing, request)
     }
 
-    private fun request(chatId: Long, mode: IndexMode) = OneTimeWorkRequestBuilder<IndexChatWorker>()
+    private fun request(chatId: Long, mode: IndexMode) =
+        if (dev.yourstream.media.api.LocalSourceIds.isLocal(chatId)) localRequest(chatId) else telegramRequest(chatId, mode)
+
+    /** Files on this device: no network needed; never on a low battery when the policy says so. */
+    private fun localRequest(chatId: Long) = OneTimeWorkRequestBuilder<dev.yourstream.media.indexer.local.LocalScanWorker>()
+        .setInputData(workDataOf(IndexChatWorker.KEY_CHAT_ID to chatId))
+        .setConstraints(localConstraintsFor(_policy.value))
+        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+        .addTag(TAG)
+        .build()
+
+    private fun telegramRequest(chatId: Long, mode: IndexMode) = OneTimeWorkRequestBuilder<IndexChatWorker>()
         .setInputData(workDataOf(IndexChatWorker.KEY_CHAT_ID to chatId, IndexChatWorker.KEY_MODE to mode.name))
         .setConstraints(constraints)
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -72,6 +105,18 @@ class IndexScheduler @Inject constructor(@ApplicationContext private val context
 
     companion object {
         const val TAG = "media-index"
+        private const val KEY_WIFI = "wifi_only"
+        private const val KEY_BATTERY = "battery_aware"
+
+        /** WorkManager conditions for [policy] (pure; tested). */
+        fun constraintsFor(policy: IndexingPolicy): Constraints = Constraints.Builder()
+            .setRequiredNetworkType(if (policy.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(policy.batteryAware)
+            .build()
+        /** Local scans read the system's index only: the battery rule applies, the network rule does not (pure; tested). */
+        fun localConstraintsFor(policy: IndexingPolicy): Constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(policy.batteryAware)
+            .build()
         private const val PERIODIC_NAME = "media-index-periodic"
         private const val REPARSE_NAME = "media-index-reparse"
         fun uniqueName(chatId: Long) = "index-chat-$chatId"

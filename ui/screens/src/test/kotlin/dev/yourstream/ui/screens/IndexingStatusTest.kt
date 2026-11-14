@@ -17,10 +17,10 @@ class IndexingStatusTest {
     @Test
     fun statusSumsRunningChats() {
         val s = IndexingStatus.of(listOf(
-            chat(1, IndexState.RUNNING, progress(1, 100, 9, 400)),
-            chat(2, IndexState.RUNNING, progress(2, 50, 2, -1)),
+            chat(1, IndexState.SCANNING, progress(1, 100, 9, 400)),
+            chat(2, IndexState.SCANNING, progress(2, 50, 2, -1)),
             chat(3, IndexState.QUEUED),
-            chat(4, IndexState.RUNNING, progress(4, 1, 1, 1), enabled = false),
+            chat(4, IndexState.SCANNING, progress(4, 1, 1, 1), enabled = false),
             chat(5, IndexState.COMPLETED),
         ))
         assertEquals(IndexingStatus(chats = 2, queued = 1, found = 13, scanned = 150, total = 400), s)

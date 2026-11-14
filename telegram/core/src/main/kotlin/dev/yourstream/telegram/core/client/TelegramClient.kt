@@ -1,5 +1,6 @@
 package dev.yourstream.telegram.core.client
 
+import dev.yourstream.core.common.AppError
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.telegram.api.model.AuthState
 import dev.yourstream.telegram.api.model.ChatListType
@@ -75,6 +76,9 @@ interface TelegramClient {
     suspend fun getFileDownloadedPrefixSize(fileId: Int, offset: Long): AppResult<Long>
     suspend fun readFilePart(fileId: Int, offset: Long, count: Long): AppResult<ByteArray>
     suspend fun deleteFile(fileId: Int): AppResult<Unit>
+
+    /** optimizeStorage to zero: deletes every downloaded file (streamed or saved). Remote files are untouched. */
+    suspend fun deleteAllLocalFiles(): AppResult<Unit> = AppResult.Err(AppError.InvalidState("Not supported by this client"))
 
     // ---- Saved Messages (optional progress sync)
 

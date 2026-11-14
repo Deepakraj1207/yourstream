@@ -11,6 +11,8 @@ import dev.yourstream.media.api.model.IndexState
 import dev.yourstream.media.indexer.engine.IndexProgressTracker
 import dev.yourstream.media.indexer.work.IndexScheduler
 import dev.yourstream.telegram.api.TelegramChatRepository
+import dev.yourstream.media.api.model.IndexingPolicy
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,6 +44,8 @@ class DefaultMediaIndexer @Inject constructor(
                 ),
         )
         logger.i(TAG, "indexing enabled for chat $chatId")
+        // Choosing a chat again means "index it": a pause from before is lifted.
+        chats.setPaused(chatId, false, now)
         schedule(chatId, IndexMode.INCREMENTAL)
         return AppResult.Ok(Unit)
     }
@@ -54,6 +58,8 @@ class DefaultMediaIndexer @Inject constructor(
 
     override suspend fun schedule(chatId: Long, mode: IndexMode) {
         if (chats.isEnabled(chatId) != true) return
+        // Paused chats wait for resume(): periodic syncs and "sync now" leave them alone.
+        if (chats.isPaused(chatId) == true) return
         chats.setState(chatId, IndexState.QUEUED.name, null, clock.nowMillis())
         scheduler.schedule(chatId, mode)
     }
@@ -62,14 +68,54 @@ class DefaultMediaIndexer @Inject constructor(
         chats.enabledChatIds().forEach { schedule(it, IndexMode.INCREMENTAL) }
     }
 
-    override suspend fun cancel(chatId: Long) {
-        tracker.requestCancel(chatId)
+    override suspend fun cancel(chatId: Long) = stop(chatId, IndexProgressTracker.StopReason.CANCEL, IndexState.CANCELLED)
+
+    override suspend fun pause(chatId: Long) {
+        if (chats.isEnabled(chatId) != true) return
+        chats.setPaused(chatId, true, clock.nowMillis())
+        stop(chatId, IndexProgressTracker.StopReason.PAUSE, IndexState.PAUSED)
+        logger.i(TAG, "indexing paused for chat $chatId")
+    }
+
+    override suspend fun resume(chatId: Long) {
+        if (chats.isEnabled(chatId) != true) return
+        chats.setPaused(chatId, false, clock.nowMillis())
+        chats.setState(chatId, IndexState.IDLE.name, null, clock.nowMillis())
+        // Cursors are kept: the run continues where the chat stopped.
+        schedule(chatId, IndexMode.INCREMENTAL)
+        logger.i(TAG, "indexing resumed for chat $chatId")
+    }
+
+    override suspend fun pauseAll() = chats.enabledChatIds().forEach { pause(it) }
+
+    override suspend fun resumeAll() = chats.enabledChatIds().forEach { resume(it) }
+
+    override val policy: StateFlow<IndexingPolicy> get() = scheduler.policy
+
+    override suspend fun setPolicy(policy: IndexingPolicy) {
+        if (policy == scheduler.policy.value) return
+        scheduler.setPolicy(policy)
+        // Waiting and running work picks up the new conditions (a running run stops and continues).
+        for (id in chats.enabledChatIds()) {
+            if (chats.isPaused(id) == true) continue
+            val state = chats.get(id)?.state?.let { s -> IndexState.entries.firstOrNull { it.name == s } }
+            if (state != null && state.isPending) scheduler.reschedule(id)
+        }
+        logger.i(TAG, "indexing policy: wifiOnly=${policy.wifiOnly} batteryAware=${policy.batteryAware}")
+    }
+
+    /**
+     * Stops queued and running work. A running run sees [reason] and ends in [stoppedState]; if
+     * nothing was running nobody would consume it, so the state is recorded here.
+     */
+    private suspend fun stop(chatId: Long, reason: IndexProgressTracker.StopReason, stoppedState: IndexState) {
+        tracker.requestStop(chatId, reason)
         scheduler.cancel(chatId)
-        // If nothing was running, nobody consumes the request: record the state ourselves.
         if (tracker.progress.value[chatId] == null) {
-            tracker.consumeCancelRequest(chatId)
-            if (chats.get(chatId)?.state == IndexState.QUEUED.name) {
-                chats.setState(chatId, IndexState.CANCELLED.name, "Cancelled", clock.nowMillis())
+            tracker.consumeStopRequest(chatId)
+            val state = chats.get(chatId)?.state?.let { s -> IndexState.entries.firstOrNull { it.name == s } }
+            if (stoppedState == IndexState.PAUSED || state == null || state.isPending) {
+                chats.setState(chatId, stoppedState.name, null, clock.nowMillis())
             }
         }
     }

@@ -80,6 +80,20 @@ class MappingTest {
     }
 
     @Test
+    fun versionsSayWhereTheyAreFromTheStoredDownloadState() {
+        // The index stores DownloadState names (COMPLETE, PARTIAL, NOT_DOWNLOADED): the mapping must read those.
+        fun version(id: Long, state: String, locator: String? = null) =
+            MediaVersion(id, 1, id, "Vikram.$id.mkv", 2_000_000_000, null, 1080, null, null, emptyList(), false, false, null, false, false, state, locator)
+        val d = LibraryItemDetails(summary(1), "", false, false, emptyList(),
+            listOf(version(1, "COMPLETE"), version(2, "PARTIAL"), version(3, "NOT_DOWNLOADED", locator = "content://x/3")), emptyList())
+        val rows = DetailsViewModel.content(d, null).versions.associateBy { it.mediaId }
+        assertEquals(true, rows.getValue(1).onDevice)
+        assertEquals(false, rows.getValue(2).onDevice, "half downloaded does not play offline")
+        assertEquals(true, rows.getValue(3).isLocal)
+        assertEquals(false, rows.getValue(1).isLocal)
+    }
+
+    @Test
     fun detailsPrimaryActionComesFromTheDomain() {
         fun details(s: LibraryItemSummary) = LibraryItemDetails(s, "", false, false, listOf("ta"),
             listOf(MediaVersion(9, 1, 1, "Vikram.1080p.mkv", 2_000_000_000, null, 1080, "WEB-DL", null, listOf("ta"), false, false, null, false, false, "NOT_DOWNLOADED")), emptyList())

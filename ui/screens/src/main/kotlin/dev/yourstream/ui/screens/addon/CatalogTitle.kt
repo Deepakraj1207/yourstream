@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -190,13 +191,15 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
     fun playTarget(s: AddonStream): OpenTarget.Stream? {
         val st = _state.value
         val subtitle = st.episode?.let { e -> listOfNotNull(e.season?.let { "S%02dE%02d".format(it, e.episode ?: 0) }, e.title).joinToString(" · ") }
+        // Any stream of this movie or episode resumes where the last one stopped.
+        val progress = dev.yourstream.watch.engine.StreamProgressStore.keyOf(route.type, route.id, item.ref.imdbId, st.episode?.season, st.episode?.episode)
         if (s.isTorrent) {
             return OpenTarget.Stream(StreamPlayerRoute("", st.title, subtitle, infoHash = s.infoHash, fileIdx = s.fileIdx ?: -1,
-                sources = s.sources.joinToString("\n"), fileName = s.fileName))
+                sources = s.sources.joinToString("\n"), fileName = s.fileName, progressKey = progress))
         }
         val url = s.url?.takeIf { s.playable } ?: return null
         val headers = JsonObject(s.headers.mapValues { JsonPrimitive(it.value) }).toString()
-        return OpenTarget.Stream(StreamPlayerRoute(url, st.title, subtitle, headers))
+        return OpenTarget.Stream(StreamPlayerRoute(url, st.title, subtitle, headers, progressKey = progress))
     }
 }
 
@@ -205,9 +208,19 @@ fun CatalogTitleDestination(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val torrents = dev.yourstream.ui.screens.settings.LocalAppSettings.current.torrentStreaming
+    val prefs: dev.yourstream.ui.screens.settings.AppPreferencesViewModel = hiltViewModel()
+    // A torrent result tapped while torrents are off: ask (IP address visible), then play it.
+    var askFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<AddonStream?>(null) }
     CatalogTitleScreen(state, vm::onAction, onBack, onOpenLibrary = { onOpen(OpenTarget.Details(it)) }, torrents = torrents) { s ->
-        vm.playTarget(s)?.takeIf { torrents || !s.isTorrent }?.let(onOpen)
+        if (s.isTorrent && !torrents && vm.playTarget(s) != null) askFor = s
+        else vm.playTarget(s)?.takeIf { torrents || !s.isTorrent }?.let(onOpen)
             ?: s.externalUrl?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+    }
+    askFor?.let { s ->
+        dev.yourstream.ui.screens.settings.TorrentConsentDialog(
+            onEnable = { prefs.update { it.copy(torrentStreaming = true) }; vm.playTarget(s)?.let(onOpen) },
+            onClose = { askFor = null },
+        )
     }
 }
 
@@ -305,7 +318,8 @@ private fun Streams(state: CatalogTitleUiState, torrents: Boolean, onStream: (Ad
 
 @Composable
 private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream) -> Unit) {
-    val usable = s.playable || s.externalUrl != null || (s.isTorrent && torrents)
+    // Torrents stay tappable while turned off: the tap asks to turn them on (TorrentConsentDialog).
+    val usable = s.playable || s.externalUrl != null || s.isTorrent
     Surface(
         shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth().focusHighlight().clickable(enabled = usable) { onStream(s) }.testTag("stream"),
@@ -317,7 +331,7 @@ private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream)
                 when {
                     s.playable -> Unit
                     s.isTorrent && torrents -> Text(stringResource(R.string.addon_stream_torrent), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
-                    s.isTorrent -> Text(stringResource(R.string.addon_stream_torrent_off), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    s.isTorrent -> Text(stringResource(R.string.addon_stream_torrent_off), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     s.externalUrl != null -> Text(stringResource(R.string.addon_stream_external), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else -> Text(stringResource(R.string.addon_stream_unsupported), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                 }

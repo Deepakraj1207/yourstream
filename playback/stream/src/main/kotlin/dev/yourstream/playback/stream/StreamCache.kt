@@ -10,14 +10,16 @@ import kotlinx.coroutines.sync.withLock
  * (its file cache), so re-watching or seeking back costs nothing; this class only bounds how
  * much of that streaming leaves behind.
  *
- * Only files that were *not* already complete before streaming are tracked: a file the user
- * downloaded on purpose is never deleted here. When the tracked total exceeds [budgetBytes], the
+ * Only files that were *not* already complete before streaming are tracked, and never one the
+ * user asked to keep ([keep]: Download on a title): a file downloaded on purpose is never deleted
+ * here, even when it was played while still downloading. When the tracked total exceeds [budgetBytes], the
  * least recently streamed, inactive files lose their local copy (never the newest one).
  */
 class StreamCache(
     private val repo: TelegramFileRepository,
     private val budgetBytes: Long = 2L * 1024 * 1024 * 1024,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val keep: (TelegramFile) -> Boolean = { false },
 ) {
     private data class Entry(val fileId: Int, val bytes: Long, val lastUsed: Long)
 
@@ -28,7 +30,7 @@ class StreamCache(
 
     /** Records a finished streaming session and evicts the oldest copies above the budget. Returns evicted ids. */
     suspend fun recordAndTrim(file: TelegramFile, wasCompleteBefore: Boolean, activeFileIds: Set<Int>): List<Int> = lock.withLock {
-        if (!wasCompleteBefore && file.downloadedSize > 0) {
+        if (!wasCompleteBefore && file.downloadedSize > 0 && !keep(file)) {
             entries.remove(file.id)
             entries[file.id] = Entry(file.id, file.downloadedSize, clock())
         }

@@ -19,11 +19,15 @@ import java.util.concurrent.TimeUnit
  * address (TMDB on several Indian ISPs is the known case). Hosts are first resolved the normal way;
  * when that fails, or a connection to the answer fails ([Retry]), the host is resolved through
  * DNS over HTTPS (Cloudflare, then Google, reached by IP address) and remembered for 30 minutes.
- * With [always] set (Settings), every host is resolved that way.
+ * With [always] set (Settings), every host is resolved that way. With [fallback] off and [always]
+ * off, only the system DNS is used: Cloudflare and Google never see a host name.
  */
 object SecureDns {
     /** Settings → "Secure DNS": resolve every host through DNS over HTTPS. */
     @Volatile var always: Boolean = false
+
+    /** Settings → "Secure DNS for blocked sites": use DNS over HTTPS when the system DNS fails. */
+    @Volatile var fallback: Boolean = true
 
     private const val REMEMBER_MS = 30 * 60_000L
     private val viaDoh = ConcurrentHashMap<String, Long>()
@@ -78,10 +82,11 @@ object SecureDns {
             val answer = try {
                 system.lookup(hostname)
             } catch (e: UnknownHostException) {
+                if (!fallback) throw e
                 useSecure(hostname)
                 return runCatching { secure(hostname) }.getOrElse { throw e }
             }
-            if (answer.isNotEmpty() && answer.all { it.isAnyLocalAddress || it.isLoopbackAddress } && !isLocalName(hostname)) {
+            if (fallback && answer.isNotEmpty() && answer.all { it.isAnyLocalAddress || it.isLoopbackAddress } && !isLocalName(hostname)) {
                 useSecure(hostname)
                 return runCatching { secure(hostname) }.getOrDefault(answer)
             }
@@ -102,7 +107,7 @@ object SecureDns {
             return try {
                 chain.proceed(request)
             } catch (e: IOException) {
-                if (chain.call().isCanceled() || secured(host) || isLiteral(host)) throw e
+                if (chain.call().isCanceled() || !fallback || secured(host) || isLiteral(host)) throw e
                 useSecure(host)
                 try {
                     chain.proceed(request)
