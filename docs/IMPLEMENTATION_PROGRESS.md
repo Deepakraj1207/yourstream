@@ -715,3 +715,23 @@ example texts no longer say "Tamil" ("unwatched action movies", "comedy movies")
   The tab semantics (role, selected state, names for screen readers with tab names off) are
   unchanged. New test: `theMangaPanelGridKeepsTouchTargetsOnTheNarrowestPhones` (320 dp, light).
   Status: NEEDS REAL-DEVICE TESTING (look on real screens, press feedback, TalkBack).
+
+## Add-on refresh and streams grouped by add-on (14 Nov 2026)
+
+User request: "Add refresh button on addon like nuvio" and "Display streams as addon by group".
+Nuvio's source could not be read from this session (GitHub access is limited to this repository),
+so both follow Nuvio's behaviour as it is commonly known, not its code.
+
+* **Add-ons page refresh.** Reason: add-ons change their manifests (new catalogs, names, stream
+  support) and the page only checked add-ons that had not answered yet. A top-bar refresh button
+  (and pull-to-refresh) fetches every manifest again (`CatalogAddons.refresh`), keeps a renamed
+  add-on's new name across restarts, rebuilds the catalog manager, and reports how many answered.
+  Tests: `CatalogAddonsRefreshTest` (fake add-ons, no network: proves the bookkeeping, not real
+  add-ons) and `AddonsAndStreamsTest.refreshButtonAsksAgainAndSaysHowManyAnswered`.
+* **Streams grouped by add-on.** Reason: the list waited for the slowest add-on and mixed groups
+  with no way to look at one add-on. Now each add-on's streams appear as it answers, under its
+  name and count, with All / per-add-on chips, a refresh button, a stable order, and the add-ons
+  that found nothing or did not answer named. Also fixes a race: selecting another episode while a
+  slow add-on was still answering could show the previous episode's streams (the older request is
+  now cancelled). Tests: `AddonsAndStreamsTest` (grouping, chips, progressive answers, order).
+* Status: NEEDS REAL-DEVICE TESTING (real add-ons, slow networks, TV remote focus on the chips).

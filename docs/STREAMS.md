@@ -10,11 +10,20 @@ public Stremio add-on protocol, which is also what Nuvio add-ons use.
 | --- | --- |
 | **Stremio** | Built-in catalog add-ons (Cinemeta, Indian catalogs) and Stremio add-ons the user added. |
 | **Nuvio** | Nuvio add-ons the user added. Same protocol as Stremio add-ons; kept apart because that is where users find them. |
-| **Nuvio plugins** | Not supported: they are JavaScript scrapers for streaming websites, which usually have no rights to what they show. A plugin-repository link (a manifest with `scrapers`) is recognised and explained instead of failing obscurely. |
+
+Nuvio plugins (JavaScript scrapers for streaming websites, which usually have no rights to what
+they show) are not supported and have no tab (removed in 0.11.2). A plugin-repository link (a
+manifest with `scrapers`) is recognised and explained instead of failing obscurely.
 
 Each add-on card shows what its manifest offers (streams, catalogs, details). Links may be
 `https://…`, `stremio://…` or with or without `/manifest.json`; plain `http://` is accepted only
 for add-ons on the user's own network (localhost, private ranges, Tailscale, `*.local`).
+
+**Refresh** (top-bar button, or pull down; like Nuvio's): every add-on's manifest is fetched again
+at once (`CatalogAddons.refresh`). Each card shows "Checking…" until its add-on answers. An add-on
+that renamed itself in its manifest keeps the new name; the catalog manager is rebuilt so Home and
+Search use the catalogs the add-on lists now. An add-on that does not answer is left unchanged.
+The page then says how many add-ons answered.
 
 ## Asking for streams
 
@@ -23,6 +32,15 @@ form it declares in its manifest (`resources[].idPrefixes` / `types`): an anime 
 `kitsu:` gets the add-on's own id, most others the IMDb id (from the route or from the details'
 `imdb_id`), with `:season:episode` for episodes. Add-ons that handle none of them are not asked.
 A manifest without `idPrefixes` answers for any id (for `meta` as well).
+
+**Grouped by add-on, like Nuvio.** Each add-on's streams appear under its name (with a count) as
+soon as that add-on answers, instead of after the slowest one. A row of chips above them (All · n,
+then each add-on · n, a spinner on those still asked) shows all add-ons or one; a refresh button
+asks them again for the same movie or episode. Order: add-ons with direct (HTTP) streams, then
+torrents, then those still loading, then those with nothing; within each, the order the add-ons
+are listed in, so groups do not jump around as answers arrive. Add-ons that found nothing, or did
+not answer, are named under the list. A newer request (another episode, a refresh) cancels the
+older one: a slow answer for the previous episode can no longer replace the current list.
 
 Stream entries keep what playback needs: `url` + `behaviorHints.proxyHeaders`, or `infoHash` +
 `fileIdx` + `sources`, or a `magnet:` link (parsed into a hash and trackers, hex or base32),

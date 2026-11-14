@@ -18,12 +18,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -67,6 +70,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -83,6 +88,10 @@ data class AddonsUiState(
     val error: String? = null,
     /** Name of the add-on just added (confirmation). */
     val added: String? = null,
+    /** Every add-on's manifest is being fetched again (the refresh button). */
+    val refreshing: Boolean = false,
+    /** What the last refresh found, until the next action. */
+    val refreshed: RefreshResult? = null,
 ) {
     fun rows(tab: AddonsTab): List<AddonRow> = when (tab) {
         AddonsTab.STREMIO -> addons.filter { it.addon.source != AddonSource.NUVIO }
@@ -90,10 +99,15 @@ data class AddonsUiState(
     }
 }
 
+/** How many add-ons answered the last refresh. */
+data class RefreshResult(val answered: Int, val total: Int)
+
 sealed interface AddonsAction {
     data class Add(val link: String, val source: AddonSource = AddonSource.STREMIO) : AddonsAction
     data class SetEnabled(val id: String, val enabled: Boolean) : AddonsAction
     data class Remove(val id: String) : AddonsAction
+    /** Fetch every add-on's manifest again: new names, catalogs and stream support. */
+    data object Refresh : AddonsAction
 }
 
 @HiltViewModel
@@ -120,16 +134,40 @@ class AddonsViewModel @Inject constructor(private val store: CatalogAddons) : Vi
             }
             is AddonsAction.SetEnabled -> { store.setEnabled(action.id, action.enabled); refreshStatus() }
             is AddonsAction.Remove -> store.remove(action.id)
+            AddonsAction.Refresh -> refreshAll()
         }
     }
+
+    /**
+     * The refresh button: asks every add-on for its manifest again, all at once. Each card shows
+     * "Checking…" until its add-on answers; the page then says how many answered.
+     */
+    private fun refreshAll() {
+        if (ui.value.refreshing) return
+        val list = store.addons.value
+        ui.value = ui.value.copy(refreshing = true, refreshed = null, error = null, added = null)
+        status.value = status.value - list.map { it.id }.toSet()
+        viewModelScope.launch {
+            val answered = list.map { a ->
+                async {
+                    val info = runCatching { store.refresh(a.id) }.getOrNull()
+                    status.value = status.value + (a.id to row(a, info))
+                    info != null
+                }
+            }.awaitAll().count { it }
+            ui.value = ui.value.copy(refreshing = false, refreshed = RefreshResult(answered, list.size))
+        }
+    }
+
+    private fun row(a: CatalogAddon, info: dev.yourstream.catalog.api.CatalogProviderInfo?) =
+        AddonRow(a, info?.catalogs?.count { !it.requiresExtra }, info != null, info?.supportsStreams == true, info?.supportsMeta == true)
 
     /** Asks each add-on what it offers (its manifest), so every card can say it. */
     private fun refreshStatus() = viewModelScope.launch {
         store.addons.value.filter { status.value[it.id]?.reachable != true }.forEach { a ->
             launch {
                 val info = runCatching { store.describe(a.id) }.getOrNull()
-                status.value = status.value + (a.id to AddonRow(a, info?.catalogs?.count { !it.requiresExtra }, info != null,
-                    info?.supportsStreams == true, info?.supportsMeta == true))
+                status.value = status.value + (a.id to row(a, info))
             }
         }
     }
@@ -141,11 +179,17 @@ fun AddonsDestination(onBack: () -> Unit, vm: AddonsViewModel = hiltViewModel())
     AddonsScreen(state, vm::onAction, onBack)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddonsScreen(state: AddonsUiState, onAction: (AddonsAction) -> Unit, onBack: () -> Unit, initialTab: AddonsTab = AddonsTab.STREMIO) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     val rows = state.rows(tab)
-    ScreenScaffold(stringResource(R.string.settings_addons), onBack = onBack) {
+    ScreenScaffold(
+        stringResource(R.string.settings_addons), onBack = onBack,
+        actions = { RefreshButton(state.refreshing) { onAction(AddonsAction.Refresh) } },
+    ) {
+        // Pull down to refresh on phones and tablets; the top-bar button does the same (and on TV).
+        PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { onAction(AddonsAction.Refresh) }) {
         LazyColumn(
             Modifier.widthIn(max = 760.dp).testTag("addons"),
             contentPadding = PaddingValues(vertical = 8.dp),
@@ -171,6 +215,17 @@ fun AddonsScreen(state: AddonsUiState, onAction: (AddonsAction) -> Unit, onBack:
             if (rows.isEmpty()) item { Intro(if (tab == AddonsTab.NUVIO) R.string.addons_none_nuvio else R.string.addons_none) }
             items(rows, key = { it.addon.id }) { row -> Padded { AddonCard(row, onAction) } }
         }
+        }
+    }
+}
+
+/** The top bar's refresh: a spinner in its place while the add-ons are asked. */
+@Composable
+private fun RefreshButton(refreshing: Boolean, onClick: () -> Unit) {
+    val label = stringResource(R.string.addons_refresh)
+    IconButton(onClick = onClick, enabled = !refreshing, modifier = Modifier.focusHighlight().testTag("addons-refresh")) {
+        if (refreshing) CircularProgressIndicator(Modifier.size(20.dp).testTag("addons-refreshing"), strokeWidth = 2.dp)
+        else Icon(Icons.Filled.Refresh, contentDescription = label)
     }
 }
 
@@ -206,6 +261,11 @@ private fun AddBox(state: AddonsUiState, source: AddonSource, onAction: (AddonsA
             }
         }
         when {
+            state.refreshed != null -> Text(
+                if (state.refreshed.answered == state.refreshed.total) pluralStringResource(R.plurals.addons_refreshed_all, state.refreshed.total, state.refreshed.total)
+                else stringResource(R.string.addons_refreshed_some, state.refreshed.answered, state.refreshed.total),
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("addons-refreshed"),
+            )
             state.error != null -> Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("addon-error"))
             state.added != null -> Text(stringResource(R.string.addons_added, state.added), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("addon-added"))
             else -> Text(stringResource(R.string.addons_what_works), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

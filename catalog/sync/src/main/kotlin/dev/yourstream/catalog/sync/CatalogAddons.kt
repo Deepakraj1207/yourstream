@@ -118,6 +118,27 @@ class CatalogAddons @Inject constructor(
         return (synchronized(this) { provider(a) }?.describe() as? AppResult.Ok)?.value
     }
 
+    /**
+     * Fetches an add-on's manifest again (the Add-ons page's refresh, like Nuvio's): an add-on
+     * that changed its name in its manifest keeps the new name, and the catalog manager is rebuilt
+     * so Home and Search use the catalogs the add-on lists now. Null: not reachable right now
+     * (nothing is changed then).
+     */
+    suspend fun refresh(id: String): CatalogProviderInfo? {
+        val a = _addons.value.firstOrNull { it.id == id } ?: return null
+        val info = (synchronized(this) { provider(a) }?.describe() as? AppResult.Ok)?.value ?: return null
+        synchronized(this) {
+            val renamed = !a.builtIn && info.name.isNotBlank() && info.name != a.name
+            if (renamed) {
+                // The provider carries the name it was made with: make it again under the new one.
+                a.manifestUrl?.let { customProviders.remove(it) }
+                update(_addons.value.map { if (it.id == id) it.copy(name = info.name) else it })
+            }
+            built = null
+        }
+        return info
+    }
+
     /** Enabled add-ons that answer "how can I watch X?" (Stremio stream resource). */
     suspend fun streamProviders(): List<StreamProvider> =
         synchronized(this) { _addons.value.filter { it.enabled }.mapNotNull { provider(it) as? StreamProvider } }

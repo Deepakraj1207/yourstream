@@ -3,6 +3,8 @@ package dev.yourstream.ui.screens.addon
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +20,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -64,8 +71,7 @@ import dev.yourstream.ui.screens.R
 import dev.yourstream.ui.screens.navigation.CatalogTitleRoute
 import dev.yourstream.ui.screens.navigation.OpenTarget
 import dev.yourstream.ui.screens.navigation.StreamPlayerRoute
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,8 +82,34 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
-/** Streams of one add-on for the selected movie/episode. */
-data class StreamGroup(val addon: String, val streams: List<AddonStream>, val error: String? = null)
+/**
+ * Streams of one add-on for the selected movie/episode. [id] tells add-ons with the same name
+ * apart; [loading] while the add-on has not answered yet.
+ */
+data class StreamGroup(
+    val addon: String,
+    val streams: List<AddonStream>,
+    val error: String? = null,
+    val id: String = addon,
+    val loading: Boolean = false,
+) {
+    companion object {
+        /**
+         * The order groups are shown in, kept stable while answers arrive: add-ons with direct
+         * (HTTP) streams first, then torrents, then the ones still loading, then those that found
+         * nothing or did not answer. Within each, the order the add-ons are listed in.
+         */
+        fun ordered(groups: List<StreamGroup>): List<StreamGroup> = groups.sortedBy { g ->
+            when {
+                g.streams.any { it.playable } -> 0
+                g.streams.any { it.isTorrent } -> 1
+                g.streams.isNotEmpty() -> 2
+                g.loading -> 3
+                else -> 4
+            }
+        }
+    }
+}
 
 data class CatalogTitleUiState(
     val title: String,
@@ -96,14 +128,29 @@ data class CatalogTitleUiState(
     val loadingStreams: Boolean = false,
     /** No enabled add-on offers streams. */
     val noStreamAddons: Boolean = false,
+    /** The add-on whose streams are shown alone ([StreamGroup.id]); null: all add-ons, grouped. */
+    val streamAddon: String? = null,
 ) {
     val episodes: List<CatalogVideo> get() = meta?.videos.orEmpty().filter { it.season == season }
+
+    /** Groups with something to show or still loading: the add-on chips. */
+    val streamTabs: List<StreamGroup> get() = streams.filter { it.streams.isNotEmpty() || it.loading }
+
+    /** The groups on screen: one add-on when its chip is chosen (and it is still there), else all with streams. */
+    val shownStreams: List<StreamGroup> get() {
+        val one = streamAddon?.let { id -> streams.firstOrNull { it.id == id && (it.streams.isNotEmpty() || it.loading) } }
+        return if (one != null) listOf(one) else streams.filter { it.streams.isNotEmpty() }
+    }
 }
 
 sealed interface CatalogTitleAction {
     data class SelectSeason(val season: Int) : CatalogTitleAction
     data class SelectEpisode(val video: CatalogVideo) : CatalogTitleAction
     data object Retry : CatalogTitleAction
+    /** Show one add-on's streams ([StreamGroup.id]), or all of them (null). */
+    data class SelectStreamAddon(val id: String?) : CatalogTitleAction
+    /** Ask the stream add-ons again for the same movie or episode. */
+    data object RefreshStreams : CatalogTitleAction
 }
 
 /**
@@ -131,6 +178,8 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
             is CatalogTitleAction.SelectSeason -> _state.update { it.copy(season = a.season) }
             is CatalogTitleAction.SelectEpisode -> { _state.update { it.copy(episode = a.video) }; loadStreams(CatalogType.SERIES, episodeIds(a.video)) }
             CatalogTitleAction.Retry -> load()
+            is CatalogTitleAction.SelectStreamAddon -> _state.update { it.copy(streamAddon = a.id) }
+            CatalogTitleAction.RefreshStreams -> lastStreams?.let { (t, ids) -> loadStreams(t, ids) }
         }
     }
 
@@ -156,35 +205,49 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
         if (type == CatalogType.MOVIE) loadStreams(CatalogType.MOVIE, listOfNotNull(imdb, item.ref.id).distinct())
     }
 
+    /** What the streams on screen are for, so the refresh can ask again. */
+    private var lastStreams: Pair<CatalogType, List<String>>? = null
+    private var streamJob: Job? = null
+
     /**
      * Asks every enabled stream add-on at once, each with the first id form it declares it
      * handles (an anime add-on gets "kitsu:…", most others the IMDb id); add-ons that handle
-     * none of them are not asked at all.
+     * none of them are dropped. Each add-on's streams appear as soon as it answers, like Nuvio,
+     * instead of after the slowest one. A newer request (another episode, a refresh) cancels the
+     * older one, so a slow answer for the previous episode cannot replace the current list.
      */
-    private fun loadStreams(t: CatalogType, ids: List<String>) = viewModelScope.launch {
-        _state.update { it.copy(loadingStreams = true, streams = emptyList(), noStreamAddons = false) }
-        val providers = addons.streamProviders()
-        if (providers.isEmpty()) { _state.update { it.copy(loadingStreams = false, noStreamAddons = true) }; return@launch }
-        val groups = coroutineScope {
-            providers.map { p ->
-                async {
-                    val id = ids.firstOrNull { runCatching { p.handles(t, it) }.getOrDefault(false) } ?: return@async null
-                    when (val r = runCatching { p.streams(t, id) }.getOrElse { AppResult.Err(dev.yourstream.core.common.AppError.Network()) }) {
-                        is AppResult.Ok -> StreamGroup(p.displayName, r.value)
-                        is AppResult.Err -> StreamGroup(p.displayName, emptyList(), r.error.message)
+    private fun loadStreams(t: CatalogType, ids: List<String>) {
+        lastStreams = t to ids
+        streamJob?.cancel()
+        streamJob = viewModelScope.launch {
+            _state.update { it.copy(loadingStreams = true, streams = emptyList(), noStreamAddons = false) }
+            val providers = addons.streamProviders()
+            if (providers.isEmpty()) { _state.update { it.copy(loadingStreams = false, noStreamAddons = true) }; return@launch }
+            val keys = providers.map { it.id.value }
+            _state.update { s -> s.copy(streams = providers.map { p -> StreamGroup(p.displayName, emptyList(), id = p.id.value, loading = true) }) }
+            fun answer(key: String, g: StreamGroup?) = _state.update { s ->
+                val next = if (g == null) s.streams.filterNot { it.id == key } else s.streams.map { if (it.id == key) g else it }
+                // Listed order first (stable), then the display order.
+                s.copy(streams = StreamGroup.ordered(next.sortedBy { keys.indexOf(it.id) }))
+            }
+            coroutineScope {
+                providers.forEach { p ->
+                    launch {
+                        val key = p.id.value
+                        val id = ids.firstOrNull { runCatching { p.handles(t, it) }.getOrDefault(false) }
+                        if (id == null) { answer(key, null); return@launch }
+                        val r = runCatching { p.streams(t, id) }.getOrElse { e ->
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            AppResult.Err(dev.yourstream.core.common.AppError.Network())
+                        }
+                        answer(key, when (r) {
+                            is AppResult.Ok -> StreamGroup(p.displayName, r.value, id = key)
+                            is AppResult.Err -> StreamGroup(p.displayName, emptyList(), r.error.message, id = key)
+                        })
                     }
                 }
-            }.awaitAll().filterNotNull()
-        }
-        // Add-ons with direct (HTTP) streams first, then torrents; add-ons with nothing at the end.
-        _state.update {
-            it.copy(loadingStreams = false, streams = groups.sortedBy { g ->
-                when {
-                    g.streams.any { s -> s.playable } -> 0
-                    g.streams.any { s -> s.isTorrent } -> 1
-                    else -> 2
-                }
-            })
+            }
+            _state.update { it.copy(loadingStreams = false) }
         }
     }
 
@@ -247,12 +310,12 @@ fun CatalogTitleScreen(
                     }
                     items(state.episodes, key = { "ep:" + it.id }) { e ->
                         EpisodeRow(e, selected = e.id == state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(e)) }
-                        if (e.id == state.episode?.id) Streams(state, torrents, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
+                        if (e.id == state.episode?.id) Streams(state, torrents, onAction, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
                     }
                 }
             } else {
                 item { SectionTitle(stringResource(R.string.addon_streams)) }
-                item { Streams(state, torrents, onStream, Modifier.padding(horizontal = d.gutter)) }
+                item { Streams(state, torrents, onAction, onStream, Modifier.padding(horizontal = d.gutter)) }
             }
         }
     }
@@ -301,18 +364,100 @@ private fun EpisodeRow(e: CatalogVideo, selected: Boolean, onClick: () -> Unit) 
     }
 }
 
+/**
+ * The streams, by add-on like Nuvio: a row of chips (All, then each add-on with its count) and a
+ * refresh button, then each add-on's streams under its name. Add-ons appear as they answer; the
+ * ones that found nothing or did not answer are named at the end, not hidden.
+ */
 @Composable
-private fun Streams(state: CatalogTitleUiState, torrents: Boolean, onStream: (AddonStream) -> Unit, modifier: Modifier) {
-    Column(modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun Streams(state: CatalogTitleUiState, torrents: Boolean, onAction: (CatalogTitleAction) -> Unit, onStream: (AddonStream) -> Unit, modifier: Modifier) {
+    Column(modifier.padding(vertical = 8.dp).testTag("streams"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
-            state.loadingStreams -> Loading()
             state.noStreamAddons -> Note(stringResource(R.string.addon_no_stream_addons))
-            state.streams.all { it.streams.isEmpty() } -> Note(stringResource(R.string.addon_no_streams))
-            else -> state.streams.filter { it.streams.isNotEmpty() }.forEach { g ->
-                Text(g.addon, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
-                g.streams.forEach { s -> StreamRow(s, torrents, onStream) }
+            state.streams.isEmpty() && state.loadingStreams -> Loading()
+            else -> {
+                StreamTabs(state, onAction)
+                val shown = state.shownStreams
+                if (shown.isEmpty() && !state.loadingStreams) Note(stringResource(R.string.addon_no_streams))
+                shown.forEach { g ->
+                    GroupHeader(g)
+                    if (g.loading) Loading()
+                    g.streams.forEach { s -> StreamRow(s, torrents, onStream) }
+                }
+                if (state.streamAddon == null || shown.none { it.id == state.streamAddon }) Missing(state.streams)
             }
         }
+    }
+}
+
+/** All · n, then one chip per add-on (a spinner on those still loading), and the refresh button. */
+@Composable
+private fun StreamTabs(state: CatalogTitleUiState, onAction: (CatalogTitleAction) -> Unit) {
+    val tabs = state.streamTabs
+    val chosen = state.streamAddon?.takeIf { id -> tabs.any { it.id == id } }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (tabs.isNotEmpty()) {
+                StreamChip(stringResource(R.string.addon_streams_all, tabs.sumOf { it.streams.size }), chosen == null, loading = false, tag = "stream-addon:all") {
+                    onAction(CatalogTitleAction.SelectStreamAddon(null))
+                }
+            }
+            tabs.forEach { g ->
+                val label = if (g.loading) g.addon else stringResource(R.string.addon_streams_chip, g.addon, g.streams.size)
+                StreamChip(label, chosen == g.id, g.loading, "stream-addon:${g.id}") { onAction(CatalogTitleAction.SelectStreamAddon(g.id)) }
+            }
+        }
+        IconButton(
+            onClick = { onAction(CatalogTitleAction.RefreshStreams) }, enabled = !state.loadingStreams,
+            modifier = Modifier.focusHighlight().testTag("streams-refresh"),
+        ) {
+            if (state.loadingStreams) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            else Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.addon_streams_refresh))
+        }
+    }
+}
+
+@Composable
+private fun StreamChip(label: String, selected: Boolean, loading: Boolean, tag: String, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected, onClick = onClick, label = { Text(label, maxLines = 1) },
+        leadingIcon = when {
+            loading -> ({ CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp) })
+            selected -> ({ Icon(Icons.Filled.Check, contentDescription = null) })
+            else -> null
+        },
+        modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag(tag),
+    )
+}
+
+/** An add-on's name over its streams, with how many it found. */
+@Composable
+private fun GroupHeader(g: StreamGroup) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).semantics(mergeDescendants = true) { heading() }.testTag("stream-group:${g.id}"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(g.addon, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (!g.loading) {
+            Text(pluralStringResource(R.plurals.addon_streams_count, g.streams.size, g.streams.size), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Add-ons that found nothing, and those that did not answer, by name. */
+@Composable
+private fun Missing(groups: List<StreamGroup>) {
+    val done = groups.filter { !it.loading && it.streams.isEmpty() }
+    val none = done.filter { it.error == null }.map { it.addon }
+    val failed = done.filter { it.error != null }.map { it.addon }
+    if (none.isEmpty() && failed.isEmpty()) return
+    Column(Modifier.padding(top = 8.dp).testTag("streams-missing"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        val style = MaterialTheme.typography.bodySmall
+        val color = MaterialTheme.colorScheme.onSurfaceVariant
+        if (none.isNotEmpty()) Text(stringResource(R.string.addon_streams_none_from, none.joinToString(", ")), style = style, color = color)
+        if (failed.isNotEmpty()) Text(stringResource(R.string.addon_streams_no_answer, failed.joinToString(", ")), style = style, color = color)
     }
 }
 

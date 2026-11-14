@@ -313,6 +313,12 @@
     <string name="addons_built_in">Built in</string>
     <string name="addons_remove">Remove %1$s</string>
     <string name="addons_checking">Checking…</string>
+    <string name="addons_refresh">Refresh add-ons</string>
+    <plurals name="addons_refreshed_all">
+        <item quantity="one">Refreshed: the add-on answered.</item>
+        <item quantity="other">Refreshed: all %1$d add-ons answered.</item>
+    </plurals>
+    <string name="addons_refreshed_some">Refreshed: %1$d of %2$d add-ons answered. The others are not reachable right now.</string>
     <string name="addons_unavailable">Not reachable right now</string>
     <plurals name="addons_catalogs">
         <item quantity="one">%1$d catalog</item>
@@ -348,6 +354,15 @@
     <string name="addon_no_episodes">No episode list from your add-ons for this series.</string>
     <string name="addon_no_stream_addons">No stream add-on is installed. Add one in Settings → Add-ons to see streams here.</string>
     <string name="addon_no_streams">No streams found for this title.</string>
+    <string name="addon_streams_all">All · %1$d</string>
+    <string name="addon_streams_chip">%1$s · %2$d</string>
+    <plurals name="addon_streams_count">
+        <item quantity="one">%1$d stream</item>
+        <item quantity="other">%1$d streams</item>
+    </plurals>
+    <string name="addon_streams_refresh">Refresh streams</string>
+    <string name="addon_streams_none_from">No streams from %1$s.</string>
+    <string name="addon_streams_no_answer">Did not answer: %1$s. Refresh to ask again.</string>
     <string name="addon_stream_external">Opens in another app</string>
     <string name="addon_stream_torrent">Torrent · plays while it downloads</string>
     <string name="addon_stream_torrent_off">Torrent · tap to turn on torrent streaming</string>

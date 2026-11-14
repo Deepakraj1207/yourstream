@@ -191,7 +191,13 @@ class ScreenshotTest {
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Breaking.Bad.S01E02.2160p.mkv · 6.1 GB · 👤 120", null, null, "aabbccddeeff00112233445566778899aabbccdd"),
-                ))),
+                ), id = "example"),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Other Add-on", listOf(
+                        dev.yourstream.catalog.api.AddonStream("Other Add-on", "1080p", "WEB-DL · 1.4 GB", "https://example.org/b.mkv", null, null),
+                    ), id = "other"),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Slow Add-on", emptyList(), id = "slow", loading = true),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Quiet Add-on", emptyList(), id = "quiet"),
+                ), loadingStreams = true,
             ),
             {}, {}, {}, onStream = {},
         )
