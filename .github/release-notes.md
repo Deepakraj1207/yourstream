@@ -1,3 +1,12 @@
+## What's new in 0.11.2
+
+- **Fixed: Telegram sign-in could keep loading forever.** Closing the app quickly a few times
+  (or installing an update) could start it in a safe mode where Telegram never started. Now
+  only real crashes count, and the sign-in screen always explains a slow or stopped start, with
+  a button to start Telegram.
+- Library status: buttons no longer squeeze the text on phones.
+- Add-ons: the Nuvio plugins tab is gone (plugin links get a short note).
+
 ## What's new in 0.11.1
 
 - **Titles fixed for names joined with underscores** ("@Channel_LinkZ_Movie_2023_…"): such files
