@@ -303,7 +303,8 @@ speed labels are pure functions in `PlayerViewModel` (tested).
   * screenshots (12, Robolectric native graphics): phone home (dark), library (light), empty
     favorites, tablet home, TV home, TV settings, phone player, phone audio panel, phone player
     error, TV player buffering, TV episode list, TV up next. They are written to
-    `ui/screens/build/screenshots/` for review.
+    `ui/screens/build/screenshots/` for review; a selection, resized, is kept in `docs/screenshots/`
+    for the README.
 * **Engine and library:** playback speed and stream format reported by the controller (Robolectric
   playback test); previous episode across seasons (library test).
 
