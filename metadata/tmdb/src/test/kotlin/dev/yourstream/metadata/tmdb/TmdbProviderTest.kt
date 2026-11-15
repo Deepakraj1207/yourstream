@@ -178,7 +178,8 @@ class TmdbProviderTest {
                   "credits":{"cast":[{"name":"Vijay Sethupathi","character":"Bathvachalam","profile_path":"/v.jpg","order":1},{"name":"Sai Prithviraj","character":"Sabari","order":0}],
                     "crew":[{"name":"Balaji T","job":"Director","department":"Directing"},{"name":"Balaji T","job":"Screenplay","department":"Writing"},{"name":"Someone","job":"Editor","department":"Editing"}]},
                   "videos":{"results":[{"name":"Teaser","key":"t1","site":"YouTube","type":"Teaser"},{"name":"Official Trailer","key":"tr1","site":"YouTube","type":"Trailer","official":true,"published_at":"2026-01-01T00:00:00Z"},{"name":"Vimeo","key":"v","site":"Vimeo","type":"Trailer"}]},
-                  "images":{"logos":[{"file_path":"/de.png","iso_639_1":"de","vote_average":9},{"file_path":"/en.png","iso_639_1":"en","vote_average":5},{"file_path":"/ta.png","iso_639_1":"ta","vote_average":1}]},
+                  "images":{"logos":[{"file_path":"/de.png","iso_639_1":"de","vote_average":9},{"file_path":"/en.png","iso_639_1":"en","vote_average":5},{"file_path":"/ta.png","iso_639_1":"ta","vote_average":1}],
+                    "posters":[{"file_path":"/titled.jpg","iso_639_1":"en","vote_average":9},{"file_path":"/clean.jpg","iso_639_1":null,"vote_average":4}]},
                   "recommendations":{"results":[{"id":7,"title":"Airborne","release_date":"1993-09-17","poster_path":"/a.jpg"}]},
                   "release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"certification":"R"}]},{"iso_3166_1":"IN","release_dates":[{"certification":""},{"certification":"U/A 13+"}]}]}}"""
                 else -> HttpStatusCode.NotFound to "{}"
@@ -188,6 +189,7 @@ class TmdbProviderTest {
         assertEquals("555", d.tmdbId)
         assertEquals("U/A 13+", d.certification, "the user's region first")
         assertEquals("https://image.tmdb.org/t/p/w500/ta.png", d.logoUrl, "the logo in the user's language first")
+        assertEquals("https://image.tmdb.org/t/p/w780/clean.jpg", d.textlessPosterUrl, "a poster without printed title")
         assertEquals(listOf("Balaji T"), d.directors)
         assertEquals(listOf("Balaji T"), d.writers)
         assertEquals(listOf("Sai Prithviraj", "Vijay Sethupathi"), d.cast.map { it.name }, "billing order")

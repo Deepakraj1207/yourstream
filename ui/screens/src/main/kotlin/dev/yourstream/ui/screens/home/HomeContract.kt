@@ -41,6 +41,10 @@ data class HeroSlide(
     /** ISO codes ("ta"), shown as "TA". */
     val languages: List<String>,
     val open: OpenTarget,
+    /** The title's logo (TMDB), drawn instead of the title text. */
+    val logoUrl: String? = null,
+    /** Artwork without the title printed on it (TMDB), so the logo is not shown twice. */
+    val textlessPosterUrl: String? = null,
 )
 
 data class HeroItem(
@@ -76,6 +80,8 @@ data class HomeUiState(
     val catalogsLoading: Boolean = false,
     /** The hero carousel's slides (from the hero catalogs); empty: the library hero. */
     val heroSlides: List<HeroSlide> = emptyList(),
+    /** The hero catalogs are still loading: a placeholder of the carousel's size, not the library hero. */
+    val heroLoading: Boolean = false,
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?

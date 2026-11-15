@@ -146,7 +146,7 @@ private fun TopBar(state: CatalogTitleUiState, title: String, collapsed: Boolean
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (collapsed) {
                 val logo = state.details?.logoUrl
-                if (logo != null) Artwork(logo, title, Modifier.height(40.dp).widthIn(max = 200.dp).fillMaxWidth(), contentScale = ContentScale.Fit, showInitials = false)
+                if (logo != null) Artwork(logo, title, Modifier.height(40.dp).widthIn(max = 200.dp).fillMaxWidth(), contentScale = ContentScale.Fit, showInitials = false, placeholder = false)
                 else Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -173,7 +173,7 @@ private fun Hero(state: CatalogTitleUiState, title: String, height: androidx.com
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val logo = d?.logoUrl
             if (logo != null) {
-                Artwork(logo, title, Modifier.fillMaxWidth(0.75f).height(110.dp).testTag("title-logo"), contentScale = ContentScale.Fit, showInitials = false)
+                Artwork(logo, title, Modifier.fillMaxWidth(0.75f).height(110.dp).testTag("title-logo"), contentScale = ContentScale.Fit, showInitials = false, placeholder = false)
             } else {
                 Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
@@ -252,7 +252,8 @@ private fun Facts(state: CatalogTitleUiState) {
                     if (state.ratingIsImdb) Rating("IMDb", Color(0xFFF5C518), Color.Black, "%.1f".format(java.util.Locale.ROOT, r), Color(0xFFF5C518))
                     else Text("★ %.1f".format(java.util.Locale.ROOT, r), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFF5C518))
                 }
-                tmdbRating?.let { r -> Rating("TMDB", Color(0xFF0D253F), Color(0xFF01B4E4), (r * 10).toInt().toString(), Color(0xFF01B4E4)) }
+                // TMDB scores out of 10 ("6.7"), like IMDb.
+                tmdbRating?.let { r -> Rating("TMDB", Color(0xFF0D253F), Color(0xFF01B4E4), "%.1f".format(java.util.Locale.ROOT, r), Color(0xFF01B4E4)) }
             }
         }
         val crew = listOf(
@@ -327,7 +328,7 @@ private fun Production(companies: List<TitleDetails.Company>) {
         LazyRow(contentPadding = PaddingValues(horizontal = g), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(companies, key = { it.name }) { c ->
                 Box(Modifier.width(100.dp).height(56.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFFE0E0E0)).padding(10.dp), contentAlignment = Alignment.Center) {
-                    if (c.logoUrl != null) Artwork(c.logoUrl, c.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, showInitials = false)
+                    if (c.logoUrl != null) Artwork(c.logoUrl, c.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, showInitials = false, placeholder = false)
                     else Text(c.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 2,
                         overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                 }

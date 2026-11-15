@@ -910,3 +910,22 @@ Checked on the published files (run 25):
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 8 (15 Nov 2026): startup hero swap, logo boxes, TMDB score
+
+From the user's screen recording and screenshots of 0.12.1:
+* **The old home showed first, then the new one.** Until the hero catalogs answered, Home showed
+  the library hero (Continue watching), then swapped it for the carousel. Home now keeps the
+  carousel's space empty while it loads (`HomeUiState.heroLoading`, `HeroCarouselPlaceholder`).
+  Test: `LayoutSettingsTest.homeShowsTheHeroCarouselWhenHeroCatalogsAreChosen`.
+* **The title logo had a box behind it, and production logos looked wrong.** `Artwork` always
+  drew its grey placeholder under the image. Transparent PNGs (logos) showed it as a box, and
+  dark company logos disappeared into it. `Artwork(placeholder = false)` is now used for title
+  and company logos.
+* **The carousel showed the title twice** (printed on the poster, and as text). With a TMDB key,
+  slides use TMDB's logo over a poster without printed title (or the backdrop). The wait for
+  TMDB is at most 3 s; slides it does not answer for keep the add-on's artwork. The logo carries
+  the title for screen readers.
+* **The TMDB score showed "67".** It is now "6.7", out of 10 like IMDb.
+* Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.

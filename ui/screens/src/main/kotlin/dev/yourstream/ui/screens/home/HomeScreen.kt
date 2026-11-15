@@ -140,7 +140,7 @@ private fun HomeContent(
         Modifier.fillMaxSize().testTag("home"),
         // The hero carousel starts at the very top (full width, like Nuvio's).
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            top = if (shown.hero && state.heroSlides.isNotEmpty()) 0.dp else if (LocalWindowLayout.current.isTv) 32.dp else 16.dp,
+            top = if (shown.hero && (state.heroSlides.isNotEmpty() || state.heroLoading)) 0.dp else if (LocalWindowLayout.current.isTv) 32.dp else 16.dp,
             bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current,
         ),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
@@ -148,6 +148,8 @@ private fun HomeContent(
         state.banner?.let { b -> item(key = "banner") { Banner(b, onSignIn, onChooseSources) } }
         // Settings → Layout → Home layout → Hero catalogs: a carousel from them, else the library hero.
         if (shown.hero && state.heroSlides.isNotEmpty()) item(key = "hero-carousel") { HeroCarousel(state.heroSlides, onOpen) }
+        // Still asking the hero catalogs: keep their space empty rather than flash the library hero.
+        else if (shown.hero && state.heroLoading) item(key = "hero-carousel") { HeroCarouselPlaceholder() }
         else if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()

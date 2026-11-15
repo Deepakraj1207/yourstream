@@ -132,15 +132,18 @@ class HomeViewModel @Inject constructor(
         .catch { emit(UiState.Error(it.toUiError())) }
 
     /** The hero carousel from the user's hero catalogs (empty while loading or with none picked). */
-    private val heroSlides: Flow<List<HeroSlide>> = heroSource.slides().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
+    // Null until the first answer: Home then keeps the carousel's space instead of flashing the
+    // library hero and swapping it out a moment later.
+    private val heroSlides: Flow<List<HeroSlide>?> = heroSource.slides().map<List<HeroSlide>, List<HeroSlide>?> { it }
+        .onStart { emit(null) }.catch { emit(emptyList()) }
 
     // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
     private val extras = combine(forYou, catalogs, heroSlides) { f, c, h -> Extras(f, c, h) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?, val hero: List<HeroSlide>)
+    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?, val hero: List<HeroSlide>?)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
-        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null, heroSlides = e.hero)
+        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null, heroSlides = e.hero.orEmpty(), heroLoading = e.hero == null)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

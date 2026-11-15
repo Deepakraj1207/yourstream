@@ -68,7 +68,7 @@ class TitleDetailsPageTest {
         compose.onNodeWithTag("title-certification").assertTextContains("U/A 13+")
         compose.onNodeWithText("2h 39m").assertExists()
         compose.onNodeWithText("8.5", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("79", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("7.9", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Director:  Balaji Tharaneetharan").assertExists()
         compose.onNodeWithTag("catalog-title").performScrollToNode(hasTestTag("title-overview"))
         compose.onNodeWithTag("title-show-more").performClick()

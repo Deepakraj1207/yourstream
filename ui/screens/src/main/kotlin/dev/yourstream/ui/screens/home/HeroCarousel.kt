@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -73,8 +74,7 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (OpenTarget) -> Unit, modifier
         pager.animateScrollToPage((pager.settledPage + 1) % slides.size)
     }
     val compact = LocalWindowLayout.current == WindowLayout.COMPACT
-    val screen = LocalConfiguration.current.screenHeightDp.dp
-    val height = if (compact) (screen * 0.66f).coerceIn(420.dp, 680.dp) else (screen * 0.6f).coerceIn(360.dp, 620.dp)
+    val height = heroHeight()
     Column(modifier.fillMaxWidth().testTag("hero-carousel")) {
         HorizontalPager(pager, Modifier.fillMaxWidth().height(height), key = { slides[it].key }) { page ->
             Slide(slides[page], compact, onOpen)
@@ -83,11 +83,34 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (OpenTarget) -> Unit, modifier
     }
 }
 
+/** The carousel's height, the same while it loads ([HeroCarouselPlaceholder]) and once it shows. */
+@Composable
+private fun heroHeight(): androidx.compose.ui.unit.Dp {
+    val compact = LocalWindowLayout.current == WindowLayout.COMPACT
+    val screen = LocalConfiguration.current.screenHeightDp.dp
+    return if (compact) (screen * 0.66f).coerceIn(420.dp, 680.dp) else (screen * 0.6f).coerceIn(360.dp, 620.dp)
+}
+
+/** The carousel's space while its catalogs load: the page does not jump or swap heroes. */
+@Composable
+fun HeroCarouselPlaceholder(modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().testTag("hero-loading")) {
+        Box(Modifier.fillMaxWidth().height(heroHeight()).background(Brush.verticalGradient(
+            0f to MaterialTheme.colorScheme.surfaceContainer, 1f to MaterialTheme.colorScheme.background,
+        )))
+        // Where the dots go.
+        Box(Modifier.height(20.dp))
+    }
+}
+
 @Composable
 private fun Slide(s: HeroSlide, compact: Boolean, onOpen: (OpenTarget) -> Unit) {
     val background = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxSize().testTag("hero-slide:${s.key}")) {
-        Artwork(if (compact) s.posterUrl ?: s.backdropUrl else s.backdropUrl ?: s.posterUrl, s.title, Modifier.fillMaxSize(), showInitials = false)
+        // With the title's logo drawn over it, artwork without the title printed on it.
+        val art = if (compact) s.textlessPosterUrl ?: (if (s.logoUrl != null) s.backdropUrl else null) ?: s.posterUrl ?: s.backdropUrl
+        else s.backdropUrl ?: s.textlessPosterUrl ?: s.posterUrl
+        Artwork(art, s.title, Modifier.fillMaxSize(), showInitials = false)
         // Fades into the page so the title reads on any artwork.
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
             0f to Color.Transparent, 0.45f to Color.Transparent, 0.8f to background.copy(alpha = 0.85f), 1f to background,
@@ -96,8 +119,13 @@ private fun Slide(s: HeroSlide, compact: Boolean, onOpen: (OpenTarget) -> Unit) 
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(s.title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+            if (s.logoUrl != null) {
+                Artwork(s.logoUrl, s.title, Modifier.fillMaxWidth(0.8f).height(120.dp).semantics { heading(); contentDescription = s.title }.testTag("hero-logo"),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit, showInitials = false, placeholder = false)
+            } else {
+                Text(s.title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+            }
             val type = stringResource(if (s.type == CatalogType.SERIES) R.string.hero_series else R.string.hero_movie)
             Text(
                 listOfNotNull(type, s.genre, s.runtimeMinutes?.let(::runtimeLabel), s.year?.toString()).joinToString("  •  "),

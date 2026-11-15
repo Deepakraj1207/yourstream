@@ -197,21 +197,31 @@ class LayoutSettingsTest {
     @Test
     fun homeShowsTheHeroCarouselWhenHeroCatalogsAreChosen() {
         var slides by mutableStateOf(emptyList<dev.yourstream.ui.screens.home.HeroSlide>())
+        var loading by mutableStateOf(true)
         compose.setContent {
             YourStreamTheme(WindowLayout.COMPACT) {
                 val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
                 val hero = dev.yourstream.ui.screens.home.HeroItem(dev.yourstream.ui.screens.home.HeroItem.Kind.NEW, "hero:1", "Leo", "2023", null, null,
                     OpenTarget.Play(PlaybackTarget(1)), OpenTarget.Details(1))
                 HomeScreen(HomeUiState(null, UiState.Content(hero), UiState.Empty(dev.yourstream.ui.core.EmptyKind.NOTHING_IN_PROGRESS), libraryCount = 3,
-                    heroSlides = slides), HomeRows(none, none), {}, {}, {}, {}, {})
+                    heroSlides = slides, heroLoading = loading), HomeRows(none, none), {}, {}, {}, {}, {})
             }
         }
+        // Reported from a device: the library hero showed first, then the carousel replaced it.
+        // While the hero catalogs load: their space, empty.
+        compose.onNodeWithTag("hero-loading").assertExists()
+        compose.onNodeWithTag("hero").assertDoesNotExist()
+        loading = false
         // No hero catalogs: the library hero.
         compose.onNodeWithTag("hero").assertExists()
         compose.onNodeWithTag("hero-carousel").assertDoesNotExist()
         slides = listOf(dev.yourstream.ui.screens.home.HeroSlide("hero:x", "Immortal", null, null, CatalogType.MOVIE, null, null, 2026, null, emptyList(), OpenTarget.Details(9)))
         compose.onNodeWithTag("hero-carousel").assertExists()
         compose.onNodeWithTag("hero").assertDoesNotExist()
+        // With TMDB's logo: the logo instead of the title text (still the title for screen readers).
+        slides = listOf(slides.single().copy(logoUrl = "https://image.tmdb.org/t/p/w500/logo.png"))
+        compose.onNodeWithTag("hero-logo").assertExists()
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Immortal")).assertExists()
     }
 
     @Test

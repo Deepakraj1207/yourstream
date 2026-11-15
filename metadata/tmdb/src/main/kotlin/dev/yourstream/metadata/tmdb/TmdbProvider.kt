@@ -264,6 +264,8 @@ class TmdbProvider(
             videos = videos,
             originCountries = d.originCountry.ifEmpty { d.productionCountries.map { it.code } },
             originalLanguage = d.originalLanguage?.ifBlank { null },
+            // Posters with no language have no title printed on them.
+            textlessPosterUrl = d.images?.posters.orEmpty().filter { it.language == null }.maxByOrNull { it.voteAverage }?.let { image(it.filePath, POSTER_LARGE) },
             seasonCount = d.numberOfSeasons, episodeCount = d.numberOfEpisodes,
             recommendations = similar,
         )
@@ -305,6 +307,7 @@ class TmdbProvider(
         private const val STILL = "w300"
         private const val PROFILE = "w185"
         private const val LOGO = "w500"
+        private const val POSTER_LARGE = "w780"
         private const val LOGO_SMALL = "w185"
         private const val MAX_COMPANIES = 6
         private const val MAX_SIMILAR = 20

@@ -38,6 +38,8 @@ data class TitleDetails(
     val originCountries: List<String>,
     /** ISO 639 code ("ta"). */
     val originalLanguage: String?,
+    /** A poster without its title printed on it (for a hero that shows [logoUrl] over it). */
+    val textlessPosterUrl: String? = null,
     val seasonCount: Int? = null,
     val episodeCount: Int? = null,
     val recommendations: List<Recommendation>,

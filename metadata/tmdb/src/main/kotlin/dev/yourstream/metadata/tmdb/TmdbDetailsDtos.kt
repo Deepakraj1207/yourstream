@@ -52,7 +52,7 @@ internal data class TmdbVideo(
     @SerialName("published_at") val publishedAt: String? = null,
 )
 
-@Serializable internal data class TmdbImages(val logos: List<TmdbImage> = emptyList())
+@Serializable internal data class TmdbImages(val logos: List<TmdbImage> = emptyList(), val posters: List<TmdbImage> = emptyList())
 
 @Serializable
 internal data class TmdbImage(

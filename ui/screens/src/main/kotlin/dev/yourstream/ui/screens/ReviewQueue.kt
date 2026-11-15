@@ -118,10 +118,37 @@ object ScreensModule {
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Provides
-    fun heroSlides(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs): HeroSlides = HeroSlides {
+    fun heroSlides(
+        addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs,
+        details: dev.yourstream.metadata.api.TitleDetailsProvider,
+    ): HeroSlides = HeroSlides {
         kotlinx.coroutines.flow.combine(addons.addons.map { list -> list.filter { it.enabled }.map { it.id } }.distinctUntilChanged(),
             layout.layout.map { it.hero }.distinctUntilChanged()) { e, h -> e to h }
-            .mapLatest { (enabled, hero) -> if (enabled.isEmpty() || hero.isEmpty()) emptyList() else heroSlides(addons.manager(), hero) }
+            .mapLatest { (enabled, hero) -> if (enabled.isEmpty() || hero.isEmpty()) emptyList() else withTmdbArt(heroSlides(addons.manager(), hero), details) }
+    }
+
+    /** How long the carousel waits for TMDB's logos before showing the add-on's artwork instead. */
+    private const val HERO_ART_WAIT_MS = 3_000L
+
+    /**
+     * Like Nuvio's hero: the title's logo over artwork without the title printed on it, from TMDB
+     * (with its key). Slides TMDB does not answer for in time keep the add-on's artwork and the
+     * title as text.
+     */
+    private suspend fun withTmdbArt(slides: List<dev.yourstream.ui.screens.home.HeroSlide>, details: dev.yourstream.metadata.api.TitleDetailsProvider) = coroutineScope {
+        if (!details.isConfigured) return@coroutineScope slides
+        val locale = java.util.Locale.getDefault()
+        slides.map { s ->
+            async {
+                val route = (s.open as? dev.yourstream.ui.screens.navigation.OpenTarget.CatalogTitle)?.route ?: return@async s
+                val imdb = route.imdb ?: route.id.takeIf { it.startsWith("tt") } ?: return@async s
+                val type = if (s.type == dev.yourstream.catalog.api.CatalogType.SERIES) dev.yourstream.metadata.api.MetadataType.SERIES else dev.yourstream.metadata.api.MetadataType.MOVIE
+                val d = kotlinx.coroutines.withTimeoutOrNull(HERO_ART_WAIT_MS) {
+                    runCatching { (details.details(type, imdb, null, locale.toLanguageTag(), locale.country.ifBlank { null }) as? dev.yourstream.core.common.AppResult.Ok)?.value }.getOrNull()
+                } ?: return@async s
+                s.copy(logoUrl = d.logoUrl, textlessPosterUrl = d.textlessPosterUrl, backdropUrl = d.backdropUrl ?: s.backdropUrl)
+            }
+        }.awaitAll()
     }
 
     private suspend fun heroSlides(manager: dev.yourstream.catalog.core.CatalogManager, hero: List<String>) = coroutineScope {
