@@ -164,6 +164,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.core.ktx)
+    // Android 12+ launch screen (also back-ported): the logo on ink instead of a blank window.
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

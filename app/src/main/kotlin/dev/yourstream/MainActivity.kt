@@ -9,8 +9,18 @@ import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import dev.yourstream.ui.screens.navigation.LaunchIntro
 import dev.yourstream.ui.screens.navigation.YourStreamUi
 import dev.yourstream.ui.screens.player.PictureInPicture
 import dev.yourstream.ui.screens.update.AppUpdates
@@ -23,10 +33,18 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var updates: AppUpdates
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The logo on ink while the app starts (Theme.YourStream.Starting), then the animated intro.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // The intro plays when the app is opened, not after rotation or returning to it.
+        val opened = savedInstanceState == null
         setContent {
-            YourStreamUi(appVersion = BuildConfig.VERSION_NAME)
+            var intro by rememberSaveable { mutableStateOf(opened) }
+            Box(Modifier.fillMaxSize()) {
+                YourStreamUi(appVersion = BuildConfig.VERSION_NAME)
+                if (intro) LaunchIntro(painterResource(R.drawable.ic_launcher_foreground), onDone = { intro = false })
+            }
         }
     }
 
