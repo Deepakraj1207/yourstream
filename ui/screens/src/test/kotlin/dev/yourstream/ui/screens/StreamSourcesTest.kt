@@ -72,6 +72,21 @@ class StreamSourcesTest {
         assertEquals(listOf(2160, 720), StreamFilter().apply(listOf(tg)).single().streams.map { it.library?.resolution })
     }
 
+    /**
+     * Reported from a device: the app closed while streams loaded. Streams with and without a
+     * size sorted together compared an Int (0 for "no size") with a Long and threw.
+     */
+    @Test
+    fun streamsWithAndWithoutSizesSortTogether() {
+        val mixed = StreamGroup("Alpha", listOf(web("1080p", 2_000), web("1080p", null), web("720p", 500), web("720p", null), torrent("1080p")), id = "a")
+        StreamSort.entries.forEach { sort ->
+            assertEquals(5, StreamFilter(sort = sort).apply(listOf(mixed)).single().streams.size, "sort $sort")
+        }
+        assertEquals(listOf(2_000L, null, null), StreamFilter().apply(listOf(mixed)).single().streams.take(3).map { it.sizeBytes })
+        assertEquals(listOf(2_000L, 500L), StreamFilter(sort = StreamSort.LARGEST).apply(listOf(mixed)).single().streams.take(2).map { it.sizeBytes })
+        assertEquals(listOf(500L, 2_000L), StreamFilter(sort = StreamSort.SMALLEST).apply(listOf(mixed)).single().streams.take(2).map { it.sizeBytes })
+    }
+
     @Test
     fun filtersDropStreamsAndEmptiedSources() {
         val groups = listOf(tg, alpha, beta)

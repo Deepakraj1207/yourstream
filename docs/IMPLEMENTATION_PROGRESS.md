@@ -870,3 +870,20 @@ Checked on the published files:
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 6 (15 Nov 2026): app closed while streams loaded (0.12.0)
+
+* **Cause:** the new stream sort (`StreamFilter.apply`). The "best quality" tie-break used
+  `sizeBytes ?: 0` and "Largest" used `?: -1`. For streams without a size, those are `Int` values,
+  compared with other streams' `Long` sizes, which threw `ClassCastException` while composing
+  the list. Add-ons usually send a mix of streams with and without sizes. The 0.12.0 tests gave
+  every stream a size, or none, so they never compared the two.
+* **Fix:** `0L` / `-1L`. `qualityOf` now returns null instead of throwing for an unknown height.
+* **Tests:**
+  - `StreamSourcesTest.streamsWithAndWithoutSizesSortTogether`, checked to fail with the old
+    code (same exception);
+  - `TitleStreamsCrashTest`, which runs the real title-page view model with a Torrentio-like
+    add-on (40 results, some without a size) and a Telegram file, and renders the page. It
+    reproduced the device crash before the fix.
+* Gate: 682 tests, 0 failures; lint 0 errors, 15 warnings (unchanged).
+* Status: NEEDS REAL-DEVICE TESTING.

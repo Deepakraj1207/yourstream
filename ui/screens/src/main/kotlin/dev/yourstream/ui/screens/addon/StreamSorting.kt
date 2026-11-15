@@ -35,8 +35,8 @@ data class StreamFilter(
         val kept = g.streams.filter { s -> keeps(s, languageNames) }
         val sorted = when (sort) {
             StreamSort.SOURCE -> kept
-            StreamSort.BEST -> kept.sortedWith(compareByDescending<AddonStream> { heightOf(it) ?: 0 }.thenByDescending { it.sizeBytes ?: 0 })
-            StreamSort.LARGEST -> kept.sortedByDescending { it.sizeBytes ?: -1 }
+            StreamSort.BEST -> kept.sortedWith(compareByDescending<AddonStream> { heightOf(it) ?: 0 }.thenByDescending { it.sizeBytes ?: 0L })
+            StreamSort.LARGEST -> kept.sortedByDescending { it.sizeBytes ?: -1L }
             StreamSort.SMALLEST -> kept.sortedBy { it.sizeBytes ?: Long.MAX_VALUE }
         }
         if (sorted.isEmpty() && !g.loading && g.streams.isNotEmpty()) null else g.copy(streams = sorted)
@@ -70,6 +70,6 @@ data class StreamFilter(
                 HEIGHT.find(text)?.groupValues?.get(1)?.toInt() ?: if (UHD_WORDS.containsMatchIn(text)) 2160 else null
             }
 
-        fun qualityOf(s: AddonStream): StreamQuality? = heightOf(s)?.let { h -> StreamQuality.entries.first { h >= it.minHeight } }
+        fun qualityOf(s: AddonStream): StreamQuality? = heightOf(s)?.let { h -> StreamQuality.entries.firstOrNull { h >= it.minHeight } }
     }
 }
