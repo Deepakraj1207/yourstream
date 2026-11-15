@@ -754,3 +754,12 @@ the start played with a wrong duration, and later pieces failed.
   TDLib, and the clips are small: real multi-GB 4K pieces have not been played.
 * Status: NEEDS REAL-DEVICE TESTING (a real channel's 4K pieces: start time, seeking far into a
   late piece, the boundary between pieces, 4K decoding on the device).
+
+## v0.11.3 release (15 Nov 2026)
+
+Published as the latest release (not a pre-release), on the user's instruction ("release as
+latest"), with the Panel Grid navigation, add-on refresh, streams grouped by add-on, and movies
+in raw pieces. Checked on the published files: `releases/latest` is v0.11.3; the arm64 APK's
+SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 20, versionName 0.11.3; `apksigner`
+shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
+Status: NEEDS REAL-DEVICE TESTING (above all, real 4K movies in pieces from a channel).
