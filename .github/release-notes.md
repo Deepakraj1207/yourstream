@@ -1,3 +1,11 @@
+## What's new in 0.12.2
+
+- Fixed: the old home showed for a moment at start before the hero carousel replaced it.
+- **Carousel like Nuvio's** (with your TMDB key): the title's logo over artwork without the title
+  printed on it, instead of the title twice.
+- Fixed: title logos and production company logos had a grey box behind them.
+- The TMDB score shows out of 10 ("6.7"), like IMDb.
+
 ## What's new in 0.12.1
 
 - **Fixed: the app closed while streams loaded** (0.12.0). Streams with and without a file size
