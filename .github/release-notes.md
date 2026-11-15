@@ -1,3 +1,19 @@
+## What's new in 0.12.0
+
+- **One poster per title.** A movie or series you have on Telegram shows once, with a blue
+  "Telegram" badge, instead of a second poster. Its page lists **your Telegram files first, as a
+  stream source**, above the add-on streams, with quality, size and audio languages. Tapping one
+  plays it in your player (resume, tracks and split files work as before).
+- **Sort & filter streams:** sort by best quality, largest, smallest or source order. Filter by
+  quality (4K / 1080p / 720p / SD), source (Telegram / add-ons), direct or torrent, and audio
+  language. Your choice is remembered for every title.
+- **Search like Nuvio:** recent searches, and **Discover** (type, catalog and genre over a poster
+  grid) before you type. While typing, your Telegram titles come first, then one row per add-on.
+- **Smoother navigation bar:** in Adaptive mode the labels fade and fold away together as the bar
+  shrinks, and the highlight slides between tabs. It reacts only after a real scroll.
+- Home: "Recently added" is tagged **From Telegram**, and the separate Series row is gone.
+- Fixed: the hero carousel stopped halfway between two slides.
+
 ## What's new in 0.11.5
 
 - **Navigation like Nuvio's** in the classic theme: a floating bar over the content, the current
