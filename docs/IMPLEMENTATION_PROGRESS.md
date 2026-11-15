@@ -850,3 +850,23 @@ Implemented after the user approved the mockups:
   Dependencies were left as they are in this change.
 * Status: NEEDS REAL-DEVICE TESTING.
 
+## v0.12.0 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction:
+- one poster per title, with Telegram files as a stream source;
+- stream Sort & filter;
+- Search like Nuvio;
+- the adaptive bar animated like Nuvio;
+- Home: "From Telegram" tag and no Series row;
+- the hero carousel fix.
+
+A first run was cancelled before it published, because the release notes still described 0.11.5.
+The notes were updated and run 24 published the release.
+
+Checked on the published files:
+- `releases/latest` is v0.12.0 and is not a pre-release.
+- The arm64 APK's SHA-256 (`24a95782…7481`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 24 and versionName 0.12.0.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
