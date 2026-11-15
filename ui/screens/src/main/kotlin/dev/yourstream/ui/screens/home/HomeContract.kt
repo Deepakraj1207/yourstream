@@ -43,6 +43,12 @@ data class HomeUiState(
     /** Chats being indexed right now (the status bar at the top). */
     val indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
     val catalogs: List<CatalogRow> = emptyList(),
+    /**
+     * The add-on catalogs are still loading. Home then keeps the layout it will have once they
+     * arrive (setup panel above rows), instead of a full-screen "Sign in" that turns into the
+     * panel a moment later.
+     */
+    val catalogsLoading: Boolean = false,
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?

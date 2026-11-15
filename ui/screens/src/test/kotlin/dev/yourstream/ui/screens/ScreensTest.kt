@@ -147,6 +147,29 @@ class ScreensTest {
     }
 
     @Test
+    fun signInPanelDoesNotJumpFromFullScreenWhileAddonRowsLoad() {
+        // Launch while signed out with an empty library: the add-on rows are still loading. The
+        // layout is already the final one (sign-in panel above rows), not a full-screen
+        // "Connect Telegram" that turns into the panel a moment later.
+        var state by androidx.compose.runtime.mutableStateOf(HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.LIBRARY_EMPTY),
+            UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), libraryCount = 0, catalogsLoading = true))
+        val tile = Tile(MediaCardModel("item:9", "Leo", "2023"), OpenTarget.Details(9), itemId = 9, isFavorite = false, watched = false)
+        set { HomeScreen(state, rows(), {}, {}, {}, {}, {}) }
+        compose.onNodeWithTag("home-setup").assertExists()
+        compose.onAllNodes(hasTestTag("home-catalogs-loading")).fetchSemanticsNodes().let { assertTrue(it.isNotEmpty(), "placeholders for the rows") }
+        compose.onNodeWithTag("state-action").assertDoesNotExist()
+
+        state = state.copy(catalogsLoading = false, catalogs = listOf(dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Popular", listOf(tile))))
+        compose.onNodeWithTag("home-setup").assertExists()
+        compose.onNodeWithText("Popular").assertExists()
+        assertTrue(compose.onAllNodes(hasTestTag("home-catalogs-loading")).fetchSemanticsNodes().isEmpty())
+
+        // No add-on rows at all (none enabled, or none answered): the full-screen step is right.
+        state = state.copy(catalogs = emptyList())
+        compose.onNodeWithTag("state-action").assertExists()
+    }
+
+    @Test
     fun browseShowsCountAndSkeletonWhileLoading() {
         set {
             val loading = androidx.compose.runtime.remember {

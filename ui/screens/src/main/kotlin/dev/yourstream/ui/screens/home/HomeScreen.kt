@@ -101,7 +101,8 @@ private fun HomeContent(
             EmptyKind.NO_SOURCES -> onChooseSources
             else -> null
         }
-        if (catalogs.isEmpty()) {
+        val waiting = shown.catalogs && state.catalogsLoading
+        if (catalogs.isEmpty() && !waiting) {
             EmptyState(blocking, Modifier.testTag("home"), onAction = setupAction)
             return
         }
@@ -118,6 +119,8 @@ private fun HomeContent(
             catalogs.forEach { c ->
                 item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
             }
+            // The add-on rows are on their way: placeholders where they will appear.
+            if (catalogs.isEmpty() && waiting) items(2, key = { "catalog-loading-$it" }) { SkeletonRow(modifier = Modifier.testTag("home-catalogs-loading")) }
         }
         return
     }

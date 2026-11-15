@@ -72,8 +72,11 @@ references `:catalog:indian`.
 `secrets.properties` / `local.properties` / Gradle property / environment (same lookup as the
 other secrets, see `secrets.properties.example`):
 
+Default since 0.11.4: `none`. The app ships with Cinemeta only (switchable on the Add-ons page);
+users add every other add-on themselves. A build can still name known providers:
+
 ```properties
-# order = fallback order; "none" = no providers (local library only)
+# order = fallback order; "none" (default) = no built-in providers besides Cinemeta
 catalog.providers=indiastreams,indian_regional
 # extra Stremio-compatible add-ons (catalog/meta only), comma-separated
 catalog.customManifests=

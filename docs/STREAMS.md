@@ -8,7 +8,7 @@ public Stremio add-on protocol, which is also what Nuvio add-ons use.
 
 | Tab | What it holds |
 | --- | --- |
-| **Stremio** | Built-in catalog add-ons (Cinemeta, Indian catalogs) and Stremio add-ons the user added. |
+| **Stremio** | Cinemeta (the only built-in add-on since 0.11.4; switchable) and Stremio add-ons the user added. |
 | **Nuvio** | Nuvio add-ons the user added. Same protocol as Stremio add-ons; kept apart because that is where users find them. |
 
 Nuvio plugins (JavaScript scrapers for streaming websites, which usually have no rights to what
