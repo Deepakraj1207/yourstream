@@ -1,3 +1,15 @@
+## What's new in 0.12.3
+
+- **The hero carousel no longer reloads** when you come back to Home from another tab, and it
+  shows at once when the app starts (the last carousel is kept and refreshed in the background).
+  The catalog rows are kept too.
+- **Manga style for the hero carousel:** inked comic panels with speed lines, a red FEATURED
+  caption, manga lettering, ink boxes for the rating and language, and square dots.
+- **Player alignment:** the title, times, timeline and buttons share one edge. Rewind, play and
+  forward sit on one line. The times sit over the ends of the timeline. The buttons are centred,
+  all the same height, and wrap onto a second line in portrait instead of running off the
+  screen. The quality badge matches the icons, and the Audio, Subtitles and Speed menus line up.
+
 ## What's new in 0.12.2
 
 - Fixed: the old home showed for a moment at start before the hero carousel replaced it.
