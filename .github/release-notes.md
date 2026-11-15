@@ -1,3 +1,16 @@
+## What's new in 0.12.1
+
+- **Fixed: the app closed while streams loaded** (0.12.0). Streams with and without a file size
+  could not be sorted together.
+- **Title page like Nuvio's, from TMDB** (with your TMDB key in Settings → TMDB): the title's
+  logo over the artwork, genres, **Play**, year · length · age rating, IMDb and TMDB scores,
+  director and writer, the overview with Show More, production companies, cast with photos,
+  trailers (open in YouTube), movie details, and **More Like This**. Without a TMDB key, your
+  add-ons' details fill the same page.
+- **Play opens the streams** on their own page, like Nuvio. They start loading when you open the
+  title, so they are ready. For series, tap an episode to see its streams.
+- **+ in the top bar** adds a title you have on Telegram to My library.
+
 ## What's new in 0.12.0
 
 - **One poster per title.** A movie or series you have on Telegram shows once, with a blue
