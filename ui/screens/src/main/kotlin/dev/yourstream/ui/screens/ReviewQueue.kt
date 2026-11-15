@@ -12,14 +12,14 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-/** Home's hero carousel, from the catalogs the user picked for it (empty: none picked). */
+/** Home's hero carousel, from the catalogs the user picked for it (empty: none picked; null: loading). */
 fun interface HeroSlides {
-    fun slides(): Flow<List<dev.yourstream.ui.screens.home.HeroSlide>>
+    fun slides(): Flow<List<dev.yourstream.ui.screens.home.HeroSlide>?>
 }
 
-/** Catalog rows for Home, from the user's add-ons. */
+/** Catalog rows for Home, from the user's add-ons (null: loading). */
 fun interface HomeCatalogs {
-    fun rows(): Flow<List<dev.yourstream.ui.screens.home.CatalogRow>>
+    fun rows(): Flow<List<dev.yourstream.ui.screens.home.CatalogRow>?>
 }
 
 /**
@@ -102,12 +102,15 @@ object ScreensModule {
      * Reloaded when add-ons are switched on/off, added, removed or reordered, and when the user
      * hides, reorders or renames a catalog (Settings → Layout → Home layout); empty when none is enabled.
      */
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    /** From [dev.yourstream.ui.screens.home.HomeSources]: kept while Home is not on screen. */
     @Provides
-    fun homeCatalogs(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs): HomeCatalogs = HomeCatalogs {
+    fun homeCatalogs(sources: dev.yourstream.ui.screens.home.HomeSources): HomeCatalogs = HomeCatalogs { sources.catalogs }
+
+    /** The rows' source; [dev.yourstream.ui.screens.home.HomeSources] keeps it running for the whole app. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    internal fun catalogRowsFlow(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs) =
         kotlinx.coroutines.flow.combine(addons.addons.map { list -> list.filter { it.enabled }.map { it.id } }.distinctUntilChanged(), layout.layout) { e, l -> e to l }
             .mapLatest { (enabled, l) -> if (enabled.isEmpty()) emptyList() else catalogRows(addons.manager(), l) }
-    }
 
     private const val HERO_SLIDES = 10
 
@@ -116,16 +119,18 @@ object ScreensModule {
      * every picked catalog shows up, at most [HERO_SLIDES]. Reloaded when the choice or the
      * add-ons change; catalog pages come from the catalog cache (the rows load them too).
      */
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Provides
-    fun heroSlides(
-        addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs,
-        details: dev.yourstream.metadata.api.TitleDetailsProvider,
-    ): HeroSlides = HeroSlides {
+    fun heroSlides(sources: dev.yourstream.ui.screens.home.HomeSources): HeroSlides = HeroSlides { sources.hero }
+
+    /** What the hero carousel depends on: the enabled add-ons and the hero catalogs. */
+    internal fun heroKey(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs) =
         kotlinx.coroutines.flow.combine(addons.addons.map { list -> list.filter { it.enabled }.map { it.id } }.distinctUntilChanged(),
             layout.layout.map { it.hero }.distinctUntilChanged()) { e, h -> e to h }
-            .mapLatest { (enabled, hero) -> if (enabled.isEmpty() || hero.isEmpty()) emptyList() else withTmdbArt(heroSlides(addons.manager(), hero), details) }
-    }
+
+    /** The carousel's slides for [enabled] add-ons and [hero] catalogs, with TMDB's art. */
+    internal suspend fun heroSlidesFor(
+        addons: dev.yourstream.catalog.sync.CatalogAddons, enabled: List<String>, hero: List<String>, details: dev.yourstream.metadata.api.TitleDetailsProvider,
+    ) = if (enabled.isEmpty() || hero.isEmpty()) emptyList() else withTmdbArt(heroSlides(addons.manager(), hero), details)
 
     /** How long the carousel waits for TMDB's logos before showing the add-on's artwork instead. */
     private const val HERO_ART_WAIT_MS = 3_000L

@@ -824,6 +824,7 @@
     <string name="player_offset_high">High</string>
     <!-- Home hero carousel -->
     <string name="hero_movie">Movie</string>
+    <string name="hero_featured">Featured</string>
     <string name="hero_series">Series</string>
     <string name="hero_view_details">View Details</string>
     <string name="layout_group_hero">Hero catalogs</string>

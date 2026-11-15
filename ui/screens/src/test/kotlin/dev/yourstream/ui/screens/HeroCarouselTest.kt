@@ -58,4 +58,38 @@ class HeroCarouselTest {
         assertEquals("2h 11m", dev.yourstream.ui.screens.home.runtimeLabel(131))
         assertEquals("45m", dev.yourstream.ui.screens.home.runtimeLabel(45))
     }
+
+    @Test
+    fun mangaLookDrawsInkedPanels() {
+        val opened = mutableListOf<OpenTarget>()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT, manga = true) { HeroCarousel(listOf(slide(1, "Immortal"), slide(2, "Jailer 2")), { opened += it }) }
+        }
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithTag("hero-manga-panel").assertExists()
+        compose.onNodeWithTag("hero-manga-eyebrow").assertTextContains("FEATURED")
+        compose.onNodeWithText("IMMORTAL").assertExists()
+        compose.onNodeWithTag("hero-meta").assertTextContains("Movie  ·  Romance  ·  2h 11m  ·  2026")
+        compose.onNodeWithTag("hero-details").performClick()
+        assertEquals(OpenTarget.Details(1), opened.last())
+    }
+
+    /**
+     * Reported from a device: the carousel loaded slowly at every start. The last slides are saved
+     * and shown at once next time; what opens a slide survives the round trip.
+     */
+    @Test
+    fun savedSlidesComeBackTheSame() {
+        val route = dev.yourstream.ui.screens.navigation.CatalogTitleRoute("cinemeta", "MOVIE", "tt1", "Immortal", 2026, "https://p/1.jpg", "tt1")
+        val slides = listOf(
+            slide(1, "Immortal", OpenTarget.CatalogTitle(route)).copy(posterUrl = "https://p/1.jpg", logoUrl = "https://l/1.png", textlessPosterUrl = "https://t/1.jpg"),
+            HeroSlide("hero:2", "No Rating", null, null, CatalogType.SERIES, null, null, null, null, emptyList(),
+                OpenTarget.CatalogTitle(route.copy(id = "tt2", title = "No Rating", year = null, poster = null, imdb = null))),
+        )
+        val back = dev.yourstream.ui.screens.home.HomeSources.decode(dev.yourstream.ui.screens.home.HomeSources.encode(slides))
+        assertEquals(slides, back)
+        // Slides that do not open a catalog title are not saved.
+        assertEquals(emptyList(), dev.yourstream.ui.screens.home.HomeSources.decode(dev.yourstream.ui.screens.home.HomeSources.encode(listOf(slide(3, "Local")))))
+    }
 }

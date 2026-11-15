@@ -114,8 +114,8 @@ class HomeViewModel @Inject constructor(
 
     /** Rows from the user's catalog add-ons (Settings → Add-ons); reloaded when they change. */
     /** Null while the first answer is loading. */
-    private val catalogs: Flow<List<CatalogRow>?> = homeCatalogs.rows().map<List<CatalogRow>, List<CatalogRow>?> { it }
-        .onStart { emit(null) }.catch { emit(emptyList()) }
+    // The source keeps its last rows while Home is away (HomeSources): no reload on return.
+    private val catalogs: Flow<List<CatalogRow>?> = homeCatalogs.rows().catch { emit(emptyList()) }
 
     /**
      * Recommendations from the local watch profile (nothing leaves the device), recomputed when the
@@ -134,8 +134,7 @@ class HomeViewModel @Inject constructor(
     /** The hero carousel from the user's hero catalogs (empty while loading or with none picked). */
     // Null until the first answer: Home then keeps the carousel's space instead of flashing the
     // library hero and swapping it out a moment later.
-    private val heroSlides: Flow<List<HeroSlide>?> = heroSource.slides().map<List<HeroSlide>, List<HeroSlide>?> { it }
-        .onStart { emit(null) }.catch { emit(emptyList()) }
+    private val heroSlides: Flow<List<HeroSlide>?> = heroSource.slides().catch { emit(emptyList()) }
 
     // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
     private val extras = combine(forYou, catalogs, heroSlides) { f, c, h -> Extras(f, c, h) }

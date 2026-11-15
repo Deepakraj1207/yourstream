@@ -48,6 +48,8 @@ import dev.yourstream.ui.core.LocalReducedMotion
 import dev.yourstream.ui.core.LocalWindowLayout
 import dev.yourstream.ui.core.WindowLayout
 import dev.yourstream.ui.core.focusHighlight
+import dev.yourstream.ui.core.inkPanel
+import dev.yourstream.ui.core.speedLines
 import dev.yourstream.ui.screens.R
 import dev.yourstream.ui.screens.navigation.OpenTarget
 import kotlinx.coroutines.delay
@@ -76,10 +78,12 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (OpenTarget) -> Unit, modifier
     val compact = LocalWindowLayout.current == WindowLayout.COMPACT
     val height = heroHeight()
     Column(modifier.fillMaxWidth().testTag("hero-carousel")) {
+        val manga = dev.yourstream.ui.core.LocalMangaStyle.current
         HorizontalPager(pager, Modifier.fillMaxWidth().height(height), key = { slides[it].key }) { page ->
-            Slide(slides[page], compact, onOpen)
+            if (manga) MangaSlide(slides[page], compact, onOpen) else Slide(slides[page], compact, onOpen)
         }
-        Dots(slides.size, pager.currentPage, Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
+        if (manga) MangaDots(slides.size, pager.currentPage, Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
+        else Dots(slides.size, pager.currentPage, Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
     }
 }
 
@@ -149,6 +153,78 @@ private fun Slide(s: HeroSlide, compact: Boolean, onOpen: (OpenTarget) -> Unit) 
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                 modifier = Modifier.heightIn(min = 52.dp).width(220.dp).focusHighlight(CircleShape).testTag("hero-details"),
             ) { Text(stringResource(R.string.hero_view_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+/**
+ * The manga look (Settings → Appearance → Manga): each slide an inked comic panel with speed
+ * lines behind the title, a red "FEATURED" caption, the title (or its logo) in the manga
+ * lettering, the rating in an ink box, and a white action button, like Home's manga hero.
+ */
+@Composable
+private fun MangaSlide(s: HeroSlide, compact: Boolean, onOpen: (OpenTarget) -> Unit) {
+    val g = dev.yourstream.ui.core.LocalDimens.current.gutter
+    val panel = MaterialTheme.shapes.large
+    Box(Modifier.fillMaxSize().padding(horizontal = g, vertical = 8.dp).testTag("hero-slide:${s.key}")) {
+        Box(Modifier.fillMaxSize().inkPanel(panel).clip(panel).testTag("hero-manga-panel")) {
+            val art = if (compact) s.textlessPosterUrl ?: (if (s.logoUrl != null) s.backdropUrl else null) ?: s.posterUrl ?: s.backdropUrl
+            else s.backdropUrl ?: s.textlessPosterUrl ?: s.posterUrl
+            Artwork(art, s.title, Modifier.fillMaxSize(), showInitials = false)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                0f to Color.Black.copy(alpha = 0.15f), 0.45f to Color.Black.copy(alpha = 0.25f), 1f to Color.Black.copy(alpha = 0.92f),
+            )))
+            // Speed lines rushing out behind the title.
+            Box(Modifier.fillMaxSize().speedLines(Color.White.copy(alpha = 0.10f), seed = s.key.hashCode()))
+            Column(
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(if (compact) 18.dp else 28.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.hero_featured).uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.testTag("hero-manga-eyebrow"))
+                if (s.logoUrl != null) {
+                    Artwork(s.logoUrl, s.title, Modifier.fillMaxWidth(0.75f).height(96.dp).semantics { heading(); contentDescription = s.title }.testTag("hero-logo"),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit, showInitials = false, placeholder = false)
+                } else {
+                    Text(s.title.uppercase(), style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
+                        color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                }
+                val type = stringResource(if (s.type == CatalogType.SERIES) R.string.hero_series else R.string.hero_movie)
+                Text(listOfNotNull(type, s.genre, s.runtimeMinutes?.let(::runtimeLabel), s.year?.toString()).joinToString("  ·  "),
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("hero-meta"))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    s.rating?.takeIf { it > 0 }?.let { r ->
+                        // An ink box: black lettering on white, a hard black edge.
+                        Text("★ %.1f".format(java.util.Locale.ROOT, r), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.Black,
+                            modifier = Modifier.background(Color.White).border(2.dp, Color.Black).padding(horizontal = 8.dp, vertical = 3.dp).testTag("hero-rating"))
+                    }
+                    s.languages.take(2).takeIf { it.isNotEmpty() }?.let { l ->
+                        Text(l.joinToString(" · ") { it.uppercase() }, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White,
+                            modifier = Modifier.border(2.dp, Color.White).padding(horizontal = 8.dp, vertical = 2.dp))
+                    }
+                }
+                Button(
+                    onClick = { onOpen(s.open) }, shape = MaterialTheme.shapes.small,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                    modifier = Modifier.padding(top = 4.dp).heightIn(min = 48.dp).border(2.dp, Color.Black, MaterialTheme.shapes.small)
+                        .focusHighlight(MaterialTheme.shapes.small).testTag("hero-details"),
+                ) { Text(stringResource(R.string.hero_view_details).uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+/** One ink square per slide; the current one filled red. */
+@Composable
+private fun MangaDots(count: Int, current: Int, modifier: Modifier) {
+    if (count < 2) return
+    val ink = MaterialTheme.colorScheme.onBackground
+    Row(modifier.testTag("hero-dots"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(count) { i ->
+            Box(Modifier.animateContentSize().size(width = if (i == current) 22.dp else 10.dp, height = 10.dp)
+                .background(if (i == current) MaterialTheme.colorScheme.tertiary else Color.Transparent)
+                .border(2.dp, ink))
         }
     }
 }

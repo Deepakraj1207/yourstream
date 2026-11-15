@@ -490,4 +490,16 @@ class ScreenshotTest {
             {}, {}, {}, onStream = {},
         )
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneMangaHeroCarousel() = shot("phone-manga-hero", WindowLayout.COMPACT, TopLevel.HOME, manga = true) {
+        androidx.compose.foundation.layout.Column {
+            dev.yourstream.ui.screens.home.HeroCarousel(listOf(
+                dev.yourstream.ui.screens.home.HeroSlide("hero:1", "Thedal", null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Drama", 142, 2026, 7.4,
+                    listOf("ta"), OpenTarget.Details(1)),
+                dev.yourstream.ui.screens.home.HeroSlide("hero:2", "Jailer 2", null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Action", 160, 2026, null,
+                    emptyList(), OpenTarget.Details(2)),
+            ), {})
+        }
+    }
 }

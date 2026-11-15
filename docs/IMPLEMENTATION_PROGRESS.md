@@ -942,3 +942,20 @@ Checked on the published files (run 26):
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 9 (15 Nov 2026): slow hero carousel, reload on return, manga carousel
+
+* **The carousel reloaded every time the user came back from another tab.** Home's state stopped
+  listening 5 s after Home left the screen (`WhileSubscribed`). The cold hero and catalog-row
+  flows then started over: catalog pages, library check, TMDB art, with the placeholder in
+  between. They now live in `HomeSources`, an app-wide singleton that computes once and follows
+  add-on, hero-choice and layout changes. Coming back to Home shows them at once.
+* **Slow at every start.** The last carousel is saved (`home_hero_cache`, used only for the same
+  hero choice and add-ons) and shown at once. It is refreshed quietly; when nothing changed,
+  nothing on screen changes. Test: `HeroCarouselTest.savedSlidesComeBackTheSame`.
+* **Manga style for the carousel.** Each slide is an inked comic panel with speed lines, a red
+  FEATURED caption, the title (or logo) in the manga lettering, ink boxes for the rating and
+  language, a square VIEW DETAILS button, and ink-square dots. This is the same look as Home's
+  manga hero. Test: `HeroCarouselTest.mangaLookDrawsInkedPanels`; screenshot `phone-manga-hero`.
+* Gate: 690 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.
