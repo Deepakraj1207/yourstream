@@ -101,6 +101,16 @@ data class MediaVersionRow(
     val locator: String? = null,
 )
 
+/** A media file that may be a raw piece of a split file ("Film.mkv.002"), for joining the pieces. */
+data class SplitPartRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "message_id") val messageId: Long,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    @ColumnInfo(name = "size_bytes") val sizeBytes: Long,
+    @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
+    @ColumnInfo(name = "download_state") val downloadState: String,
+)
+
 /** Continue-watching / recently-watched entry. */
 data class WatchEntryRow(
     @ColumnInfo(name = "item_id") val itemId: Long,

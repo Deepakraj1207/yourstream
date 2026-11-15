@@ -33,14 +33,34 @@ data class PlayableMedia(
      * streaming; [fileId] is 0). Null for Telegram files.
      */
     val localUri: String? = null,
+    /**
+     * A movie in raw pieces, played as one file: the pieces' Telegram files in order (the first is
+     * [fileId]; [sizeBytes] is their total). Empty for a single file.
+     */
+    val parts: List<StreamPart> = emptyList(),
 ) {
     val isLocal: Boolean get() = localUri != null
+    val isSplit: Boolean get() = parts.size > 1
+
+    /** Every Telegram file this media reads (one, or each piece). */
+    val fileIds: List<Int> get() = if (isSplit) parts.map { it.fileId } else listOf(fileId)
+
+    /** The file being read right now: for a split file, the piece the player is in. */
+    val activeFileId: Int get() = if (isSplit) SplitReads.current(fileId) else fileId
+
+    private fun telegramUri(): android.net.Uri =
+        if (isSplit) TelegramMediaUri.split(parts.map { it.fileId to it.sizeBytes }, durationMs).toUri()
+        else TelegramMediaUri(fileId, StreamHints(sizeBytes.takeIf { it > 0 }, durationMs)).toUri()
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun mediaItem(): MediaItem = MediaItem.Builder()
-        .setUri(localUri?.let(android.net.Uri::parse) ?: TelegramMediaUri(fileId, StreamHints(sizeBytes.takeIf { it > 0 }, durationMs)).toUri())
+        .setUri(localUri?.let(android.net.Uri::parse) ?: telegramUri())
         .setMediaId(mediaId?.let { "media:$it" } ?: "tg:$remoteUniqueId")
-        .setCustomCacheKey(if (localUri != null) "local:$remoteUniqueId" else "tg:$remoteUniqueId")
+        .setCustomCacheKey(when {
+            localUri != null -> "local:$remoteUniqueId"
+            isSplit -> "tgsplit:" + parts.joinToString("+") { it.remoteUniqueId }
+            else -> "tg:$remoteUniqueId"
+        })
         .setSubtitleConfigurations(subtitles.map { s ->
             MediaItem.SubtitleConfiguration.Builder(android.net.Uri.fromFile(java.io.File(s.localPath)))
                 .setId(s.id)
@@ -53,6 +73,9 @@ data class PlayableMedia(
         })
         .build()
 }
+
+/** One raw piece of a split file: its Telegram file of the current session and exact size. */
+data class StreamPart(val fileId: Int, val sizeBytes: Long, val remoteUniqueId: String)
 
 /**
  * Library → playable Telegram file. Picks the version (file) to play, refreshes the session-local

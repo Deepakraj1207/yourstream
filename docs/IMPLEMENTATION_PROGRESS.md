@@ -735,3 +735,22 @@ so both follow Nuvio's behaviour as it is commonly known, not its code.
   slow add-on was still answering could show the previous episode's streams (the older request is
   now cancelled). Tests: `AddonsAndStreamsTest` (grouping, chips, progressive answers, order).
 * Status: NEEDS REAL-DEVICE TESTING (real add-ons, slow networks, TV remote focus on the chips).
+
+## Movies in raw pieces streamed as one file (15 Nov 2026)
+
+User report: 4K movies in their channel are split into raw pieces (".mkv.001", ".002", …).
+Before, each piece was a separate version; only the first had the container header, so at best
+the start played with a wrong duration, and later pieces failed.
+
+* Reason: Telegram's upload limit makes this the usual way 4K movies are posted. The pieces are
+  joined at the byte level while streaming (no download or copy first), so everything that works
+  for a normal file (duration, seeking, tracks, resume, offline download) works for these.
+* Changes: `SplitFiles` + `LibraryDao.splitParts` (one version with every piece), resolver
+  (`resolveSplit`, missing pieces named), `TelegramMediaUri` split form, `TelegramMediaDataSource`
+  (reads across pieces, prefetches the next piece), controller (focus/stats/release per piece),
+  `VideoDownloads` (all pieces), title page ("N pieces"). Details in `docs/STREAMS.md`.
+* Tested: `SplitFilesTest`, `SplitPlaybackTest` (real ExoPlayer on the simulated Telegram with
+  committed clips cut into pieces), resolver and download tests. The simulated Telegram is not
+  TDLib, and the clips are small: real multi-GB 4K pieces have not been played.
+* Status: NEEDS REAL-DEVICE TESTING (a real channel's 4K pieces: start time, seeking far into a
+  late piece, the boundary between pieces, 4K decoding on the device).

@@ -25,6 +25,9 @@ import javax.inject.Singleton
  * Downloads the user asked for are remembered ([isKept], by Telegram's stable unique id) so the
  * stream cache never trims them. Downloads run while the app runs; one interrupted (the app
  * closed) continues from where it stopped when "Download" is tapped again.
+ *
+ * A movie in raw pieces downloads every piece; its progress is the bytes of all pieces together,
+ * and cancel / remove act on every piece.
  */
 @Singleton
 class VideoDownloads @Inject constructor(
@@ -47,32 +50,47 @@ class VideoDownloads @Inject constructor(
             is AppResult.Ok -> r.value
             is AppResult.Err -> return r
         }
-        prefs.edit().putBoolean(media.remoteUniqueId, true).apply()
+        prefs.edit().apply { keys(media).forEach { putBoolean(it, true) } }.apply()
         if (media.alreadyDownloaded) return AppResult.Ok(Unit)
-        val started = files.download(media.fileId, priority = PRIORITY, offset = 0, limit = 0)
-        if (started is AppResult.Err) return started
-        _progress.update { it + (mediaId to fraction(media.sizeBytes, (started as AppResult.Ok).value.downloadedSize)) }
+        val done = HashMap<Int, Long>()
+        val finished = HashSet<Int>()
+        for (id in media.fileIds) {
+            val started = files.download(id, priority = PRIORITY, offset = 0, limit = 0)
+            if (started is AppResult.Err) return started
+            val f = (started as AppResult.Ok).value
+            done[id] = f.downloadedSize
+            if (f.isDownloadingCompleted) finished += id
+        }
+        _progress.update { it + (mediaId to fraction(media.sizeBytes, done.values.sum())) }
         watchers.remove(mediaId)?.cancel()
         watchers[mediaId] = scope.launch {
-            files.observeFile(media.fileId).collect { f ->
-                when {
-                    f.isDownloadingCompleted || !f.isDownloadingActive -> {
-                        _progress.update { it - mediaId }
-                        watchers.remove(mediaId)?.cancel()
-                    }
-                    else -> _progress.update { it + (mediaId to fraction(f.size.takeIf { s -> s > 0 } ?: media.sizeBytes, f.downloadedSize)) }
+            kotlinx.coroutines.flow.merge(*media.fileIds.map { files.observeFile(it) }.toTypedArray()).collect { f ->
+                done[f.id] = f.downloadedSize
+                if (f.isDownloadingCompleted || !f.isDownloadingActive) finished += f.id
+                if (finished.containsAll(media.fileIds)) {
+                    _progress.update { it - mediaId }
+                    watchers.remove(mediaId)?.cancel()
+                } else {
+                    _progress.update { it + (mediaId to fraction(media.sizeBytes, done.values.sum())) }
                 }
             }
         }
         return AppResult.Ok(Unit)
     }
 
+    /** What is remembered as kept: the file, or every piece of a split file. */
+    private fun keys(media: PlayableMedia): List<String> =
+        if (media.isSplit) media.parts.map { it.remoteUniqueId } else listOf(media.remoteUniqueId)
+
+    private suspend fun eachFile(media: PlayableMedia, action: suspend (Int) -> AppResult<Unit>): AppResult<Unit> =
+        media.fileIds.map { action(it) }.firstOrNull { it is AppResult.Err } ?: AppResult.Ok(Unit)
+
     suspend fun cancel(target: PlaybackTarget, mediaId: Long): AppResult<Unit> {
         val media = (telegramFile(target, mediaId) as? AppResult.Ok)?.value ?: return AppResult.Err(AppError.NotFound("not a Telegram file"))
         watchers.remove(mediaId)?.cancel()
         _progress.update { it - mediaId }
-        prefs.edit().remove(media.remoteUniqueId).apply()
-        return files.cancelDownload(media.fileId)
+        prefs.edit().apply { keys(media).forEach { remove(it) } }.apply()
+        return eachFile(media) { files.cancelDownload(it) }
     }
 
     /** Frees the space: the downloaded copy is deleted (the video stays in Telegram). */
@@ -80,8 +98,8 @@ class VideoDownloads @Inject constructor(
         val media = (telegramFile(target, mediaId) as? AppResult.Ok)?.value ?: return AppResult.Err(AppError.NotFound("not a Telegram file"))
         watchers.remove(mediaId)?.cancel()
         _progress.update { it - mediaId }
-        prefs.edit().remove(media.remoteUniqueId).apply()
-        return files.deleteLocalCopy(media.fileId)
+        prefs.edit().apply { keys(media).forEach { remove(it) } }.apply()
+        return eachFile(media) { files.deleteLocalCopy(it) }
     }
 
     private suspend fun telegramFile(target: PlaybackTarget, mediaId: Long): AppResult<PlayableMedia> =

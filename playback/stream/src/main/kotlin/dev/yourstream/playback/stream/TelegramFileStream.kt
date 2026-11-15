@@ -57,6 +57,15 @@ class TelegramFileStream internal constructor(
         return read
     }
 
+    /**
+     * Starts downloading from [position] without waiting for the bytes: used to fetch the start
+     * of a split file's next piece while the current piece is still being read.
+     */
+    suspend fun prefetch() {
+        check(!closed) { "stream closed" }
+        session.maintainWindow(position, availableEnd)
+    }
+
     /** Fills [buffer] completely unless the file ends first. Returns the bytes read. */
     suspend fun readFully(buffer: ByteArray, offset: Int = 0, length: Int = buffer.size): Int {
         var total = 0

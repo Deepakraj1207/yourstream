@@ -70,7 +70,7 @@ class RoomMediaRepository @Inject constructor(
         val item = dao.item(itemId) ?: return null
         val row = dao.items(LibraryQueryBuilder.byId(itemId).query()).firstOrNull() ?: return null
         val isSeries = item.kind == LibraryKind.SERIES.name
-        val versions = dao.versions(itemId, null, includeUnavailable = true).map { it.toModel() }
+        val versions = joinSplit(dao.versions(itemId, null, includeUnavailable = true).map { it.toModel() })
             .let { all -> if (isSeries) all.filter { it.episodeId == null } else all }
         return LibraryItemDetails(
             summary = row.toModel(),
@@ -84,7 +84,9 @@ class RoomMediaRepository @Inject constructor(
     }
 
     override suspend fun versions(target: PlaybackTarget, includeUnavailable: Boolean): List<MediaVersion> =
-        dao.versions(target.itemId, target.episodeId, includeUnavailable).map { it.toModel() }
+        joinSplit(dao.versions(target.itemId, target.episodeId, includeUnavailable).map { it.toModel() })
+
+    private suspend fun joinSplit(versions: List<MediaVersion>) = dao.joinSplit(versions)
 
     override suspend fun setFavorite(itemId: Long, favorite: Boolean) {
         if (favorite) dao.addFavorite(FavoriteEntity(itemId, clock.nowMillis())) else dao.removeFavorite(itemId)
@@ -227,6 +229,16 @@ class RoomSeriesRepository @Inject constructor(
 }
 
 @Singleton
+/** A movie in raw pieces (".001", ".002", …) is one version holding every piece. */
+internal suspend fun dev.yourstream.core.database.dao.LibraryDao.joinSplit(versions: List<MediaVersion>): List<MediaVersion> =
+    dev.yourstream.library.api.SplitFiles.join(versions) { chat, base ->
+        splitParts(chat, base).mapNotNull { r ->
+            dev.yourstream.library.api.SplitFiles.piece(r.fileName)?.let { (_, n) ->
+                dev.yourstream.library.api.SplitPart(n, r.mediaId, r.messageId, r.fileName, r.sizeBytes, r.isDeleted, r.downloadState)
+            }
+        }
+    }
+
 class RoomEpisodeRepository @Inject constructor(db: YourStreamDatabase) : EpisodeRepository {
     private val dao = db.libraryDao()
 
@@ -251,6 +263,6 @@ class RoomEpisodeRepository @Inject constructor(db: YourStreamDatabase) : Episod
 
     override suspend fun versions(episodeId: Long): List<MediaVersion> {
         val episode = dao.episode(episodeId) ?: return emptyList()
-        return dao.versions(episode.seriesId, episodeId, includeUnavailable = false).map { it.toModel() }
+        return dao.joinSplit(dao.versions(episode.seriesId, episodeId, includeUnavailable = false).map { it.toModel() })
     }
 }

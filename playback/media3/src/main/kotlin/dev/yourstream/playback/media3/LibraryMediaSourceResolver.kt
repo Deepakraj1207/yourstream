@@ -21,7 +21,9 @@ import javax.inject.Singleton
  *  - the message is looked up again (file ids are only valid for the current Telegram session,
  *    and the message may have been deleted since indexing);
  *  - offline, the stored file id is used if Telegram still knows it with the same unique id;
- *  - a file Telegram cannot download (and that is not on the device) is reported unavailable.
+ *  - a file Telegram cannot download (and that is not on the device) is reported unavailable;
+ *  - a movie in raw pieces needs every piece: a missing, deleted or undownloadable piece is
+ *    named in the error, because playback would stop there.
  */
 @Singleton
 class LibraryMediaSourceResolver @Inject constructor(
@@ -71,6 +73,7 @@ class LibraryMediaSourceResolver @Inject constructor(
     private suspend fun resolveVersion(target: PlaybackTarget, version: MediaVersion): AppResult<PlayableMedia> {
         version.locator?.let { return resolveLocal(target, version, it) }
         if (version.isDeleted) return AppResult.Err(AppError.NotFound("The Telegram message of ${version.fileName} was deleted"))
+        if (version.isSplit) return resolveSplit(target, version)
 
         val (file, mime) = when (val r = currentFile(version)) {
             is AppResult.Ok -> r.value
@@ -86,6 +89,45 @@ class LibraryMediaSourceResolver @Inject constructor(
                 sizeBytes = file.size.takeIf { it > 0 } ?: version.sizeBytes, durationMs = version.durationSeconds?.let { it * 1000L },
                 mimeType = mime, width = null, height = version.resolution, alreadyDownloaded = file.isDownloadingCompleted,
                 target = target, mediaId = version.mediaId,
+            ),
+        )
+    }
+
+    /**
+     * Every piece of a split movie, looked up again in one call (offline: the file ids saved at
+     * indexing). The pieces' sizes must be exact: they say where each piece starts in the file.
+     */
+    private suspend fun resolveSplit(target: PlaybackTarget, version: MediaVersion): AppResult<PlayableMedia> {
+        val name = version.fileName.removeSuffix(".001")
+        val missing = dev.yourstream.library.api.SplitFiles.missing(version.parts)
+        if (missing.isNotEmpty()) {
+            return AppResult.Err(AppError.NotFound("$name is missing piece ${missing.joinToString(", ") { "%03d".format(it) }} in the chat, so it cannot be played"))
+        }
+        val found = when (val r = messages.lookupMessages(version.chatId, version.parts.map { it.messageId })) {
+            is AppResult.Ok -> r.value.mapNotNull { (it as? MessageLookup.Found)?.message }.associateBy { it.messageId }
+                .mapValues { (_, m) -> m.media.file to m.media.mimeType }
+            is AppResult.Err -> version.parts.mapNotNull { p -> (storedFile(p.mediaId) as? AppResult.Ok)?.value?.let { p.messageId to it } }.toMap()
+                .ifEmpty { return r }
+        }
+        val pieces = version.parts.map { p ->
+            val (file, _) = found[p.messageId]
+                ?: return AppResult.Err(AppError.NotFound("Piece ${"%03d".format(p.number)} of $name is no longer in the chat"))
+            if (!file.isDownloadingCompleted && !file.canBeDownloaded) {
+                return AppResult.Err(AppError.NotFound("Telegram can no longer download piece ${"%03d".format(p.number)} of $name"))
+            }
+            val size = file.size.takeIf { it > 0 } ?: p.sizeBytes.takeIf { it > 0 }
+                ?: return AppResult.Err(AppError.NotFound("The size of piece ${"%03d".format(p.number)} of $name is unknown"))
+            file to StreamPart(file.id, size, file.remoteUniqueId)
+        }
+        val first = pieces.first().first
+        val title = media.getItem(target.itemId)?.summary?.title ?: name
+        return AppResult.Ok(
+            PlayableMedia(
+                title = title, fileName = name, fileId = first.id, remoteUniqueId = first.remoteUniqueId,
+                sizeBytes = pieces.sumOf { it.second.sizeBytes }, durationMs = version.durationSeconds?.let { it * 1000L },
+                mimeType = found[version.parts.first().messageId]?.second, width = null, height = version.resolution,
+                alreadyDownloaded = pieces.all { it.first.isDownloadingCompleted }, target = target, mediaId = version.mediaId,
+                parts = pieces.map { it.second },
             ),
         )
     }

@@ -304,6 +304,19 @@ interface LibraryDao {
     )
     suspend fun versions(itemId: Long, episodeId: Long?, includeUnavailable: Boolean): List<MediaVersionRow>
 
+    /**
+     * The pieces of a split file in one chat: files named [base] plus a three-digit suffix
+     * (".001", ".002", …), whatever library item they were linked to. Exact prefix match (no LIKE
+     * wildcards: names often contain "_" and "%"); Telegram files only.
+     */
+    @Query(
+        """SELECT m.id AS media_id, m.message_id, m.file_name, m.size_bytes, m.is_deleted, m.download_state FROM media m
+        WHERE m.chat_id = :chatId AND m.locator IS NULL AND length(m.file_name) = length(:base) + 4
+          AND substr(m.file_name, 1, length(:base)) = :base
+        ORDER BY m.file_name, m.message_id""",
+    )
+    suspend fun splitParts(chatId: Long, base: String): List<SplitPartRow>
+
     // ================================================================ lists
 
     /** Filtered/sorted lists are built by LibraryQueryBuilder (whitelisted SQL, bound arguments). */

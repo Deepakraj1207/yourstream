@@ -46,6 +46,41 @@ Stream entries keep what playback needs: `url` + `behaviorHints.proxyHeaders`, o
 `fileIdx` + `sources`, or a `magnet:` link (parsed into a hash and trackers, hex or base32),
 plus `behaviorHints.filename` / `videoSize`.
 
+## Movies in raw pieces (".mkv.001", ".002", …)
+
+Telegram caps uploads (2 GB, 4 GB with Premium), so 4K movies are often cut into raw pieces with
+7-Zip ("split to volumes"), HJSplit or `split`: `Film.2160p.mkv.001`, `.002`, … Only the first
+piece starts with the container's header; joined in order the pieces are the original file byte
+for byte. YourStream streams them as that one file, without downloading or joining first.
+
+* **Library** (`SplitFiles`, `:library`): a first piece becomes one version holding every piece
+  (`MediaVersion.parts`), found by name in its chat (`LibraryDao.splitParts`, exact prefix match)
+  wherever the pieces were linked; later pieces are not versions of their own (none can play
+  alone). A piece posted twice: the copy nearest the first piece's message is used. The version's
+  size is the whole movie's; it is "On this device" only when every piece is. The title page
+  shows "N pieces" (and any missing piece).
+* **Resolving** (`LibraryMediaSourceResolver.resolveSplit`): every piece's message is looked up in
+  one call (offline: the file ids saved at indexing). A gap in the numbering, a deleted piece or
+  one Telegram cannot download is named in the error ("missing piece 002"), because playback would
+  stop there. A missing *last* piece cannot be noticed: nothing says how many there were.
+* **Playback** (`TelegramMediaUri` `tgfile://split/<id1>/<id2>/…?sizes=…`,
+  `TelegramMediaDataSource`, `SplitLayout`): a byte position maps to (piece, offset); reading
+  continues into the next piece at each boundary, and the next piece starts downloading 8 MB
+  before the boundary (`TelegramFileStream.prefetch`). Media3 sees one file, so the duration,
+  seeking (MKV cues / MP4 moov, wherever they are), tracks and resume work as for any file. The
+  controller steers the download window, focus and statistics of the piece being read
+  (`SplitReads`) and releases every piece when playback ends.
+* **Downloads** (`VideoDownloads`): every piece is downloaded and kept; progress counts all pieces;
+  cancel and remove act on every piece.
+* Not joined: archive pieces (`.7z.001`, `.part1.rar`), which would have to be unpacked, and
+  files on the device.
+
+Tests: `SplitFilesTest` (real indexer, database and library), `SplitPlaybackTest` (real
+ExoPlayer over the simulated Telegram: an MKV in 3 pieces plays to the end with its real duration
+and size; an MP4 in 4 pieces seeks into a later piece; the data source returns the original bytes
+from any position, including exactly on a boundary), `LibraryMediaSourceResolverTest` and
+`VideoDownloadsTest` (split cases).
+
 ## Web streams (`WebStreams`, `:playback:media3`)
 
 - One OkHttp client: HTTP/2, connection reuse across HLS/DASH segments, redirects followed

@@ -116,6 +116,45 @@ class LibraryMediaSourceResolverTest {
         assertTrue(err.message.contains("no longer on this device"))
     }
 
+    private fun piece(n: Int, size: Long, deleted: Boolean = false) =
+        dev.yourstream.library.api.SplitPart(n, 100L + n, 100L + n, "Movie.2160p.mkv.%03d".format(n), size, deleted)
+
+    @Test
+    fun aMovieInPiecesResolvesEveryPieceInOrder(): Unit = runBlocking {
+        val clip = TestMedia.file(TestMedia.SMALL_360P, dir)
+        (1..3).forEach { sim.addFile(60 + it, clip) }
+        val size = clip.length()
+        versions = listOf(version(101, 2160).copy(fileName = "Movie.2160p.mkv.001", messageId = 101, sizeBytes = 3 * size,
+            parts = (1..3).map { piece(it, size) }))
+        // Telegram answers in its own order; the pieces stay in piece order.
+        lookup = AppResult.Ok(listOf(found(63, 103), found(61, 101), found(62, 102)))
+        val media = (resolver.resolve(PlaybackTarget(7)) as AppResult.Ok).value
+        assertTrue(media.isSplit)
+        assertEquals(listOf(61, 62, 63), media.parts.map { it.fileId })
+        assertEquals(61, media.fileId)
+        assertEquals(3 * size, media.sizeBytes)
+        assertEquals("Movie.2160p.mkv", media.fileName, "named without the piece suffix")
+        val uri = media.mediaItem().localConfiguration!!.uri
+        assertEquals(listOf(61 to size, 62 to size, 63 to size), TelegramMediaUri.parse(uri)!!.parts)
+    }
+
+    @Test
+    fun aMovieWithAMissingOrVanishedPieceSaysWhichOne(): Unit = runBlocking {
+        val clip = TestMedia.file(TestMedia.SMALL_360P, dir)
+        (1..3).forEach { sim.addFile(70 + it, clip) }
+        val v = version(101, 2160).copy(fileName = "Movie.2160p.mkv.001", messageId = 101)
+        // Piece 2 was never posted (or was deleted): nothing is asked of Telegram.
+        versions = listOf(v.copy(parts = listOf(piece(1, 10), piece(3, 10))))
+        val gap = (resolver.resolve(PlaybackTarget(7)) as AppResult.Err).error
+        assertTrue(gap.message.contains("missing piece 002"), gap.message)
+        // Piece 3 is no longer in the chat.
+        versions = listOf(v.copy(parts = (1..3).map { piece(it, 10) }))
+        lookup = AppResult.Ok(listOf(found(71, 101), found(72, 102), MessageLookup.Missing(103)))
+        val gone = (resolver.resolve(PlaybackTarget(7)) as AppResult.Err).error
+        assertIs<AppError.NotFound>(gone)
+        assertTrue(gone.message.contains("Piece 003"), gone.message)
+    }
+
     @Test
     fun deletedMessagesAndUndownloadableFilesAreUnavailable(): Unit = runBlocking {
         versions = listOf(version(1, 720))
