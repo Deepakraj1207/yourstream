@@ -844,4 +844,30 @@
     <string name="layout_hero_selected">%1$d of %2$d selected</string>
     <string name="layout_hero_none">No hero sources selected: the hero shows what to continue or your newest title.</string>
     <string name="layout_hero_limit">Up to %1$d catalogs. Their first titles take turns in the carousel at the top of Home.</string>
+    <string name="home_from_telegram">From Telegram</string>
+    <string name="streams_sort_filter">Sort &amp; filter</string>
+    <string name="streams_filters_active">Filters · %1$d</string>
+    <string name="streams_filter_reset">Reset</string>
+    <string name="streams_sort">Sort</string>
+    <string name="streams_sort_best">Best quality</string>
+    <string name="streams_sort_largest">Largest</string>
+    <string name="streams_sort_smallest">Smallest</string>
+    <string name="streams_sort_source">Source order</string>
+    <string name="streams_quality">Quality</string>
+    <string name="streams_source">Source</string>
+    <string name="streams_source_telegram">Telegram</string>
+    <string name="streams_source_addons">Add-ons</string>
+    <string name="streams_type">Type</string>
+    <string name="streams_type_direct">Direct</string>
+    <string name="streams_type_torrent">Torrent</string>
+    <string name="streams_audio">Audio language</string>
+    <string name="streams_clear_filters">Clear filters</string>
+    <plurals name="streams_show">
+        <item quantity="one">Show %1$d stream</item>
+        <item quantity="other">Show %1$d streams</item>
+    </plurals>
+    <plurals name="streams_filtered_out">
+        <item quantity="one">%1$d stream is hidden by your filters.</item>
+        <item quantity="other">%1$d streams are hidden by your filters.</item>
+    </plurals>
 </resources>

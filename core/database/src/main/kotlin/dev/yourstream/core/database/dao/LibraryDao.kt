@@ -273,6 +273,13 @@ interface LibraryDao {
     )
     suspend fun episodeRow(episodeId: Long): EpisodeRow?
 
+    /** A series' episode by its numbers (a double episode "E05-E06" answers for 5 and 6). */
+    @Query(
+        """SELECT id FROM episode WHERE series_id = :seriesId AND season_number = :season
+          AND (number = :number OR (number < :number AND number_end >= :number)) ORDER BY number DESC LIMIT 1""",
+    )
+    suspend fun episodeIdByNumber(seriesId: Long, season: Int, number: Int): Long?
+
     // ================================================================ links
 
     @Upsert

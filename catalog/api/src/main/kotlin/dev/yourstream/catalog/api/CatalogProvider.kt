@@ -84,14 +84,22 @@ data class AddonStream(
     val fileName: String? = null,
     /** behaviorHints.videoSize in bytes, when known. */
     val sizeBytes: Long? = null,
+    /** One of the user's own files (Telegram or on the device), listed with the add-on streams. */
+    val library: LibraryFile? = null,
+    /** Audio languages (ISO codes), when known: the user's files say them, add-ons rarely. */
+    val languages: List<String> = emptyList(),
 ) {
     val playable: Boolean get() = url != null && (url.startsWith("https://") || url.startsWith("http://"))
+    val isLibrary: Boolean get() = library != null
     val isTorrent: Boolean get() = !playable && infoHash != null && TORRENT_HASH.matches(infoHash)
 
     companion object {
         private val TORRENT_HASH = Regex("(?i)[0-9a-f]{40}")
     }
 }
+
+/** A file of the user's library offered as a stream: played by the library player (resume, tracks, pieces). */
+data class LibraryFile(val itemId: Long, val episodeId: Long?, val mediaId: Long, val resolution: Int?)
 
 /** An add-on that answers "how can I watch X?" ([type] movie/series, [id] e.g. "tt0111161" or "tt0903747:1:2"). */
 interface StreamProvider {

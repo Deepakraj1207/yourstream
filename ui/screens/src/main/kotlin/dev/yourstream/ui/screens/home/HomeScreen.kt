@@ -163,8 +163,10 @@ private fun HomeContent(
                 }
             }
         }
-        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
-        if (shown.series) paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
+        // Your newest Telegram files (the add-on rows below are catalogs; a title you also have on
+        // Telegram carries a badge there). The Series row is gone (the user's decision, 0.12).
+        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll,
+            tag = R.string.home_from_telegram)
         // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
         catalogs.forEach { c ->
             item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
@@ -213,9 +215,9 @@ private fun LazyListScope.continueWatching(
 private fun LazyListScope.paged(
     key: String, title: Int, items: LazyPagingItems<Tile>, section: HomeSection,
     card: (Tile) -> dev.yourstream.ui.core.MediaCardModel, actions: (Tile) -> List<dev.yourstream.ui.core.CardAction>,
-    onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit,
+    onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, tag: Int? = null,
 ) {
-    item(key = key) { PagedMediaRow(stringResource(title), items, card, { onOpen(it.open) }, actions = actions, onSeeAll = { onSeeAll(section) }) }
+    item(key = key) { PagedMediaRow(stringResource(title), items, card, { onOpen(it.open) }, actions = actions, onSeeAll = { onSeeAll(section) }, tag = tag?.let { stringResource(it) }) }
 }
 
 @Composable

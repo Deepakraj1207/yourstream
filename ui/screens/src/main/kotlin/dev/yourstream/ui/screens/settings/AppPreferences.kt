@@ -149,6 +149,8 @@ data class AppSettings(
     val reduceMotion: Boolean = false,
     val homeRows: HomeRowsShown = HomeRowsShown(),
     val layout: LayoutSettings = LayoutSettings(),
+    /** The title page's stream Sort & filter choice (kept for every title). */
+    val streamFilter: dev.yourstream.ui.screens.addon.StreamFilter = dev.yourstream.ui.screens.addon.StreamFilter(),
     /** Add-on and torrent streams: how far ahead the player buffers (within its memory limit). */
     val streamBufferSeconds: Int = 120,
     /** Audio: the app's FFmpeg decoders before the device's own (for films that play without sound). */
@@ -227,6 +229,13 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("show_overview", s.layout.showOverview)
             .putBoolean("show_cast", s.layout.showCast)
             .putString("nav_style", s.layout.navStyle.name)
+            .putString("stream_sort", s.streamFilter.sort.name)
+            .putString("stream_qualities", s.streamFilter.qualities.joinToString(",") { it.name })
+            .putBoolean("stream_telegram", s.streamFilter.telegram)
+            .putBoolean("stream_addons", s.streamFilter.addons)
+            .putBoolean("stream_direct", s.streamFilter.direct)
+            .putBoolean("stream_torrents", s.streamFilter.torrents)
+            .putString("stream_languages", s.streamFilter.languages.joinToString(","))
             .putBoolean("nav_glow", s.layout.navGlow)
             .putBoolean("home_hero", s.homeRows.hero)
             .putBoolean("home_continue", s.homeRows.continueWatching)
@@ -308,6 +317,15 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             recentlyAdded = prefs.getBoolean("home_recent", true),
             series = prefs.getBoolean("home_series", true),
             catalogs = prefs.getBoolean("home_catalogs", true),
+        ),
+        streamFilter = dev.yourstream.ui.screens.addon.StreamFilter(
+            sort = enumOr(prefs.getString("stream_sort", null), dev.yourstream.ui.screens.addon.StreamSort.BEST),
+            qualities = prefs.getString("stream_qualities", "").orEmpty().split(',').mapNotNull { n -> dev.yourstream.ui.screens.addon.StreamQuality.entries.firstOrNull { it.name == n } }.toSet(),
+            telegram = prefs.getBoolean("stream_telegram", true),
+            addons = prefs.getBoolean("stream_addons", true),
+            direct = prefs.getBoolean("stream_direct", true),
+            torrents = prefs.getBoolean("stream_torrents", true),
+            languages = prefs.getString("stream_languages", "").orEmpty().split(',').filter { it.isNotBlank() }.toSet(),
         ),
         streamBufferSeconds = prefs.getInt("stream_buffer", 120).takeIf { it in AppSettings.BUFFER_OPTIONS } ?: 120,
         appAudioDecodersFirst = prefs.getBoolean("ffmpeg_first", false),

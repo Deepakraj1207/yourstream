@@ -104,8 +104,6 @@ internal fun layoutEntries(): List<SettingEntry> = buildList {
         { it.homeRows.forYou }) { s, v -> s.copy(homeRows = s.homeRows.copy(forYou = v)) })
     add(homeToggle("recent", R.string.layout_group_rows, R.string.home_recently_added, R.string.settings_home_row_detail, { Icons.Filled.List },
         { it.homeRows.recentlyAdded }) { s, v -> s.copy(homeRows = s.homeRows.copy(recentlyAdded = v)) })
-    add(homeToggle("series", R.string.layout_group_rows, R.string.home_series, R.string.settings_home_row_detail, { AppIcons.Tv },
-        { it.homeRows.series }) { s, v -> s.copy(homeRows = s.homeRows.copy(series = v)) })
     add(homeToggle("catalogs", R.string.layout_group_rows, R.string.settings_home_catalogs, R.string.settings_home_catalogs_detail, { AppIcons.Explore },
         { it.homeRows.catalogs }) { s, v -> s.copy(homeRows = s.homeRows.copy(catalogs = v)) })
     add(entry("home-hero-catalogs", home, R.string.layout_group_hero, R.string.layout_hero_catalogs, "hero carousel banner top", shown = { it.prefs.homeRows.hero }) { HeroCatalogList() })

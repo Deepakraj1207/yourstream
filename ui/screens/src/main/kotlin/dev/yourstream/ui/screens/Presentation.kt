@@ -63,7 +63,7 @@ object Presentation {
                 posterUrl = artwork(s),
                 watched = watched,
             ),
-            OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched, inLibrary = s.inLibrary,
+            unifiedTarget(s) ?: OpenTarget.Details(s.id), itemId = s.id, isFavorite = s.isFavorite, watched = watched, inLibrary = s.inLibrary,
             // Opens its details (never plays): they say what happened.
             caption = TileCaption.Removed.takeIf { !s.isAvailable },
         )
@@ -143,16 +143,33 @@ object Presentation {
      * A title from a catalog add-on. In the library: opens its details. Otherwise it searches the
      * library for it (catalogs are information only; what plays is always the user's own media).
      */
+    /**
+     * A catalog title: one poster whether or not the user has it on Telegram. When they do, a
+     * "Telegram" badge; either way it opens the title page, where their files are a stream source.
+     */
     fun tile(item: dev.yourstream.catalog.api.CatalogItem, presence: dev.yourstream.catalog.api.LibraryPresence?): Tile = Tile(
-        MediaCardModel("cat:${item.ref.provider.value}:${item.ref.id}", item.title, item.year?.toString(), posterUrl = item.posterUrl),
-        presence?.let { OpenTarget.Details(it.itemId) } ?: OpenTarget.CatalogTitle(
+        MediaCardModel("cat:${item.ref.provider.value}:${item.ref.id}", item.title, item.year?.toString(), posterUrl = item.posterUrl,
+            badge = TELEGRAM_BADGE.takeIf { presence != null }),
+        OpenTarget.CatalogTitle(
             dev.yourstream.ui.screens.navigation.CatalogTitleRoute(
                 item.ref.provider.value, item.ref.type.name, item.ref.id, item.title, item.year, item.posterUrl, item.ref.imdbId,
             ),
         ),
         itemId = presence?.itemId,
-        caption = if (presence != null) TileCaption.InLibrary else null,
     )
+
+    /** The badge on catalog posters the user also has on Telegram. */
+    const val TELEGRAM_BADGE = "Telegram"
+
+    /**
+     * A matched Telegram movie or series opens the same title page as its catalog poster (Cinemeta,
+     * by IMDb id), with its files as the first stream source. Unmatched files keep their own page.
+     */
+    fun unifiedTarget(s: LibraryItemSummary): OpenTarget.CatalogTitle? {
+        val imdb = s.imdbId?.takeIf { it.startsWith("tt") } ?: return null
+        val type = when (s.kind) { LibraryKind.MOVIE -> "MOVIE"; LibraryKind.SERIES -> "SERIES"; else -> return null }
+        return OpenTarget.CatalogTitle(dev.yourstream.ui.screens.navigation.CatalogTitleRoute("cinemeta", type, imdb, s.metadataTitle ?: s.title, s.year, s.posterUrl, imdb))
+    }
 
     /** The matched poster, else the title's own Telegram thumbnail. */
     /** The poster, then the video's Telegram thumbnail as fallback (one source per line; see Artwork). */

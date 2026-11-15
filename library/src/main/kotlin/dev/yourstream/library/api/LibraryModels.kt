@@ -77,6 +77,8 @@ data class LibraryItemSummary(
     val posterUrl: String? = null,
     /** Official title from external metadata, when matched (title stays the library's own). */
     val metadataTitle: String? = null,
+    /** The matched title's IMDb id (null: not matched, or no IMDb id). */
+    val imdbId: String? = null,
     /** The user added it to "My library". */
     val inLibrary: Boolean = false,
     /** "chatId:messageId" of a file of this title, for its Telegram thumbnail (when there is no poster). */

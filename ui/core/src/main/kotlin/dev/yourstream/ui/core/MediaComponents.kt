@@ -265,6 +265,7 @@ fun <T : Any> PagedMediaRow(
     style: CardStyle = CardStyle.POSTER,
     actions: (T) -> List<CardAction> = { emptyList() },
     onSeeAll: (() -> Unit)? = null,
+    tag: String? = null,
 ) {
     val refresh = items.loadState.refresh
     if (items.itemCount == 0) {
@@ -274,7 +275,7 @@ fun <T : Any> PagedMediaRow(
     val d = LocalDimens.current
     val reserve = items.itemSnapshotList.items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
-        SectionHeader(title, onSeeAll)
+        SectionHeader(title, onSeeAll, tag = tag)
         CompositionLocalProvider(LocalReserveCaption provides reserve) {
             LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
                 items(items.itemCount, key = items.itemKey { card(it).key }) { i ->
@@ -369,19 +370,27 @@ private fun Modifier.combinedClickableCompat(onClick: () -> Unit) = this.combine
 
 /** Section title with an optional count and "See all". */
 @Composable
-fun SectionHeader(title: String, onSeeAll: (() -> Unit)? = null, count: String? = null) {
+fun SectionHeader(title: String, onSeeAll: (() -> Unit)? = null, count: String? = null, tag: String? = null) {
     Row(
         Modifier.fillMaxWidth().padding(start = LocalDimens.current.gutter, end = LocalDimens.current.gutter - 8.dp, top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f)) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }
                 .then(if (LocalMangaStyle.current) Modifier.padding(bottom = 4.dp).inkUnderline(MaterialTheme.colorScheme.onSurface) else Modifier))
+            // Where the row's titles come from ("From Telegram").
+            tag?.let {
+                Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color.White,
+                    modifier = Modifier.background(TelegramBlue, MaterialTheme.shapes.extraSmall).padding(horizontal = 6.dp, vertical = 2.dp).testTag("row-tag"))
+            }
         }
         count?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp)) }
         onSeeAll?.let { TextButton(onClick = it, modifier = Modifier.focusHighlight()) { Text(stringResource(R.string.ui_see_all)) } }
     }
 }
+
+/** Telegram's blue, for "From Telegram" tags and badges. */
+val TelegramBlue = Color(0xFF2AABEE)
 
 /** A small overflow button that opens a card's menu (keyboard/touch alternative to long press). */
 @Composable

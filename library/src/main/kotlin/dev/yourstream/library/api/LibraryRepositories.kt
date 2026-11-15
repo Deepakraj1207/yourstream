@@ -67,6 +67,9 @@ interface EpisodeRepository {
     /** The episode before [episodeId] in watch order that has a file, or null. */
     suspend fun previousEpisode(episodeId: Long): Episode?
     suspend fun versions(episodeId: Long): List<MediaVersion>
+
+    /** The library's episode with these numbers, if the user has it (null: not in the library). */
+    suspend fun find(seriesId: Long, season: Int, number: Int): Episode? = null
 }
 
 interface WatchHistoryRepository {

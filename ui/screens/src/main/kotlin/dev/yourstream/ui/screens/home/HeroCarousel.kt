@@ -65,10 +65,12 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (OpenTarget) -> Unit, modifier
     val pager = rememberPagerState { slides.size }
     val reduced = LocalReducedMotion.current
     val dragged by pager.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(pager.currentPage, dragged, reduced, slides.size) {
+    // Keyed on the settled page: currentPage changes halfway through a move, and restarting
+    // there cancelled the animation and left two slides half on screen.
+    LaunchedEffect(pager.settledPage, dragged, reduced, slides.size) {
         if (reduced || dragged || slides.size < 2) return@LaunchedEffect
         delay(ADVANCE_MS)
-        pager.animateScrollToPage((pager.currentPage + 1) % slides.size)
+        pager.animateScrollToPage((pager.settledPage + 1) % slides.size)
     }
     val compact = LocalWindowLayout.current == WindowLayout.COMPACT
     val screen = LocalConfiguration.current.screenHeightDp.dp

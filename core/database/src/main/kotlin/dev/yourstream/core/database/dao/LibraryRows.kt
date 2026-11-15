@@ -60,6 +60,8 @@ data class LibraryItemRow(
     @ColumnInfo(name = "metadata_title") val metadataTitle: String?,
     /** "chatId:messageId" of the title's newest file: its Telegram thumbnail is the fallback artwork. */
     @ColumnInfo(name = "thumb_ref") val thumbRef: String? = null,
+    /** The matched title's IMDb id: its catalog page, where the Telegram files are a stream source. */
+    @ColumnInfo(name = "imdb_id") val imdbId: String? = null,
 )
 
 data class EpisodeRow(

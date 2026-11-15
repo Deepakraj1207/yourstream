@@ -247,6 +247,9 @@ class RoomEpisodeRepository @Inject constructor(db: YourStreamDatabase) : Episod
 
     override suspend fun episode(episodeId: Long): Episode? = dao.episodeRow(episodeId)?.toModel()
 
+    override suspend fun find(seriesId: Long, season: Int, number: Int): Episode? =
+        dao.episodeIdByNumber(seriesId, season, number)?.let { episode(it) }
+
     override suspend fun nextEpisode(episodeId: Long): Episode? {
         val current = dao.episode(episodeId) ?: return null
         val order = if (current.seasonNumber < 0) 1000 else current.seasonNumber

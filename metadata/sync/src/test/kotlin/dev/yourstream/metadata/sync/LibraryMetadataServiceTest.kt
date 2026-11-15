@@ -147,6 +147,20 @@ class LibraryMetadataServiceTest {
     }
 
     @Test
+    fun catalogEpisodeFindsTheLibraryEpisodeIncludingDoubleEpisodes() = runTest {
+        // The title page asks for S02E16 to list the user's Telegram files for it.
+        val series = item("Doraemon", null, kind = "SERIES")
+        val season = library.insertSeason(SeasonEntity(seriesId = series, number = 2, title = null))
+        val e15 = library.insertEpisode(EpisodeEntity(seriesId = series, seasonId = season, seasonNumber = 2, number = 15, numberEnd = 16, absoluteNumber = null, title = null, airDate = null))
+        val e17 = library.insertEpisode(EpisodeEntity(seriesId = series, seasonId = season, seasonNumber = 2, number = 17, numberEnd = null, absoluteNumber = null, title = null, airDate = null))
+        assertEquals(e15, library.episodeIdByNumber(series, 2, 15))
+        assertEquals(e15, library.episodeIdByNumber(series, 2, 16), "S02E15-E16 holds episode 16")
+        assertEquals(e17, library.episodeIdByNumber(series, 2, 17))
+        assertEquals(null, library.episodeIdByNumber(series, 2, 18))
+        assertEquals(null, library.episodeIdByNumber(series, 3, 15))
+    }
+
+    @Test
     fun uncertainMatchesAreDecidedAutomaticallyAndFixMatchStillWins() = runTest {
         // Since 0.11.5 there is no review queue: the app picks the strongest candidate itself
         // (the user's decision). "Fix match" (confirm) still overrides it and locks the item.
