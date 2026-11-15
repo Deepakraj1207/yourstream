@@ -981,3 +981,18 @@ and portrait) and TV screenshots:
   opened.
 * New screenshot `phone-player-portrait`. Gate: 691 tests, 0 failures; lint 0 errors, 15
   warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING.
+
+## v0.12.3 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction. It contains:
+- device report 9: the carousel and rows are kept across tabs and restarts, and the carousel has
+  a manga style;
+- the player alignment pass.
+
+Checked on the published files (run 27):
+- `releases/latest` is v0.12.3 and is not a pre-release.
+- The arm64 APK's SHA-256 (`2700c4b2…2395`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 27 and versionName 0.12.3.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
