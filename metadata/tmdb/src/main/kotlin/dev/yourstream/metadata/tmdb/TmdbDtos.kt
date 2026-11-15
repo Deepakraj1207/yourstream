@@ -33,7 +33,7 @@ internal data class TmdbCast(
 )
 
 @Serializable
-internal data class TmdbCrew(val name: String, val job: String? = null)
+internal data class TmdbCrew(val name: String, val job: String? = null, val department: String? = null)
 
 @Serializable internal data class TmdbCredits(val cast: List<TmdbCast> = emptyList(), val crew: List<TmdbCrew> = emptyList())
 

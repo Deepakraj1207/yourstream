@@ -54,7 +54,7 @@ class StreamSourcesTest {
     private val alpha = StreamGroup("Alpha", listOf(web("720p", 1_000), web("1080p", 2_000), web("4K HDR", 5_000)), id = "a")
     private val beta = StreamGroup("Beta", listOf(torrent("1080p Tamil")), id = "b")
 
-    private fun title(streams: List<StreamGroup>) = CatalogTitleUiState("Example Film", 2024, null, loadingMeta = false, streams = streams)
+    private fun title(streams: List<StreamGroup>) = CatalogTitleUiState("Example Film", 2024, null, loadingMeta = false, streams = streams, streamsOpen = true)
 
     @Test
     fun telegramComesFirstEvenWhenItAnswersLast() {

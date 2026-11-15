@@ -355,7 +355,6 @@
     <string name="addon_season">Season %1$d</string>
     <string name="addon_specials">Specials</string>
     <string name="addon_in_library">Play from your library</string>
-    <string name="addon_cast">Cast: %1$s</string>
     <string name="addon_no_episodes">No episode list from your add-ons for this series.</string>
     <string name="addon_no_stream_addons">No stream add-on is installed. Add one in Settings → Add-ons to see streams here.</string>
     <string name="addon_no_streams">No streams found for this title.</string>
@@ -885,4 +884,29 @@
     <string name="discover_failed_message">The add-on did not answer. Try again, or pick another catalog.</string>
     <string name="discover_empty_title">Nothing here</string>
     <string name="discover_empty_message">This catalog has no titles for this genre.</string>
+    <string name="title_play">Play</string>
+    <string name="title_play_episode">Play S%1$d E%2$d</string>
+    <string name="title_back">Back</string>
+    <string name="title_add_library">Add to My library</string>
+    <string name="title_remove_library">Remove from My library</string>
+    <string name="title_director">Director:</string>
+    <string name="title_creator">Creator:</string>
+    <string name="title_writer">Writer:</string>
+    <string name="title_show_more">Show More ▾</string>
+    <string name="title_show_less">Show Less ▴</string>
+    <string name="title_production">Production</string>
+    <string name="title_cast">Cast</string>
+    <string name="title_trailers">Trailers</string>
+    <string name="title_movie_details">Movie Details</string>
+    <string name="title_show_details">Show Details</string>
+    <string name="title_status">Status</string>
+    <string name="title_release">Release Info</string>
+    <string name="title_runtime">Runtime</string>
+    <string name="title_seasons">Seasons</string>
+    <string name="title_episodes">Episodes</string>
+    <string name="title_certification">Certification</string>
+    <string name="title_country">Origin Country</string>
+    <string name="title_language">Original Language</string>
+    <string name="title_more_like_this">More Like This</string>
+    <string name="title_powered_by_tmdb">Powered by TMDB</string>
 </resources>

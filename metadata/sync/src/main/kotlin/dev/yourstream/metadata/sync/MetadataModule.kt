@@ -49,6 +49,11 @@ abstract class MetadataModule {
             return order.ids.mapNotNull { available[it.trim().lowercase()]?.invoke() }
         }
 
+        /** Title pages' details (TMDB). Its own client, so a slow page never holds up library matching. */
+        @Provides @Singleton
+        fun titleDetails(tmdb: TmdbKeys, clock: Clock): dev.yourstream.metadata.api.TitleDetailsProvider =
+            TmdbProvider(HttpClients.create(), { tmdb.current() }, clock)
+
         @Provides @Singleton
         fun manager(providers: List<@JvmSuppressWildcards MetadataProvider>, cache: MetadataCache, clock: Clock, logger: Logger, settings: MetadataSettings) =
             MetadataProviderManager(providers, cache, clock, logger, defaultLanguage = settings.language)

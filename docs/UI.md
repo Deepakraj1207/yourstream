@@ -427,3 +427,35 @@ Based on Nuvio's floating bar source.
 - The hero carousel's auto-advance waits for the settled page, so it no longer stops halfway
   between two slides.
 
+## Title page like Nuvio's (0.12.1)
+
+The add-on title page is a Nuvio detail page, filled from TMDB when its key is set
+(`TitleDetailsProvider`, implemented by `TmdbProvider.details`).
+- **Data:** one request with credits, videos, images, recommendations, release dates or content
+  ratings, and external ids. A title known only by its IMDb id is found first. The last 30 pages
+  are kept in memory.
+- **Layout, top to bottom:**
+  - artwork with the logo (in your language, else English, else textless) and the genres;
+  - **Play** (opens the streams) and a "•••" menu (open in your library, refresh streams);
+  - year · length · age rating (your region's, else the US one);
+  - IMDb (titles from Cinemeta) and TMDB scores;
+  - Director, Creator, Writer;
+  - the overview, three lines with Show More;
+  - a series' seasons and episodes (an episode opens its streams);
+  - Production logos, Cast with photos and roles, and Trailers (YouTube, by kind);
+  - Movie or Show Details (status, release, runtime, seasons and episodes, certification,
+    country, language), More Like This, and "Powered by TMDB".
+- **Top bar:** back, plus the logo once the artwork has scrolled away, plus "My library" (+)
+  for titles in your library.
+- **More Like This:** these titles open by TMDB id, and TMDB gives their IMDb id for the stream
+  add-ons.
+- **Without a TMDB key:** the add-on's details fill the same layout.
+- **Not shown:** Nuvio's Rotten Tomatoes, Letterboxd and audience scores. They come from
+  MDBList, which needs its own key, so only IMDb and TMDB are shown.
+- **Streams:** on their own page, as in Nuvio. Play opens it, back returns. Streams start loading
+  when the page opens, so they are ready.
+- **Changed with stated reasons:** the old poster header and inline streams are gone, and the
+  stream tests now open the streams page first.
+- **Tests:** `TitleDetailsPageTest`, `TmdbProviderTest.titleDetailsForTheTitlePage`, and
+  `TitleStreamsCrashTest.titleOpenedByTmdbIdAsksAddonsWithItsImdbId`.
+

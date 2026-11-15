@@ -220,17 +220,21 @@ class LayoutSettingsTest {
         val ref = CatalogItemRef(CatalogProviderId("x"), CatalogType.SERIES, "tt1")
         val videos = (1..3).map { CatalogVideo("tt1:1:$it", 1, it, "Episode $it", null) }
         val stream = AddonStream("A", "1080p", "Film.mkv", "https://example.com/a.mkv", null, null, sizeBytes = 1_500_000_000L)
+        var streamsOpen by mutableStateOf(false)
         compose.setContent {
             CompositionLocalProvider(LocalAppSettings provides AppSettings(layout = layout)) {
                 YourStreamTheme(WindowLayout.COMPACT) {
                     CatalogTitleScreen(CatalogTitleUiState("Show", 2020, null, series = true,
                         meta = CatalogMetadata(ref, "Show", 2020, "A long description.", cast = listOf("Someone"), videos = videos),
                         loadingMeta = false, seasons = listOf(1), season = 1, episode = videos[0],
-                        streams = listOf(StreamGroup("A", listOf(stream), id = "a", logo = "https://example.com/logo.png"))), {}, {}, {}, onStream = {})
+                        streams = listOf(StreamGroup("A", listOf(stream), id = "a", logo = "https://example.com/logo.png")), streamsOpen = streamsOpen), {}, {}, {}, onStream = {})
                 }
             }
         }
         compose.onNodeWithText("A long description.").assertExists()
+        // An episode tapped (or Play): its streams page, like Nuvio's.
+        streamsOpen = true
+        compose.onNodeWithTag("streams-episode").assertTextContains("S1 E1", substring = true)
         compose.onNodeWithTag("catalog-title").performScrollToNode(hasTestTag("stream"))
         // Inside the tappable stream row (one merged node for screen readers): the unmerged tree.
         compose.onNode(hasTestTag("stream-size") and androidx.compose.ui.test.hasAnyDescendant(hasText("1.4 GB")), useUnmergedTree = true).assertExists()
@@ -238,6 +242,7 @@ class LayoutSettingsTest {
         layout = LayoutSettings(sizeBadges = false, addonLogo = false, showOverview = false, episodeCards = EpisodeCards.HORIZONTAL)
         compose.onNodeWithTag("stream-size", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("stream-logo:a", useUnmergedTree = true).assertDoesNotExist()
+        streamsOpen = false
         compose.onNodeWithTag("catalog-title").performScrollToNode(hasTestTag("episode-cards"))
         compose.onNodeWithTag("episode-cards").assertExists()
         compose.onNodeWithText("A long description.").assertDoesNotExist()

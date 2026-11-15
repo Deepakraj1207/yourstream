@@ -887,3 +887,12 @@ Status: NEEDS REAL-DEVICE TESTING.
     reproduced the device crash before the fix.
 * Gate: 682 tests, 0 failures; lint 0 errors, 15 warnings (unchanged).
 * Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 7 (15 Nov 2026): title page like Nuvio's, from TMDB
+
+The user had added a TMDB key, but the title page did not use it. It is now a Nuvio-style detail
+page from TMDB (see UI.md), with Play opening the streams page. Only IMDb and TMDB scores are
+shown: the other scores in the user's screenshot come from MDBList, which needs its own key.
+Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+TESTING.
+

@@ -58,7 +58,7 @@ class TmdbProvider(
     /** Read on every request, so a key entered in Settings applies at once. */
     private val configSource: () -> TmdbConfig,
     clock: Clock = Clock.System,
-) : MetadataProvider {
+) : MetadataProvider, dev.yourstream.metadata.api.TitleDetailsProvider {
     constructor(client: HttpClient, config: TmdbConfig, clock: Clock = Clock.System) : this(client, { config }, clock)
 
     private val config: TmdbConfig get() = configSource()
@@ -198,6 +198,77 @@ class TmdbProvider(
             }
         }
 
+    // ------------------------------------------------------------------ title pages
+
+    /** Recent title pages, so going back and forth does not ask TMDB again. */
+    private val detailsCache = object : LinkedHashMap<String, dev.yourstream.metadata.api.TitleDetails>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, dev.yourstream.metadata.api.TitleDetails>?) = size > DETAILS_CACHE
+    }
+
+    override suspend fun details(type: MetadataType, imdbId: String?, tmdbId: String?, language: String?, region: String?): AppResult<dev.yourstream.metadata.api.TitleDetails> {
+        val id = tmdbId?.removePrefix("tmdb:")?.takeIf { it.isNotBlank() }
+            ?: imdbId?.let { imdb -> when (val r = findByImdbId(imdb, type)) { is AppResult.Ok -> r.value.id; is AppResult.Err -> return r } }
+            ?: return AppResult.Err(AppError.NotFound("no id"))
+        val key = "$type:$id:$language:$region"
+        synchronized(detailsCache) { detailsCache[key] }?.let { return AppResult.Ok(it) }
+        val movie = type == MetadataType.MOVIE
+        val lang = language?.substringBefore('-')
+        return get(if (movie) "/movie/$id" else "/tv/$id", TmdbDetails.serializer()) {
+            parameter("append_to_response", if (movie) "credits,videos,images,recommendations,similar,release_dates,external_ids" else "credits,videos,images,recommendations,similar,content_ratings,external_ids")
+            language?.let { parameter("language", it) }
+            // Logos and videos in the user's language, English, and without text.
+            parameter("include_image_language", listOfNotNull(lang, "en", "null").distinct().joinToString(","))
+            parameter("include_video_language", listOfNotNull(lang, "en", "null").distinct().joinToString(","))
+        }.map { d -> toDetails(d, type, imdbId, lang, region).also { synchronized(detailsCache) { detailsCache[key] = it } } }
+    }
+
+    internal fun toDetails(d: TmdbDetails, type: MetadataType, imdbId: String?, lang: String?, region: String?): dev.yourstream.metadata.api.TitleDetails {
+        val movie = type == MetadataType.MOVIE
+        val date = (if (movie) d.releaseDate else d.firstAirDate)?.ifBlank { null }
+        val crew = d.credits?.crew.orEmpty()
+        val certification = if (movie) {
+            val byCountry = d.releaseDates?.results.orEmpty().associate { c -> c.country to c.dates.map { it.certification.trim() }.firstOrNull { it.isNotEmpty() } }
+            listOfNotNull(region, "US").firstNotNullOfOrNull { byCountry[it] } ?: byCountry.values.firstOrNull { it != null }
+        } else {
+            val byCountry = d.contentRatings?.results.orEmpty().associate { it.country to it.rating.trim().ifEmpty { null } }
+            listOfNotNull(region, "US").firstNotNullOfOrNull { byCountry[it] } ?: byCountry.values.firstOrNull { it != null }
+        }
+        val logo = d.images?.logos.orEmpty().filter { !it.filePath.endsWith(".svg") }
+            .sortedWith(compareBy<TmdbImage> { when (it.language) { lang -> 0; "en" -> 1; null -> 2; else -> 3 } }.thenByDescending { it.voteAverage })
+            .firstOrNull()
+        val videos = d.videos?.results.orEmpty().filter { it.site.equals("YouTube", true) && it.key.isNotBlank() }
+            .sortedWith(compareBy<TmdbVideo> { VIDEO_ORDER.indexOf(it.type).let { i -> if (i < 0) VIDEO_ORDER.size else i } }.thenByDescending { it.official }.thenByDescending { it.publishedAt })
+            .map { dev.yourstream.metadata.api.TitleDetails.Video(it.name, it.key, it.type, year(it.publishedAt), it.official) }
+        val similar = (d.recommendations?.results.orEmpty().ifEmpty { d.similar?.results.orEmpty() }).take(MAX_SIMILAR).map { r ->
+            dev.yourstream.metadata.api.TitleDetails.Recommendation(r.id.toString(), type, r.title ?: r.name ?: "", year(r.releaseDate ?: r.firstAirDate), image(r.posterPath, POSTER))
+        }.filter { it.title.isNotBlank() }
+        return dev.yourstream.metadata.api.TitleDetails(
+            tmdbId = d.id.toString(), type = type,
+            imdbId = (d.imdbId ?: d.externalIds?.imdbId)?.ifBlank { null } ?: imdbId,
+            title = d.title ?: d.name ?: "",
+            overview = d.overview?.ifBlank { null },
+            genres = d.genres.map { it.name },
+            year = year(date), releaseDate = date,
+            runtimeMinutes = (d.runtime ?: d.episodeRunTime.firstOrNull())?.takeIf { it > 0 },
+            certification = certification,
+            status = d.status?.ifBlank { null },
+            tmdbRating = d.voteAverage?.takeIf { (d.voteCount ?: 1) > 0 && it > 0 },
+            logoUrl = logo?.let { image(it.filePath, LOGO) },
+            backdropUrl = image(d.backdropPath, BACKDROP), posterUrl = image(d.posterPath, POSTER),
+            directors = crew.filter { it.job == "Director" }.map { it.name }.distinct(),
+            writers = crew.filter { it.department == "Writing" && it.job in WRITER_JOBS }.map { it.name }.distinct().take(3),
+            creators = d.createdBy.map { it.name },
+            companies = d.productionCompanies.take(MAX_COMPANIES).map { dev.yourstream.metadata.api.TitleDetails.Company(it.name, image(it.logoPath, LOGO_SMALL)) },
+            cast = d.credits?.cast.orEmpty().sortedBy { it.order }.take(MAX_CAST)
+                .map { dev.yourstream.metadata.api.TitleDetails.Person(it.name, it.character?.ifBlank { null }, image(it.profilePath, PROFILE)) },
+            videos = videos,
+            originCountries = d.originCountry.ifEmpty { d.productionCountries.map { it.code } },
+            originalLanguage = d.originalLanguage?.ifBlank { null },
+            seasonCount = d.numberOfSeasons, episodeCount = d.numberOfEpisodes,
+            recommendations = similar,
+        )
+    }
+
     private fun TmdbSearchItem.toCandidate(type: MetadataType) = MetadataCandidate(
         ref = MetadataRef(ID, type, id.toString()),
         title = title ?: name ?: "",
@@ -233,5 +304,12 @@ class TmdbProvider(
         private const val BACKDROP = "w1280"
         private const val STILL = "w300"
         private const val PROFILE = "w185"
+        private const val LOGO = "w500"
+        private const val LOGO_SMALL = "w185"
+        private const val MAX_COMPANIES = 6
+        private const val MAX_SIMILAR = 20
+        private const val DETAILS_CACHE = 30
+        private val VIDEO_ORDER = listOf("Trailer", "Teaser", "Clip", "Featurette", "Behind the Scenes")
+        private val WRITER_JOBS = setOf("Writer", "Screenplay", "Story", "Novel", "Author", "Teleplay")
     }
 }

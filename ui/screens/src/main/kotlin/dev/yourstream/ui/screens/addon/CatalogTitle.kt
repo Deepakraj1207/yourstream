@@ -76,6 +76,7 @@ import dev.yourstream.ui.screens.navigation.CatalogTitleRoute
 import dev.yourstream.ui.screens.navigation.OpenTarget
 import dev.yourstream.ui.screens.navigation.StreamPlayerRoute
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -140,6 +141,14 @@ data class CatalogTitleUiState(
     val noStreamAddons: Boolean = false,
     /** The add-on whose streams are shown alone ([StreamGroup.id]); null: all add-ons, grouped. */
     val streamAddon: String? = null,
+    /** TMDB's details (logo, cast, trailers, …); null without a TMDB key or before they arrive. */
+    val details: dev.yourstream.metadata.api.TitleDetails? = null,
+    /** The streams page is open (Play, or an episode tapped), like Nuvio's. */
+    val streamsOpen: Boolean = false,
+    /** The library title is in "My library" (the + in the top bar); null: no library title. */
+    val inLibrary: Boolean? = null,
+    /** Opened from Cinemeta: its rating is IMDb's. */
+    val ratingIsImdb: Boolean = false,
 ) {
     val episodes: List<CatalogVideo> get() = meta?.videos.orEmpty().filter { it.season == season }
 
@@ -157,6 +166,10 @@ sealed interface CatalogTitleAction {
     data class SelectSeason(val season: Int) : CatalogTitleAction
     data class SelectEpisode(val video: CatalogVideo) : CatalogTitleAction
     data object Retry : CatalogTitleAction
+    /** Play: the streams page (series: of the chosen episode, else the season's first). */
+    data object Play : CatalogTitleAction
+    data object CloseStreams : CatalogTitleAction
+    data object ToggleLibrary : CatalogTitleAction
     /** Show one add-on's streams ([StreamGroup.id]), or all of them (null). */
     data class SelectStreamAddon(val id: String?) : CatalogTitleAction
     /** Ask the stream add-ons again for the same movie or episode. */
@@ -176,14 +189,18 @@ class CatalogTitleViewModel @Inject constructor(
     private val addons: CatalogAddons,
     private val media: dev.yourstream.library.api.MediaRepository,
     private val episodeRepo: dev.yourstream.library.api.EpisodeRepository,
+    private val titleDetails: dev.yourstream.metadata.api.TitleDetailsProvider,
 ) : ViewModel() {
     private val route = saved.toRoute<CatalogTitleRoute>()
     private val type = runCatching { CatalogType.valueOf(route.type) }.getOrDefault(CatalogType.MOVIE)
+    /** Titles opened from "More like this" carry TMDB's id ("tmdb:123"). */
+    private val tmdbId = route.id.takeIf { it.startsWith("tmdb:") }?.removePrefix("tmdb:")
     private val item = CatalogItem(
-        CatalogItemRef(CatalogProviderId(route.provider), type, route.id, route.imdb ?: route.id.takeIf { it.startsWith("tt") }),
+        CatalogItemRef(CatalogProviderId(route.provider), type, route.id, route.imdb ?: route.id.takeIf { it.startsWith("tt") }, tmdbId),
         route.title, route.year, route.poster,
     )
-    private val _state = MutableStateFlow(CatalogTitleUiState(route.title, route.year, route.poster, series = type == CatalogType.SERIES))
+    private val _state = MutableStateFlow(CatalogTitleUiState(route.title, route.year, route.poster, series = type == CatalogType.SERIES,
+        ratingIsImdb = route.provider == "cinemeta"))
     val state: StateFlow<CatalogTitleUiState> = _state.asStateFlow()
 
     /** The IMDb id once known (from the route, or from the details): what most stream add-ons key on. */
@@ -194,7 +211,21 @@ class CatalogTitleViewModel @Inject constructor(
     fun onAction(a: CatalogTitleAction) {
         when (a) {
             is CatalogTitleAction.SelectSeason -> _state.update { it.copy(season = a.season) }
-            is CatalogTitleAction.SelectEpisode -> { _state.update { it.copy(episode = a.video) }; loadStreams(CatalogType.SERIES, episodeIds(a.video)) }
+            is CatalogTitleAction.SelectEpisode -> { _state.update { it.copy(episode = a.video, streamsOpen = true) }; loadStreams(CatalogType.SERIES, episodeIds(a.video)) }
+            CatalogTitleAction.Play -> {
+                val s = _state.value
+                if (s.series) {
+                    val e = s.episode ?: s.episodes.firstOrNull() ?: return
+                    onAction(CatalogTitleAction.SelectEpisode(e))
+                } else _state.update { it.copy(streamsOpen = true) }
+            }
+            CatalogTitleAction.CloseStreams -> _state.update { it.copy(streamsOpen = false) }
+            CatalogTitleAction.ToggleLibrary -> {
+                val id = _state.value.libraryItemId ?: return
+                val now = _state.value.inLibrary ?: return
+                _state.update { it.copy(inLibrary = !now) }
+                viewModelScope.launch { runCatching { media.setInLibrary(id, !now) }.onFailure { _state.update { it.copy(inLibrary = now) } } }
+            }
             CatalogTitleAction.Retry -> load()
             is CatalogTitleAction.SelectStreamAddon -> _state.update { it.copy(streamAddon = a.id) }
             CatalogTitleAction.RefreshStreams -> lastStreams?.let { (t, ids) -> loadStreams(t, ids) }
@@ -209,9 +240,26 @@ class CatalogTitleViewModel @Inject constructor(
 
     private fun load() = viewModelScope.launch {
         _state.update { it.copy(loadingMeta = true) }
-        val presence = runCatching { addons.manager().withLibraryPresence(listOf(item)).firstOrNull()?.second }.getOrNull()
-        val meta = runCatching { addons.metadata(item) }.getOrNull()
+        // The add-on's details and TMDB's side by side; TMDB also gives the IMDb id of titles
+        // opened from "More like this", which stream add-ons need.
+        val tmdb = async {
+            if (!titleDetails.isConfigured) null
+            else runCatching {
+                val locale = java.util.Locale.getDefault()
+                (titleDetails.details(if (type == CatalogType.SERIES) dev.yourstream.metadata.api.MetadataType.SERIES else dev.yourstream.metadata.api.MetadataType.MOVIE,
+                    imdb, tmdbId, locale.toLanguageTag(), locale.country.ifBlank { null }) as? AppResult.Ok)?.value
+            }.getOrNull()
+        }
+        val details = if (imdb == null) tmdb.await() else null
+        imdb = imdb ?: details?.imdbId
+        val known = if (imdb != null && item.ref.imdbId == null) item.copy(ref = item.ref.copy(imdbId = imdb)) else item
+        val meta = runCatching { addons.metadata(known) }.getOrNull()
         imdb = imdb ?: meta?.ref?.imdbId
+        val presence = runCatching { addons.manager().withLibraryPresence(listOf(if (imdb != null) known.copy(ref = known.ref.copy(imdbId = imdb)) else known)).firstOrNull()?.second }.getOrNull()
+        val inLibrary = presence?.let { p -> runCatching { media.getItem(p.itemId)?.summary?.inLibrary }.getOrNull() }
+        _state.update { it.copy(details = details, inLibrary = inLibrary) }
+        // Never wait for TMDB to show the add-on's details or ask for streams.
+        if (details == null) launch { tmdb.await()?.let { d -> _state.update { it.copy(details = d) } } }
         val seasons = meta?.videos.orEmpty().mapNotNull { it.season }.distinct().sortedWith(compareBy { if (it == 0) Int.MAX_VALUE else it })
         _state.update {
             it.copy(
@@ -326,7 +374,9 @@ fun CatalogTitleDestination(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, vm
     var askFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<AddonStream?>(null) }
     val filter = dev.yourstream.ui.screens.settings.LocalAppSettings.current.streamFilter
     CatalogTitleScreen(state, vm::onAction, onBack, onOpenLibrary = { onOpen(OpenTarget.Details(it)) }, torrents = torrents,
-        filter = filter, onFilter = { f -> prefs.update { it.copy(streamFilter = f) } }) { s ->
+        filter = filter, onFilter = { f -> prefs.update { it.copy(streamFilter = f) } }, onOpen = onOpen,
+        // Trailers open in YouTube (or the browser).
+        onOpenUrl = { url -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }) { s ->
         val library = vm.libraryTarget(s)
         if (library != null) onOpen(library)
         else if (s.isTorrent && !torrents && vm.playTarget(s) != null) askFor = s
@@ -350,39 +400,40 @@ fun CatalogTitleScreen(
     torrents: Boolean = true,
     filter: StreamFilter = StreamFilter(),
     onFilter: (StreamFilter) -> Unit = {},
+    onOpen: (OpenTarget) -> Unit = {},
+    onOpenUrl: (String) -> Unit = {},
     onStream: (AddonStream) -> Unit,
+) {
+    if (state.streamsOpen) {
+        androidx.activity.compose.BackHandler { onAction(CatalogTitleAction.CloseStreams) }
+        StreamsPage(state, torrents, filter, onFilter, onAction, onStream)
+    } else {
+        TitleDetailsPage(state, onAction, onBack, onOpenLibrary, onOpen, onOpenUrl)
+    }
+}
+
+/** Play's page, like Nuvio's streams screen: what is playing (and the episode), then the streams. */
+@Composable
+private fun StreamsPage(
+    state: CatalogTitleUiState, torrents: Boolean, filter: StreamFilter, onFilter: (StreamFilter) -> Unit,
+    onAction: (CatalogTitleAction) -> Unit, onStream: (AddonStream) -> Unit,
 ) {
     val d = LocalDimens.current
     val layout = dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout
+    val title = state.details?.title?.ifBlank { null } ?: state.title
     Box(Modifier.fillMaxSize()) {
-    // Settings → Layout → Detail page → Background: Cinematic puts the artwork, blurred, behind the page.
-    if (layout.detailBackground == dev.yourstream.ui.screens.settings.DetailBackground.CINEMATIC) CinematicBackground(state.poster ?: state.meta?.backdropUrl)
-    ScreenScaffold("", onBack = onBack, modifier = Modifier.background(androidx.compose.ui.graphics.Color.Transparent)) {
-        LazyColumn(Modifier.fillMaxSize().testTag("catalog-title"), contentPadding = PaddingValues(bottom = 32.dp)) {
-            item { Header(state, onOpenLibrary, layout.showOverview, layout.showCast) }
-            if (state.series) {
-                if (state.loadingMeta) item { Loading() }
-                else if (state.seasons.isEmpty()) item { Note(stringResource(R.string.addon_no_episodes)) }
-                else {
-                    item {
-                        ChipRow(state.seasons.map { ChipOption(it, if (it == 0) stringResource(R.string.addon_specials) else stringResource(R.string.addon_season, it)) },
-                            state.season, { onAction(CatalogTitleAction.SelectSeason(it)) }, Modifier.padding(vertical = 8.dp))
-                    }
-                    if (layout.episodeCards == dev.yourstream.ui.screens.settings.EpisodeCards.HORIZONTAL) {
-                        // Episodes as a row of cards; the chosen episode's streams under the row.
-                        item(key = "episode-row") { EpisodeCardsRow(state.episodes, state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(it)) } }
-                        if (state.episode != null) item(key = "episode-streams") { Streams(state, torrents, filter, onFilter, onAction, onStream, Modifier.padding(horizontal = d.gutter)) }
-                    } else items(state.episodes, key = { "ep:" + it.id }) { e ->
-                        EpisodeRow(e, selected = e.id == state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(e)) }
-                        if (e.id == state.episode?.id) Streams(state, torrents, filter, onFilter, onAction, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
+        if (layout.detailBackground == dev.yourstream.ui.screens.settings.DetailBackground.CINEMATIC) CinematicBackground(state.details?.backdropUrl ?: state.poster ?: state.meta?.backdropUrl)
+        ScreenScaffold(title, onBack = { onAction(CatalogTitleAction.CloseStreams) }, modifier = Modifier.background(androidx.compose.ui.graphics.Color.Transparent)) {
+            LazyColumn(Modifier.fillMaxSize().testTag("catalog-title"), contentPadding = PaddingValues(bottom = dev.yourstream.ui.core.LocalBottomClearance.current + 32.dp)) {
+                state.episode?.takeIf { state.series }?.let { e ->
+                    item(key = "streams-episode") {
+                        Text(listOfNotNull(e.season?.let { s -> "S$s E${e.episode ?: 0}" }, e.title).joinToString(" · "), style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter, vertical = 4.dp).testTag("streams-episode"))
                     }
                 }
-            } else {
-                item { SectionTitle(stringResource(R.string.addon_streams)) }
-                item { Streams(state, torrents, filter, onFilter, onAction, onStream, Modifier.padding(horizontal = d.gutter)) }
+                item(key = "streams") { Streams(state, torrents, filter, onFilter, onAction, onStream, Modifier.padding(horizontal = d.gutter)) }
             }
         }
-    }
     }
 }
 
@@ -401,7 +452,7 @@ internal fun CinematicBackground(url: String?) {
 
 /** Episodes as 16:9 cards in a row (Settings → Layout → Detail page → Episode cards: Horizontal). */
 @Composable
-private fun EpisodeCardsRow(episodes: List<CatalogVideo>, selected: String?, onSelect: (CatalogVideo) -> Unit) {
+internal fun EpisodeCardsRow(episodes: List<CatalogVideo>, selected: String?, onSelect: (CatalogVideo) -> Unit) {
     val d = LocalDimens.current
     androidx.compose.foundation.lazy.LazyRow(
         Modifier.testTag("episode-cards"), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp),
@@ -426,31 +477,7 @@ private fun EpisodeCardsRow(episodes: List<CatalogVideo>, selected: String?, onS
 }
 
 @Composable
-private fun Header(state: CatalogTitleUiState, onOpenLibrary: (Long) -> Unit, showOverview: Boolean = true, showCast: Boolean = true) {
-    val d = LocalDimens.current
-    Row(Modifier.padding(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Artwork(state.poster, state.title, Modifier.width(d.posterWidth).aspectRatio(2f / 3f).clip(MaterialTheme.shapes.medium))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(state.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-            val m = state.meta
-            listOfNotNull(state.year?.toString(), m?.runtimeMinutes?.let { "$it min" }, m?.rating?.let { "★ %.1f".format(it) }, m?.genres?.take(3)?.joinToString(", ")?.ifEmpty { null })
-                .joinToString(" · ").ifEmpty { null }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            state.libraryItemId?.let { id ->
-                Button(onClick = { onOpenLibrary(id) }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag("open-library")) {
-                    Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp)); Text(stringResource(R.string.addon_in_library), Modifier.padding(start = 6.dp))
-                }
-            }
-        }
-    }
-    state.meta?.description?.takeIf { showOverview }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = d.gutter, vertical = 8.dp)) }
-    state.meta?.cast?.takeIf { showCast && it.isNotEmpty() }?.let {
-        Text(stringResource(R.string.addon_cast, it.take(6).joinToString(", ")), style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter))
-    }
-}
-
-@Composable
-private fun EpisodeRow(e: CatalogVideo, selected: Boolean, onClick: () -> Unit) {
+internal fun EpisodeRow(e: CatalogVideo, selected: Boolean, onClick: () -> Unit) {
     val d = LocalDimens.current
     Surface(
         color = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,

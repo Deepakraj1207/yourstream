@@ -41,6 +41,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import dev.yourstream.metadata.api.TitleDetails
 import java.io.File
 
 /**
@@ -211,7 +212,7 @@ class ScreenshotTest {
                     ), id = "other"),
                     dev.yourstream.ui.screens.addon.StreamGroup("Slow Add-on", emptyList(), id = "slow", loading = true),
                     dev.yourstream.ui.screens.addon.StreamGroup("Quiet Add-on", emptyList(), id = "quiet"),
-                ), loadingStreams = true,
+                ), loadingStreams = true, streamsOpen = true,
             ),
             {}, {}, {}, onStream = {},
         )
@@ -469,5 +470,24 @@ class ScreenshotTest {
             dev.yourstream.ui.screens.addon.StreamFilter(qualities = setOf(dev.yourstream.ui.screens.addon.StreamQuality.FHD)),
             listOf(dev.yourstream.ui.screens.addon.StreamGroup("A", listOf(s("1080p", 2_000, null), s("2160p", 6_000, null), s("1080p WEB", 1_500, "aabbccddeeff00112233445566778899aabbccdd")), id = "a")),
         ) {}
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneTitleDetails() = shot("phone-title-details", WindowLayout.COMPACT, null) {
+        val ref = dev.yourstream.catalog.api.CatalogItemRef(dev.yourstream.catalog.api.CatalogProviderId("cinemeta"), dev.yourstream.catalog.api.CatalogType.MOVIE, "tt9000001", "tt9000001")
+        dev.yourstream.ui.screens.addon.CatalogTitleScreen(
+            dev.yourstream.ui.screens.addon.CatalogTitleUiState("Baththa", 2026, null, loadingMeta = false, ratingIsImdb = true, libraryItemId = 7, inLibrary = false,
+                meta = dev.yourstream.catalog.api.CatalogMetadata(ref, "Baththa", 2026, rating = 8.5),
+                details = TitleDetails("555", dev.yourstream.metadata.api.MetadataType.MOVIE, "tt9000001", "Baththa",
+                    "In 1986 Madras, a timid eight-year-old boy accidentally traps a feared gangster inside a deserted school toilet. As the gangster is forced to confront his past, the boy finds his courage.",
+                    listOf("Drama", "Comedy", "Action"), 2026, "2026-01-10", 159, "U/A 13+", "Released", 7.9, null, null, null,
+                    listOf("Balaji Tharaneetharan"), listOf("Balaji Tharaneetharan"), emptyList(),
+                    listOf(TitleDetails.Company("Passion Studios", null), TitleDetails.Company("Star Studios", null)),
+                    listOf(TitleDetails.Person("Balaji Tharaneetharan", "Director", null), TitleDetails.Person("Vijay Sethupathi", "Bathvachalam", null), TitleDetails.Person("Sai Prithviraj", "Sabari", null)),
+                    listOf(TitleDetails.Video("Official Trailer [Subtitled]", "abc", "Trailer", 2026, true)), listOf("IN"), "ta",
+                    recommendations = listOf(TitleDetails.Recommendation("7", dev.yourstream.metadata.api.MetadataType.MOVIE, "Airborne", 1993, null))),
+            ),
+            {}, {}, {}, onStream = {},
+        )
     }
 }

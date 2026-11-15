@@ -53,6 +53,9 @@ class TitleStreamsCrashTest {
     @get:Rule val compose = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Ids the stream add-on was asked for. */
+    private val asked = mutableListOf<String>()
+
     private val torrentio = object : CatalogProvider, StreamProvider {
         override val id = CatalogProviderId("custom:torrentio.example")
         override val displayName = "Torrentio"
@@ -62,7 +65,7 @@ class TitleStreamsCrashTest {
         override suspend fun search(query: String, type: CatalogType?) = AppResult.Err(AppError.InvalidState("no"))
         override suspend fun metadata(ref: CatalogItemRef) = AppResult.Err(AppError.InvalidState("no"))
         override suspend fun hasStreams() = true
-        override suspend fun streams(type: CatalogType, id: String): AppResult<List<AddonStream>> = AppResult.Ok((1..40).map { i ->
+        override suspend fun streams(type: CatalogType, id: String): AppResult<List<AddonStream>> = AppResult.Ok((1..40).also { asked += id }.map { i ->
             AddonStream("Torrentio", listOf("Torrentio\n4k DV | HDR", "Torrentio\n1080p", "Torrentio\n720p", "Torrentio\nSCR")[i % 4],
                 "Example.Film.2024.${listOf("2160p", "1080p", "720p", "CAM")[i % 4]}.WEB-DL\n👤 $i 💾 ${i}.5 GB ⚙️ ThePirateBay\nMulti Audio / 🇮🇳 / 🇬🇧",
                 if (i % 5 == 0) "https://cdn.example/$i.mkv" else null, null,
@@ -114,7 +117,12 @@ class TitleStreamsCrashTest {
         val media = stub<MediaRepository> { name, _ -> if (name == "versions") listOf(version) else error(name) }
         val episodes = stub<EpisodeRepository> { name, _ -> error(name) }
         val saved = SavedStateHandle(mapOf("provider" to "cinemeta", "type" to "MOVIE", "id" to "tt1234567", "title" to "Example Film", "year" to 2024, "poster" to null, "imdb" to "tt1234567"))
-        val vm = CatalogTitleViewModel(saved, store, media, episodes)
+        val noTmdb = object : dev.yourstream.metadata.api.TitleDetailsProvider {
+            override val isConfigured = false
+            override suspend fun details(type: dev.yourstream.metadata.api.MetadataType, imdbId: String?, tmdbId: String?, language: String?, region: String?) =
+                AppResult.Err(AppError.NotConfigured("no key"))
+        }
+        val vm = CatalogTitleViewModel(saved, store, media, episodes, noTmdb)
         compose.setContent {
             YourStreamTheme(WindowLayout.COMPACT) {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -122,9 +130,34 @@ class TitleStreamsCrashTest {
             }
         }
         compose.waitUntil(10_000) { !vm.state.value.loadingStreams && vm.state.value.streams.isNotEmpty() }
+        vm.onAction(dev.yourstream.ui.screens.addon.CatalogTitleAction.Play)
         compose.waitForIdle()
         // The Telegram file first, then the add-on's 40 results (some without a size).
         kotlin.test.assertEquals(listOf("telegram" to 1, "custom:torrentio.example" to 40), vm.state.value.streams.map { it.id to it.streams.size })
         assertTrue(compose.onAllNodesWithTag("stream").fetchSemanticsNodes().isNotEmpty())
+    }
+
+    /** "More like this" opens a title by TMDB id: TMDB gives its IMDb id, which stream add-ons need. */
+    @Test
+    fun titleOpenedByTmdbIdAsksAddonsWithItsImdbId() {
+        context.getSharedPreferences("catalog_addons", Context.MODE_PRIVATE).edit().clear().commit()
+        val store = addons()
+        kotlinx.coroutines.runBlocking { store.add("https://torrentio.example/manifest.json") }
+        val tmdb = object : dev.yourstream.metadata.api.TitleDetailsProvider {
+            override val isConfigured = true
+            override suspend fun details(type: dev.yourstream.metadata.api.MetadataType, imdbId: String?, tmdbId: String?, language: String?, region: String?) =
+                AppResult.Ok(dev.yourstream.metadata.api.TitleDetails(tmdbId ?: "?", type, "tt7000007", "Airborne", null, emptyList(), 1993, null, 91, "PG", "Released",
+                    6.1, null, null, null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), "en", recommendations = emptyList()))
+        }
+        val media = stub<MediaRepository> { name, _ -> if (name == "versions") emptyList<MediaVersion>() else if (name == "getItem") null else error(name) }
+        val saved = SavedStateHandle(mapOf("provider" to "tmdb", "type" to "MOVIE", "id" to "tmdb:7", "title" to "Airborne", "year" to 1993, "poster" to null, "imdb" to null))
+        val vm = CatalogTitleViewModel(saved, store, media, stub<EpisodeRepository> { name, _ -> error(name) }, tmdb)
+        compose.setContent { YourStreamTheme(WindowLayout.COMPACT) { val state by vm.state.collectAsStateWithLifecycle(); CatalogTitleScreen(state, vm::onAction, {}, {}, onStream = {}) } }
+        compose.waitUntil(10_000) { !vm.state.value.loadingStreams && vm.state.value.streams.isNotEmpty() }
+        kotlin.test.assertEquals("PG", vm.state.value.details?.certification)
+        kotlin.test.assertEquals(listOf("tt7000007"), asked)
+        kotlin.test.assertFalse(vm.state.value.streamsOpen, "the details page first; Play opens the streams")
+        vm.onAction(dev.yourstream.ui.screens.addon.CatalogTitleAction.Play)
+        kotlin.test.assertTrue(vm.state.value.streamsOpen)
     }
 }

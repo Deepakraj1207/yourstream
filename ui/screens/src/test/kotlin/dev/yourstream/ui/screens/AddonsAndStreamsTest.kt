@@ -136,7 +136,7 @@ class AddonsAndStreamsTest {
     private val beta = StreamGroup("Beta", listOf(stream("Beta", "4K", url = null, hash = "aabbccddeeff00112233445566778899aabbccdd")), id = "b")
 
     private fun title(streams: List<StreamGroup>, loading: Boolean = false, chosen: String? = null) =
-        CatalogTitleUiState("Example Film", 2024, null, loadingMeta = false, streams = streams, loadingStreams = loading, streamAddon = chosen)
+        CatalogTitleUiState("Example Film", 2024, null, loadingMeta = false, streams = streams, loadingStreams = loading, streamAddon = chosen, streamsOpen = true)
 
     @Test
     fun streamsAreGroupedByAddonWithChipsToShowOneAddon() {
