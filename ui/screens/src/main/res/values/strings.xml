@@ -800,10 +800,13 @@
     <string name="layout_show_cast">Cast</string>
     <string name="layout_group_nav_style">Navigation bar</string>
     <string name="layout_nav_style">Style</string>
-    <string name="layout_nav_style_detail">Adaptive follows the look: Panel Grid in the manga style, the classic bar otherwise.</string>
+    <string name="layout_nav_style_detail">Adaptive: a floating bar that shrinks to icons while you scroll down and grows back when you scroll up (in the manga look: Panel Grid).</string>
+    <string name="layout_nav_expanded">Always expanded</string>
+    <string name="layout_nav_compact">Always compact</string>
+    <string name="layout_nav_preview">Preview</string>
+    <string name="layout_nav_preview_hint">Tap the bar to try it. Scroll the strip above it to try adaptive sizing.</string>
     <string name="layout_nav_adaptive">Adaptive</string>
     <string name="layout_nav_panels">Panel Grid</string>
-    <string name="layout_nav_floating">Floating</string>
     <string name="layout_nav_classic">Classic</string>
     <string name="layout_nav_glow">Glow</string>
     <string name="layout_nav_glow_detail">Soft light around the floating bar.</string>

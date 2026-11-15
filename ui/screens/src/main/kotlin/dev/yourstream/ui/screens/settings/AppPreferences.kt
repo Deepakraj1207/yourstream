@@ -32,11 +32,15 @@ enum class DetailBackground { NORMAL, CINEMATIC }
 enum class EpisodeCards { LIST, HORIZONTAL }
 
 /**
- * The phone navigation bar. ADAPTIVE follows the look (Panel Grid in the manga style, the classic
- * bar otherwise); PANELS is the manga panel grid; FLOATING a rounded bar floating above the
- * screen's edge; CLASSIC the Material bar.
+ * The phone navigation bar, as Nuvio offers it. ADAPTIVE: Nuvio's floating bar that shrinks to
+ * icons while scrolling down and grows back when scrolling up (in the manga look: the Panel
+ * Grid); EXPANDED / COMPACT: the floating bar always with names / always icons only; PANELS: the
+ * manga panel grid; CLASSIC: the Material bar under the content.
  */
-enum class NavStyle { ADAPTIVE, PANELS, FLOATING, CLASSIC }
+enum class NavStyle { ADAPTIVE, EXPANDED, COMPACT, PANELS, CLASSIC;
+    /** What the bar is in [manga] look: floating (and whether it adapts), panels or classic. */
+    fun floating(manga: Boolean): Boolean = this == EXPANDED || this == COMPACT || (this == ADAPTIVE && !manga)
+}
 
 /**
  * Settings → Layout, in Nuvio's structure: Home layout, Continue Watching, poster cards, streams,
@@ -293,7 +297,8 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             episodeCards = enumOr(prefs.getString("episode_cards", null), EpisodeCards.LIST),
             showOverview = prefs.getBoolean("show_overview", true),
             showCast = prefs.getBoolean("show_cast", true),
-            navStyle = enumOr(prefs.getString("nav_style", null), NavStyle.ADAPTIVE),
+            // 0.11.4's "Floating" is now "Always expanded".
+            navStyle = prefs.getString("nav_style", null).let { if (it == "FLOATING") NavStyle.EXPANDED else enumOr(it, NavStyle.ADAPTIVE) },
             navGlow = prefs.getBoolean("nav_glow", false),
         ),
         homeRows = HomeRowsShown(

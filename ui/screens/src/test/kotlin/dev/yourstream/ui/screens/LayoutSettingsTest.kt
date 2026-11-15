@@ -14,6 +14,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -120,9 +125,10 @@ class LayoutSettingsTest {
 
         page = SettingsPage.LAYOUT_NAVIGATION
         compose.onNodeWithTag("pref-nav-glow").assertDoesNotExist()
-        compose.onNodeWithTag("pref-nav-style:Floating").performClick()
+        compose.onNodeWithTag("pref-nav-style:Always expanded").performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-nav-glow"))
         compose.onNodeWithTag("pref-nav-glow").performClick()
-        assertEquals(NavStyle.FLOATING, prefs.layout.navStyle)
+        assertEquals(NavStyle.EXPANDED, prefs.layout.navStyle)
         assertEquals(true, prefs.layout.navGlow)
 
         page = SettingsPage.LAYOUT_DETAIL
@@ -220,8 +226,31 @@ class LayoutSettingsTest {
     }
 
     @Test
+    fun adaptiveBarShrinksWhileScrollingDownAndGrowsBack() {
+        // Classic look, Adaptive (the default): Nuvio's floating bar over the content.
+        val settings = AppSettings(style = dev.yourstream.ui.screens.settings.UiStyle.CLASSIC)
+        compose.setContent {
+            CompositionLocalProvider(LocalAppSettings provides settings) {
+                YourStreamTheme(WindowLayout.COMPACT) {
+                    dev.yourstream.ui.screens.navigation.AdaptiveShell(WindowLayout.COMPACT, TopLevel.HOME, {}) { m ->
+                        androidx.compose.foundation.lazy.LazyColumn(m.testTag("content")) {
+                            items(60) { androidx.compose.material3.Text("Row $it", androidx.compose.ui.Modifier.padding(16.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("nav:expanded").assertExists()
+        compose.onNodeWithTag("content").performTouchInput { swipeUp() }
+        compose.onNodeWithTag("nav:compact").assertExists()
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+        compose.onNodeWithTag("content").performTouchInput { swipeDown() }
+        compose.onNodeWithTag("nav:expanded").assertExists()
+    }
+
+    @Test
     fun floatingBarKeepsTabsAndTouchTargets() {
-        var layout by mutableStateOf(LayoutSettings(navStyle = NavStyle.FLOATING, navGlow = true))
+        var layout by mutableStateOf(LayoutSettings(navStyle = NavStyle.EXPANDED, navGlow = true))
         val selected = mutableListOf<TopLevel>()
         compose.setContent {
             CompositionLocalProvider(LocalAppSettings provides AppSettings(layout = layout)) {

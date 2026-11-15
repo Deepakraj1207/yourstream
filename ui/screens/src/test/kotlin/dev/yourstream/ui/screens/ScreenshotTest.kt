@@ -237,7 +237,12 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeFloatingNav() = shot("phone-home-floating-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
         settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
-            navStyle = dev.yourstream.ui.screens.settings.NavStyle.FLOATING, navGlow = true))) { home() }
+            navStyle = dev.yourstream.ui.screens.settings.NavStyle.EXPANDED, navGlow = true))) { home() }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeCompactNav() = shot("phone-home-compact-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
+        settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
+            navStyle = dev.yourstream.ui.screens.settings.NavStyle.COMPACT))) { home() }
 
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
         SettingsUiState("Asha Kumar", true, 3, "Tamil, English"), version,

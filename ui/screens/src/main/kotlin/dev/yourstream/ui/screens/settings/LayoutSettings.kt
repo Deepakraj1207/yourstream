@@ -40,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -194,7 +196,9 @@ internal fun layoutEntries(): List<SettingEntry> = buildList {
         Chips(stringResource(R.string.layout_nav_style), NavStyle.entries.map { it to navStyleLabel(it) }, prefs.layout.navStyle, "pref-nav-style",
             stringResource(R.string.layout_nav_style_detail)) { change(prefs.copy(layout = prefs.layout.copy(navStyle = it))) }
     })
-    add(entry("nav-glow", na, R.string.layout_group_nav_style, R.string.layout_nav_glow, "glow light", shown = { it.prefs.layout.navStyle == NavStyle.FLOATING }) {
+    add(entry("nav-preview", na, R.string.layout_group_nav_style, R.string.layout_nav_preview, "preview try") { NavPreview(prefs) })
+    add(entry("nav-glow", na, R.string.layout_group_nav_style, R.string.layout_nav_glow, "glow light",
+        shown = { it.prefs.layout.navStyle.floating(it.prefs.style == UiStyle.MANGA) }) {
         SettingToggle(stringResource(R.string.layout_nav_glow), stringResource(R.string.layout_nav_glow_detail), AppIcons.Palette, prefs.layout.navGlow, "pref-nav-glow") {
             change(prefs.copy(layout = prefs.layout.copy(navGlow = it)))
         }
@@ -228,7 +232,7 @@ internal fun layoutSummary(page: SettingsPage, host: SettingsHost): String? {
         ).joinToString(" · ")
         SettingsPage.LAYOUT_NAVIGATION -> listOfNotNull(
             navStyleLabel(l.navStyle),
-            stringResource(if (l.navGlow) R.string.layout_glow_on else R.string.layout_glow_off).takeIf { l.navStyle == NavStyle.FLOATING },
+            stringResource(if (l.navGlow) R.string.layout_glow_on else R.string.layout_glow_off).takeIf { l.navStyle.floating(host.prefs.style == UiStyle.MANGA) },
         ).joinToString(" · ")
         else -> null
     }
@@ -237,8 +241,9 @@ internal fun layoutSummary(page: SettingsPage, host: SettingsHost): String? {
 @Composable
 internal fun navStyleLabel(s: NavStyle) = stringResource(when (s) {
     NavStyle.ADAPTIVE -> R.string.layout_nav_adaptive
+    NavStyle.EXPANDED -> R.string.layout_nav_expanded
+    NavStyle.COMPACT -> R.string.layout_nav_compact
     NavStyle.PANELS -> R.string.layout_nav_panels
-    NavStyle.FLOATING -> R.string.layout_nav_floating
     NavStyle.CLASSIC -> R.string.layout_nav_classic
 })
 
@@ -274,6 +279,37 @@ internal fun <T> Chips(title: String, options: List<Pair<T, String>>, selected: 
                 )
             }
         }
+    }
+}
+
+/**
+ * The navigation bar as chosen, to try (Nuvio's preview): tap a tab; scroll the strip above it
+ * to see Adaptive shrink and grow.
+ */
+@Composable
+private fun NavPreview(prefs: AppSettings) {
+    var tab by remember { mutableStateOf(dev.yourstream.ui.screens.navigation.TopLevel.HOME) }
+    var compact by remember { mutableStateOf(false) }
+    val manga = prefs.style == UiStyle.MANGA
+    val connection = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (available.x < -4f) compact = true else if (available.x > 4f) compact = false
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("nav-preview"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().nestedScroll(connection).horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(12) { androidx.compose.material3.Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                modifier = Modifier.size(width = 56.dp, height = 40.dp)) {} }
+        }
+        androidx.compose.runtime.CompositionLocalProvider(LocalAppSettings provides prefs) {
+            dev.yourstream.ui.screens.navigation.MainNavigationBar(tab, { tab = it }, compactHint = compact && prefs.layout.navStyle == NavStyle.ADAPTIVE && !manga)
+        }
+        Text(stringResource(R.string.layout_nav_preview_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp))
     }
 }
 

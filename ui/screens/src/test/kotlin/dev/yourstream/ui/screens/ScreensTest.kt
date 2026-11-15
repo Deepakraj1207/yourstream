@@ -569,8 +569,10 @@ class ScreensTest {
                 YourStreamTheme(WindowLayout.COMPACT) { MainNavigationBar(TopLevel.HOME, {}) }
             }
         }
-        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
-        compose.onNodeWithTag("nav:SETTINGS").assert(androidx.compose.ui.test.hasText("Settings"))
+        // The name as text, or as the icon's description when the bar hides it (floating / manga bars).
+        for ((tag, name) in listOf("nav:SEARCH" to "Search", "nav:SETTINGS" to "Settings")) {
+            compose.onNodeWithTag(tag).assert(androidx.compose.ui.test.hasText(name) or androidx.compose.ui.test.hasContentDescription(name))
+        }
     }
 
     @Test

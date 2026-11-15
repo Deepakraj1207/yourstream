@@ -1,5 +1,8 @@
 package dev.yourstream.ui.screens.navigation
 
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -126,10 +129,16 @@ fun AdaptiveShell(
     }
     when (layout) {
         WindowLayout.COMPACT -> {
-            // A Material 3 navigation bar under the content on the main tabs; other pages (details,
-            // players, settings pages) use the whole screen. Nothing floats over the lists, so they
-            // need no extra bottom padding (LocalBottomClearance stays 0).
             val showBar = current != null
+            val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+            val floating = settings.layout.navStyle.floating(dev.yourstream.ui.core.LocalMangaStyle.current)
+            if (floating) {
+                FloatingShell(current, onSelect, showBar, settings.layout.navStyle == dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE, indexing, onIndexing, content)
+                return
+            }
+            // A bar under the content on the main tabs (Panel Grid or the Material bar); other pages
+            // (details, players, settings pages) use the whole screen. Nothing floats over the lists,
+            // so they need no extra bottom padding (LocalBottomClearance stays 0).
             Column(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
                 // Status bar padding applied (and consumed) here, as the old scaffold did: Home has no
                 // top bar of its own, and screens' top bars must not add it a second time. The
@@ -208,14 +217,21 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
  * they made tabs under 48 dp wide on 320 dp screens; kept for narrow screens and large fonts).
  */
 @Composable
-fun MainNavigationBar(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier) {
+fun MainNavigationBar(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier, compactHint: Boolean = false) {
     val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
     val labels = settings.dockLabels
-    // Settings → Layout → Navigation bar → Style. Adaptive follows the look.
+    val manga = dev.yourstream.ui.core.LocalMangaStyle.current
+    // Settings → Layout → Navigation bar → Style (Nuvio's): Adaptive, Always expanded, Always
+    // compact, Panel Grid, Classic. Adaptive is Nuvio's floating bar (Panel Grid in the manga look).
     when (settings.layout.navStyle) {
         dev.yourstream.ui.screens.settings.NavStyle.PANELS -> { MangaNavigationBar(current, onSelect, labels, modifier); return }
-        dev.yourstream.ui.screens.settings.NavStyle.FLOATING -> { FloatingNavigationBar(current, onSelect, labels, settings.layout.navGlow, modifier); return }
-        dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE -> if (dev.yourstream.ui.core.LocalMangaStyle.current) { MangaNavigationBar(current, onSelect, labels, modifier); return }
+        dev.yourstream.ui.screens.settings.NavStyle.EXPANDED -> { FloatingNavigationBar(current, onSelect, labels, settings.layout.navGlow, modifier); return }
+        dev.yourstream.ui.screens.settings.NavStyle.COMPACT -> { FloatingNavigationBar(current, onSelect, labels, settings.layout.navGlow, modifier, compact = true); return }
+        dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE -> {
+            if (manga) MangaNavigationBar(current, onSelect, labels, modifier)
+            else FloatingNavigationBar(current, onSelect, labels, settings.layout.navGlow, modifier, compact = compactHint)
+            return
+        }
         dev.yourstream.ui.screens.settings.NavStyle.CLASSIC -> Unit
     }
     Surface(
@@ -240,5 +256,46 @@ fun MainNavigationBar(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier
                 )
             }
         }
+    }
+}
+
+/**
+ * Phones with Nuvio's floating bar: the content runs behind the bar (lists end above it through
+ * [dev.yourstream.ui.core.LocalBottomClearance]). [adaptive]: the bar shrinks to icons while the
+ * content scrolls down and grows back when it scrolls up.
+ */
+@Composable
+private fun FloatingShell(
+    current: TopLevel?, onSelect: (TopLevel) -> Unit, showBar: Boolean, adaptive: Boolean,
+    indexing: dev.yourstream.ui.screens.IndexingStatus, onIndexing: () -> Unit, content: @Composable (Modifier) -> Unit,
+) {
+    var compact by remember { androidx.compose.runtime.mutableStateOf(false) }
+    // Back to full size on another tab.
+    androidx.compose.runtime.LaunchedEffect(current) { compact = false }
+    val connection = remember(adaptive) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (adaptive) { if (available.y < -6f) compact = true else if (available.y > 6f) compact = false }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    val navInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            dev.yourstream.ui.core.LocalBottomClearance provides if (showBar) FloatingBarClearance + navInset else 0.dp,
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars)
+                    .let { if (showBar) it.consumeWindowInsets(androidx.compose.foundation.layout.WindowInsets.navigationBars) else it.navigationBarsPadding() }
+                    .nestedScroll(connection),
+            ) {
+                content(Modifier.fillMaxSize())
+                IndexingPill(indexing, onIndexing, Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                    .padding(bottom = 8.dp + if (showBar) FloatingBarClearance else 0.dp))
+            }
+        }
+        if (showBar) MainNavigationBar(current, onSelect, Modifier.align(androidx.compose.ui.Alignment.BottomCenter), compactHint = compact)
     }
 }
