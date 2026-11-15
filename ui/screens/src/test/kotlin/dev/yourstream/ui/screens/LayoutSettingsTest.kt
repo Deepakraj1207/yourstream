@@ -292,4 +292,49 @@ class LayoutSettingsTest {
         layout = layout.copy(navGlow = false)
         compose.onNodeWithTag("nav:glow").assertDoesNotExist()
     }
+
+    @Test
+    fun adaptiveBarNeedsSixtyPixelsOneWayAndStartsOverWhenTheDirectionTurns() {
+        val changes = mutableListOf<Boolean>()
+        val scroll = dev.yourstream.ui.screens.navigation.AdaptiveBarScroll { changes += it }
+        fun drag(dy: Float) = scroll.onPreScroll(androidx.compose.ui.geometry.Offset(0f, dy), androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput)
+        drag(-30f); drag(20f); drag(-30f)
+        assertEquals(emptyList(), changes, "jitter: no change")
+        drag(-31f)
+        assertEquals(listOf(true), changes, "61 px down: compact")
+        drag(59f)
+        assertEquals(listOf(true), changes)
+        drag(2f)
+        assertEquals(listOf(true, false), changes, "61 px up: expanded")
+    }
+
+    @Test
+    fun barAnimatesThroughInBetweenSizesAndCompactTabsStayTouchable() {
+        var compact by mutableStateOf(false)
+        compose.setContent {
+            CompositionLocalProvider(LocalAppSettings provides AppSettings()) {
+                YourStreamTheme(WindowLayout.COMPACT) {
+                    dev.yourstream.ui.screens.navigation.FloatingNavigationBar(TopLevel.LIBRARY, {}, labels = true, glow = false, compact = compact)
+                }
+            }
+        }
+        // The tab area, inside the bar's 5 dp margin: 54 dp with names, 48 dp (still touchable) without.
+        fun barHeight() = with(compose.density) { compose.onNodeWithTag("nav:capsule", useUnmergedTree = true).fetchSemanticsNode().size.height.toDp().value }
+        assertEquals(54f, barHeight(), 0.5f)
+        compose.onNodeWithText("Library", useUnmergedTree = true).assertExists()
+        compose.mainClock.autoAdvance = false
+        compact = true
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        compose.mainClock.advanceTimeBy(100)
+        val midway = barHeight()
+        assertTrue(midway < 54f && midway > 48f, "midway through the fold: $midway dp")
+        compose.mainClock.advanceTimeBy(400)
+        assertEquals(48f, barHeight(), 0.5f)
+        compose.onNodeWithText("Library", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("nav:capsule", useUnmergedTree = true).assertExists()
+        val small = compose.onAllNodes(androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().filter { n ->
+            with(compose.density) { n.size.height.toDp().value < 47.5f }
+        }
+        assertTrue(small.isEmpty(), "compact touch targets under 48 dp: ${small.map { it.size }}")
+    }
 }

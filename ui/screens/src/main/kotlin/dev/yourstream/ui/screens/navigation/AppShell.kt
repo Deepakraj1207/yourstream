@@ -272,14 +272,7 @@ private fun FloatingShell(
     var compact by remember { androidx.compose.runtime.mutableStateOf(false) }
     // Back to full size on another tab.
     androidx.compose.runtime.LaunchedEffect(current) { compact = false }
-    val connection = remember(adaptive) {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                if (adaptive) { if (available.y < -6f) compact = true else if (available.y > 6f) compact = false }
-                return androidx.compose.ui.geometry.Offset.Zero
-            }
-        }
-    }
+    val connection = remember(adaptive) { AdaptiveBarScroll { compact = it }.takeIf { adaptive } ?: object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {} }
     val navInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background)) {
         androidx.compose.runtime.CompositionLocalProvider(
@@ -297,5 +290,26 @@ private fun FloatingShell(
             }
         }
         if (showBar) MainNavigationBar(current, onSelect, Modifier.align(androidx.compose.ui.Alignment.BottomCenter), compactHint = compact)
+    }
+}
+
+/**
+ * Adaptive bar, as in Nuvio: scrolling 60 px down folds the names away, 60 px up brings them
+ * back. The distance adds up while the direction stays the same and starts over when it turns,
+ * so small jitters and short flicks do not make the bar pump.
+ */
+internal class AdaptiveBarScroll(private val threshold: Float = 60f, private val onCompact: (Boolean) -> Unit) :
+    androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+    private var travelled = 0f
+
+    override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+        val dy = available.y
+        if (dy != 0f) {
+            if (travelled != 0f && (dy > 0f) != (travelled > 0f)) travelled = 0f
+            travelled += dy
+            if (travelled <= -threshold) { onCompact(true); travelled = 0f }
+            else if (travelled >= threshold) { onCompact(false); travelled = 0f }
+        }
+        return androidx.compose.ui.geometry.Offset.Zero
     }
 }
