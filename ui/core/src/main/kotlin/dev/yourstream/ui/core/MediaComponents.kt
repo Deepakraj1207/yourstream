@@ -1,5 +1,6 @@
 package dev.yourstream.ui.core
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -95,6 +96,24 @@ data class CardLook(val cornerRadius: Dp? = null, val hideLabels: Boolean = fals
 
 val LocalCardLook = staticCompositionLocalOf { CardLook() }
 
+/**
+ * A row or grid where some card has a caption line ("Next episode", "★ 7.6"): every card keeps
+ * room for one, so all cards are the same height. Rows of uneven cards change height as they
+ * scroll sideways (the tallest visible card sets it) and push the rows below up and down.
+ */
+val LocalReserveCaption = staticCompositionLocalOf { false }
+
+/** The height of a poster's text block: a two-line title, a subtitle, and a caption when reserved. */
+@Composable
+private fun posterTextHeight(caption: Boolean): Dp {
+    val t = MaterialTheme.typography
+    fun lh(style: androidx.compose.ui.text.TextStyle) =
+        if (style.lineHeight != androidx.compose.ui.unit.TextUnit.Unspecified) style.lineHeight else style.fontSize * 1.35f
+    return with(androidx.compose.ui.platform.LocalDensity.current) {
+        8.dp + lh(t.titleSmall).toDp() * 2 + lh(t.bodySmall).toDp() + (if (caption) lh(t.labelSmall).toDp() else 0.dp) + 2.dp
+    }
+}
+
 @Composable
 private fun cardShape(): androidx.compose.ui.graphics.Shape =
     LocalCardLook.current.cornerRadius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it) } ?: MaterialTheme.shapes.medium
@@ -142,8 +161,10 @@ fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = 
                 Artwork(model.posterUrl, model.title, Modifier.fillMaxSize())
                 Overlays(model)
             }
-            // Hidden labels: the title stays in the card's accessibility description.
-            if (!LocalCardLook.current.hideLabels) Column(Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
+            // Hidden labels: the title stays in the card's accessibility description. The text
+            // block has one fixed height (see LocalReserveCaption): rows do not jump while scrolling.
+            val reserve = LocalReserveCaption.current
+            if (!LocalCardLook.current.hideLabels) Column(Modifier.height(posterTextHeight(reserve || (model.caption != null && model.caption != model.badge))).padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
                 Text(model.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 model.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 // Why it is here ("Tamil · action · ★ 7.6", "Next episode"), when the screen gives a reason.
@@ -221,10 +242,13 @@ fun <T> MediaRow(
     onSeeAll: (() -> Unit)? = null,
 ) {
     val d = LocalDimens.current
+    val reserve = items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
         SectionHeader(title, onSeeAll)
-        LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
-            items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+        CompositionLocalProvider(LocalReserveCaption provides reserve) {
+            LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
+                items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+            }
         }
     }
 }
@@ -248,11 +272,14 @@ fun <T : Any> PagedMediaRow(
         return // empty or failed: the row is simply absent (the screen shows its own state)
     }
     val d = LocalDimens.current
+    val reserve = items.itemSnapshotList.items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
         SectionHeader(title, onSeeAll)
-        LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
-            items(items.itemCount, key = items.itemKey { card(it).key }) { i ->
-                items[i]?.let { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+        CompositionLocalProvider(LocalReserveCaption provides reserve) {
+            LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
+                items(items.itemCount, key = items.itemKey { card(it).key }) { i ->
+                    items[i]?.let { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+                }
             }
         }
     }
