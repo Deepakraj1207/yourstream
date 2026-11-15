@@ -1,5 +1,7 @@
 package dev.yourstream.catalog.core
 
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import dev.yourstream.catalog.api.CatalogDescriptor
 import dev.yourstream.catalog.api.CatalogItem
 import dev.yourstream.catalog.api.CatalogItemRef
@@ -69,6 +71,12 @@ data class DiscoverRequest(
     /** Continue a previous listing (from [DiscoverResult.next]). */
     val cursor: DiscoverCursor? = null,
 )
+
+/** One add-on's search results of one type; [provider] null: the external metadata fallback. */
+data class SearchSection(val provider: CatalogProviderId?, val providerName: String?, val type: CatalogType, val items: List<CatalogItem>)
+
+/** [searchable]: some add-on offers search; [failed]: every add-on that does failed. */
+data class SearchSections(val sections: List<SearchSection>, val searchable: Boolean, val failed: Boolean)
 
 data class DiscoverResult(
     val items: List<CatalogItem>,
@@ -187,10 +195,11 @@ class CatalogManager(
 
     // ------------------------------------------------------------------ pages / discover
 
-    suspend fun page(catalog: CatalogDescriptor, skip: Int = 0): AppResult<Sourced<CatalogPage>> {
+    /** One page of [catalog]; [genre] narrows it when the catalog offers genres (Search → Discover). */
+    suspend fun page(catalog: CatalogDescriptor, skip: Int = 0, genre: String? = null): AppResult<Sourced<CatalogPage>> {
         val p = byId[catalog.provider] ?: return AppResult.Err(AppError.NotFound("provider ${catalog.provider}"))
-        val key = "page:${catalog.type}:${catalog.id}:$skip"
-        return cached(p, key, policy.pageTtlMillis, CatalogPage.serializer()) { p.page(catalog, skip) }.also { r ->
+        val key = "page:${catalog.type}:${catalog.id}:$skip" + (genre?.let { ":genre=$it" } ?: "")
+        return cached(p, key, policy.pageTtlMillis, CatalogPage.serializer()) { p.page(catalog, skip, genre) }.also { r ->
             if (r is AppResult.Ok) r.value.value.items.forEach { item ->
                 observedGenres.getOrPut(item.ref.type) { ConcurrentHashMap.newKeySet() }.addAll(item.genres)
             }
@@ -261,6 +270,37 @@ class CatalogManager(
         val localHits = local?.search(q, type, LOCAL_PAGE).orEmpty()
         if (localHits.isNotEmpty()) return Sourced(localHits, CatalogSource.Local)
         return Sourced(emptyList(), CatalogSource.Fallback)
+    }
+
+    /**
+     * Search results kept apart per add-on and type ("Cinemeta · Movies", "Cinemeta · Series"),
+     * add-ons asked side by side, in their order. Add-ons without search are skipped; one that
+     * fails is left out (the others still show). Nothing from any add-on: the [search] chain's
+     * external answer as one section (library-only answers are left to the library search).
+     */
+    suspend fun searchSections(query: String): SearchSections = kotlinx.coroutines.coroutineScope {
+        val q = query.trim()
+        if (q.isEmpty()) return@coroutineScope SearchSections(emptyList(), searchable = false, failed = false)
+        val asked = providers.map { p ->
+            async {
+                val i = info(p) ?: return@async null
+                if (i.catalogs.none { it.supportsSearch }) return@async null
+                val r = cached(p, "search:ANY:${q.lowercase(Locale.ROOT)}", policy.searchTtlMillis, ListSerializer(CatalogItem.serializer())) { p.search(q, null) }
+                p to r
+            }
+        }.awaitAll().filterNotNull()
+        val sections = asked.flatMap { (p, r) ->
+            val items = (r as? AppResult.Ok)?.value?.value.orEmpty()
+            items.groupBy { it.ref.type }.toSortedMap().map { (type, list) -> SearchSection(p.id, p.displayName, type, list) }
+        }
+        if (sections.isNotEmpty()) return@coroutineScope SearchSections(sections, searchable = true, failed = false)
+        val fallback = external?.search(q, null)
+        val extra = (fallback as? AppResult.Ok)?.value?.takeIf { it.value.isNotEmpty() }
+        SearchSections(
+            extra?.value?.groupBy { it.ref.type }?.toSortedMap()?.map { (type, list) -> SearchSection(null, null, type, list) }.orEmpty(),
+            searchable = asked.isNotEmpty(),
+            failed = asked.isNotEmpty() && asked.all { it.second is AppResult.Err } && extra == null,
+        )
     }
 
     // ------------------------------------------------------------------ metadata

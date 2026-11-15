@@ -374,3 +374,56 @@ A poster's text block has a fixed height (two title lines, subtitle, and a capti
 card of that row or grid has one: `LocalReserveCaption`). Before, a row's height followed its
 tallest visible card, so rows grew and shrank while scrolling sideways and pushed the rows below
 up and down (seen in the user's screen recording). Test: `RowHeightTest`.
+
+## Search like Nuvio (0.12)
+
+Top to bottom, as in Nuvio's search screen:
+- **Field:** a filled field with 16 dp corners, placeholder "Search movies, shows…", and a clear
+  button once something is typed.
+- **Recent Searches:** shown while the field is focused and empty, each with a remove button.
+  A search is saved when you press search on the keyboard or open a result, not on every typed
+  letter, so half-typed words are not kept. At most 10, newest first, no repeats in any case.
+- **Discover** (empty query):
+  - A type / catalog / genre drop-down row over a poster grid of the chosen add-on catalog.
+  - A line names the add-on and type.
+  - More pages load as the grid scrolls. The choice is kept.
+  - A catalog that requires a genre starts on its first genre, and "All genres" is not offered.
+  - Once scrolled, the page heading reads "Discover".
+- **While typing:**
+  - The user's own titles first ("Your titles", tagged FROM TELEGRAM, best match first).
+  - Then one row per add-on and type ("Cinemeta · Movies"), add-ons asked side by side
+    (`CatalogManager.searchSections`).
+  - Media Brain's answer to requests stays above the rows.
+- **Messages:** "No results found", "No searchable catalogs" and "Search failed" with Retry.
+  The verdict waits until the add-ons have answered.
+
+Removed with stated reasons: the results count and the wide "Top result" card (Nuvio shows rows;
+the best match now leads the Telegram row), and the example-request chips on the empty page
+(Discover takes that space, as in Nuvio).
+
+Tests: `ScreensTest` (rows, empty states, recent and Discover), `ViewModelTest` (recent,
+Discover choice and paging, add-on rows), `CatalogManagerTest` (search sections, genre pages).
+
+## Adaptive navigation bar motion (0.12)
+
+Based on Nuvio's floating bar source.
+- One label fraction, eased over 300 ms with CubicBezier(0.2, 0, 0, 1), drives the bar together:
+  - height 58 → 64 dp;
+  - side margins 58 → 28 dp;
+  - the names fading while their line folds away.
+- The selected capsule slides between tabs on a spring. The glow fades in over 420 ms.
+- Adaptive mode reacts after 60 px of scrolling in one direction. The count starts over when the
+  direction turns, so jitters and short flicks do not make the bar pump.
+- Reduced motion: no animation.
+- Deviation: Nuvio's compact bar is 48 dp. Here it is 58 dp so the tabs keep the 48 dp
+  touch-target minimum.
+- Tests: `LayoutSettingsTest` (threshold, in-between sizes, compact touch targets).
+
+## Home (0.12)
+
+- "Recently added" carries a blue FROM TELEGRAM tag.
+- The separate Series row is gone: series appear once, as catalog posters (with the Telegram
+  badge when you have them).
+- The hero carousel's auto-advance waits for the settled page, so it no longer stops halfway
+  between two slides.
+

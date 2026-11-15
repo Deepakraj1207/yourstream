@@ -60,20 +60,9 @@
     <string name="details_episode_count">%1$d episodes</string>
     <string name="episodes_title">Episodes</string>
     <string name="episode_unavailable">Not available</string>
-
-    <string name="search_hint">Search or ask: “unwatched action movies”</string>
     <string name="search_clear">Clear search</string>
-    <string name="search_examples">Type a title in any spelling, or ask for what you want. Requests are understood on this device.</string>
-    <string name="search_example_1">comedy movies</string>
-    <string name="search_example_2">unwatched movies from 2023</string>
-    <string name="search_example_3">s2e5</string>
-    <string name="search_example_4">what should I watch</string>
-    <string name="search_example_5">continue watching</string>
     <string name="search_brain_heading">Media Brain</string>
     <string name="search_brain_play">Play now</string>
-    <string name="search_title_matches">Title matches</string>
-    <string name="search_top_result">Top result</string>
-    <string name="search_more_results">More results</string>
 
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
@@ -396,7 +385,6 @@
     </plurals>
     <string name="stream_torrent_done">%1$d%% downloaded</string>
     <string name="stream_torrent_complete">fully downloaded</string>
-    <string name="search_from_addons">From your add-ons</string>
     <string name="settings_group_content">Content</string>
     <string name="settings_group_player">Player</string>
     <string name="settings_group_appearance">Appearance</string>
@@ -870,4 +858,31 @@
         <item quantity="one">%1$d stream is hidden by your filters.</item>
         <item quantity="other">%1$d streams are hidden by your filters.</item>
     </plurals>
+    <string name="search_discover">Discover</string>
+    <string name="search_placeholder">Search movies, shows…</string>
+    <string name="search_recent">Recent Searches</string>
+    <string name="search_remove_recent">Remove recent search</string>
+    <string name="search_your_titles">Your titles</string>
+    <string name="search_row_title">%1$s · %2$s</string>
+    <string name="search_more_titles">More titles</string>
+    <string name="search_movies">Movies</string>
+    <string name="search_series">Series</string>
+    <string name="search_select_type">Type</string>
+    <string name="search_select_catalog">Catalog</string>
+    <string name="search_select_genre">Genre</string>
+    <string name="search_all_genres">All genres</string>
+    <string name="search_catalog_context">%1$s · %2$s</string>
+    <string name="search_empty_title">No results found</string>
+    <string name="search_empty_message">Your Telegram titles and installed searchable catalogs did not return any matches for this query.</string>
+    <string name="search_no_catalogs_title">No searchable catalogs</string>
+    <string name="search_no_catalogs_message">Your enabled add-ons do not support catalog search. Your Telegram titles are still searched.</string>
+    <string name="search_failed_title">Search failed</string>
+    <string name="search_failed_message">Installed add-ons failed to return valid search results.</string>
+    <string name="search_retry">Retry</string>
+    <string name="discover_no_catalogs_title">Nothing to discover</string>
+    <string name="discover_no_catalogs_message">Add an add-on with catalogs in Settings → Add-ons to browse here.</string>
+    <string name="discover_failed_title">Catalog did not load</string>
+    <string name="discover_failed_message">The add-on did not answer. Try again, or pick another catalog.</string>
+    <string name="discover_empty_title">Nothing here</string>
+    <string name="discover_empty_message">This catalog has no titles for this genre.</string>
 </resources>

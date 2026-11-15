@@ -197,7 +197,11 @@ class ScreenshotTest {
                 meta = dev.yourstream.catalog.api.CatalogMetadata(ref, "Breaking Bad", 2008, "A chemistry teacher diagnosed with cancer turns to making methamphetamine.",
                     genres = listOf("Crime", "Drama"), rating = 9.5, runtimeMinutes = 49, videos = videos),
                 loadingMeta = false, seasons = listOf(1, 2, 3), season = 1, episode = ep,
-                streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
+                streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Telegram", listOf(
+                    dev.yourstream.catalog.api.AddonStream("Telegram", "1080p", "Breaking.Bad.S01E02.1080p.mkv", null, null, null, sizeBytes = 1_300_000_000,
+                        library = dev.yourstream.catalog.api.LibraryFile(20, 6, 1, 1080), languages = listOf("en", "ta")),
+                ), id = dev.yourstream.ui.screens.addon.StreamGroup.TELEGRAM),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Breaking.Bad.S01E02.2160p.mkv · 6.1 GB · 👤 120", null, null, "aabbccddeeff00112233445566778899aabbccdd"),
@@ -436,5 +440,34 @@ class ScreenshotTest {
                 brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched action movies.", listOf("genre action", "unwatched", "movies"), tiles, 4),
             ), {}, {},
         )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSearchDiscover() = shot("phone-search-discover", WindowLayout.COMPACT, TopLevel.SEARCH) {
+        val top = DiscoverCatalog("cat:cinemeta:MOVIE:top", "Popular", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Action", "Drama"))
+        dev.yourstream.ui.screens.search.SearchScreen(
+            dev.yourstream.ui.screens.search.SearchUiState(discover = dev.yourstream.ui.screens.search.DiscoverUiState(listOf(top), loadingCatalogs = false,
+                type = top.type, catalog = top, tiles = movies + series, nextSkip = 12)), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSearchResults() = shot("phone-search-results", WindowLayout.COMPACT, TopLevel.SEARCH) {
+        dev.yourstream.ui.screens.search.SearchScreen(
+            dev.yourstream.ui.screens.search.SearchUiState("leo", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(movies[2], movies.take(2), 3)),
+                addons = AddonSections(listOf(
+                    SearchRow("cinemeta:MOVIE", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, movies.drop(3)),
+                    SearchRow("cinemeta:SERIES", "Cinemeta", dev.yourstream.catalog.api.CatalogType.SERIES, series),
+                ))), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneStreamFilter() = shot("phone-stream-filter", WindowLayout.COMPACT, null) {
+        val s = { name: String, size: Long, hash: String? -> dev.yourstream.catalog.api.AddonStream("A", name, "$name Tamil", if (hash == null) "https://example.com/$name.mkv" else null, null, hash, sizeBytes = size) }
+        dev.yourstream.ui.screens.addon.StreamFilterContent(
+            dev.yourstream.ui.screens.addon.StreamFilter(qualities = setOf(dev.yourstream.ui.screens.addon.StreamQuality.FHD)),
+            listOf(dev.yourstream.ui.screens.addon.StreamGroup("A", listOf(s("1080p", 2_000, null), s("2160p", 6_000, null), s("1080p WEB", 1_500, "aabbccddeeff00112233445566778899aabbccdd")), id = "a")),
+        ) {}
     }
 }

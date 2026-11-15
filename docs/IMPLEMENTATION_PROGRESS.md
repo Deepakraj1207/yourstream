@@ -830,3 +830,23 @@ automatic poster matching without Check matches, row-height fix). Checked on the
 `releases/latest` is v0.11.5 and not a pre-release; the arm64 APK's SHA-256 matches
 `SHA256SUMS.txt`; `aapt2` shows versionCode 22, versionName 0.11.5; `apksigner` shows the pinned
 release certificate (`35249306…07b2`). Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 5 (15 Nov 2026)
+
+Implemented after the user approved the mockups:
+* **Hero stopped halfway:** the auto-advance was keyed on `currentPage`, which changes in the
+  middle of a move and restarted the effect, cancelling the animation. It is now keyed on
+  `settledPage`.
+* **One poster per title; Telegram files as a stream source:** see STREAMS.md. Tests:
+  `StreamSourcesTest`, `LibraryMetadataServiceTest.catalogEpisodeFindsTheLibraryEpisodeIncludingDoubleEpisodes`.
+* **"From Telegram" tag on Recently added; Series row removed.** Test: `StreamSourcesTest.recentlyAddedIsTaggedFromTelegram`.
+* **Sort & filter for streams** (this app's design; Nuvio has none). Tests: `StreamSourcesTest`.
+* **Search like Nuvio** (field, recent searches, Discover, rows per add-on, Nuvio's messages): see
+  UI.md. Tests: `ScreensTest`, `ViewModelTest`, `CatalogManagerTest`.
+* **Adaptive bar animated like Nuvio:** see UI.md. Tests: `LayoutSettingsTest`.
+* **Gate:** 680 tests, 0 failures. Lint has 0 errors and 15 warnings. The 4 warnings above the
+  previous 11 are "newer version available" notices (AGP 9.5.1, kotlinx-serialization 1.13.0)
+  that appeared because those versions were published upstream, not from these changes.
+  Dependencies were left as they are in this change.
+* Status: NEEDS REAL-DEVICE TESTING.
+

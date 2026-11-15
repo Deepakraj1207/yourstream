@@ -152,7 +152,7 @@ class ViewModelTest {
             }
             override suspend fun suggest(prefix: String, limit: Int) = listOf("vikram")
         }
-        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, AddonSearch { emptyList() })
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, noAddons, dev.yourstream.ui.screens.search.InMemorySearchMemory())
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
         assertNull(vm.state.value.results, "blank query: hint, no search")
@@ -175,6 +175,55 @@ class ViewModelTest {
         assertIs<UiState.Error>(vm.state.value.results, "an engine failure is an error state, not a crash")
         vm.onAction(SearchAction.Clear); advanceUntilIdle()
         assertNull(vm.state.value.results)
+    }
+
+    private val noAddons = object : AddonSearch { override suspend fun sections(query: String) = AddonSections(emptyList()) }
+
+    @Test
+    fun searchRemembersMeantSearchesAndDiscoverBrowsesCatalogs() = runTest(dispatcher) {
+        val movie = { k: String -> Tile(dev.yourstream.ui.core.MediaCardModel(k, k), OpenTarget.Details(1)) }
+        val top = DiscoverCatalog("cat:a:MOVIE:top", "Top", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Drama", "Comedy"))
+        val shows = DiscoverCatalog("cat:a:SERIES:top", "Top series", "Alpha", dev.yourstream.catalog.api.CatalogType.SERIES, listOf("Anime"), genreRequired = true)
+        val pages = mutableListOf<String>()
+        val addons = object : AddonSearch {
+            override suspend fun sections(query: String) = AddonSections(listOf(SearchRow("a:MOVIE", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf(movie("hit")))))
+            override suspend fun catalogs() = listOf(top, shows)
+            override suspend fun page(catalog: DiscoverCatalog, genre: String?, skip: Int): DiscoverPage {
+                pages += "${catalog.name}:$genre:$skip"
+                return DiscoverPage(listOf(movie("${catalog.name}-$skip")), if (skip == 0) 1 else null)
+            }
+        }
+        val search = object : LibrarySearch {
+            override suspend fun search(request: SearchRequest) = SearchPage(emptyList(), 0, 0, null, emptyList(), 1)
+            override suspend fun suggest(prefix: String, limit: Int) = emptyList<String>()
+        }
+        val memory = dev.yourstream.ui.screens.search.InMemorySearchMemory(listOf("older"))
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, addons, memory)
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // Discover: the first type and catalog, all genres; more on demand; choices are kept.
+        val d = vm.state.value.discover
+        assertEquals(listOf("Top:null:0"), pages)
+        assertEquals(top, d.catalog)
+        vm.onAction(SearchAction.DiscoverMore); advanceUntilIdle()
+        assertEquals(listOf("Top-0", "Top-1"), vm.state.value.discover.tiles.map { it.card.key })
+        vm.onAction(SearchAction.DiscoverGenre("Comedy")); advanceUntilIdle()
+        assertEquals("Top:Comedy:0", pages.last())
+        // A catalog that requires a genre starts on its first.
+        vm.onAction(SearchAction.DiscoverType(dev.yourstream.catalog.api.CatalogType.SERIES)); advanceUntilIdle()
+        assertEquals("Top series:Anime:0", pages.last())
+        assertEquals(dev.yourstream.ui.screens.search.DiscoverChoice(dev.yourstream.catalog.api.CatalogType.SERIES, shows.key, "Anime"), memory.discover())
+
+        // Typing: the add-ons' rows; typing alone is not remembered, a meant search is.
+        vm.onAction(SearchAction.QueryChanged("leo")); advanceUntilIdle()
+        assertEquals(listOf("hit"), vm.state.value.addons!!.rows.single().tiles.map { it.card.key })
+        assertEquals(listOf("older"), vm.state.value.recent)
+        vm.onAction(SearchAction.Submit)
+        vm.onAction(SearchAction.PickRecent("OLDER")); advanceUntilIdle()
+        assertEquals(listOf("OLDER", "leo"), vm.state.value.recent, "newest first, no repeats in any case")
+        vm.onAction(SearchAction.RemoveRecent("leo"))
+        assertEquals(listOf("OLDER"), memory.recent())
     }
 
     private fun fakeTelegram(status: MutableStateFlow<dev.yourstream.telegram.api.model.TelegramStatus>, calls: MutableList<String>) =

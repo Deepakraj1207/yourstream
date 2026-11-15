@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** The engine's best match first (when it clearly leads), then everything else. */
@@ -61,14 +62,45 @@ data class SearchUiState(
     val interpretation: List<String> = emptyList(),
     /** Set when the query is a request rather than a bare title. */
     val brain: BrainAnswer? = null,
-    /** Matching titles from the add-ons (open their title page with streams). */
-    val addons: List<Tile> = emptyList(),
+    /** The add-ons' answer, one row per add-on and type; null: not asked (blank or one letter). */
+    val addons: dev.yourstream.ui.screens.AddonSections? = null,
+    val addonsLoading: Boolean = false,
+    /** Recent searches, newest first (shown while the field is focused and empty). */
+    val recent: List<String> = emptyList(),
+    val discover: DiscoverUiState = DiscoverUiState(),
 )
+
+/** Search → Discover: browse an add-on catalog by type, catalog and genre. */
+data class DiscoverUiState(
+    val catalogs: List<dev.yourstream.ui.screens.DiscoverCatalog> = emptyList(),
+    val loadingCatalogs: Boolean = true,
+    val type: dev.yourstream.catalog.api.CatalogType? = null,
+    val catalog: dev.yourstream.ui.screens.DiscoverCatalog? = null,
+    /** Null: all genres. */
+    val genre: String? = null,
+    val tiles: List<Tile> = emptyList(),
+    val loading: Boolean = false,
+    val loadingMore: Boolean = false,
+    val nextSkip: Int? = null,
+    val failed: Boolean = false,
+) {
+    val types: List<dev.yourstream.catalog.api.CatalogType> get() = catalogs.map { it.type }.distinct()
+    val catalogsOfType: List<dev.yourstream.ui.screens.DiscoverCatalog> get() = catalogs.filter { it.type == type }
+}
 
 sealed interface SearchAction {
     data class QueryChanged(val text: String) : SearchAction
     data class PickSuggestion(val text: String) : SearchAction
     data object Clear : SearchAction
+    /** The search was meant (keyboard search, or a result opened): remember it. */
+    data object Submit : SearchAction
+    data class PickRecent(val text: String) : SearchAction
+    data class RemoveRecent(val text: String) : SearchAction
+    data object Retry : SearchAction
+    data class DiscoverType(val type: dev.yourstream.catalog.api.CatalogType) : SearchAction
+    data class DiscoverCatalog(val key: String) : SearchAction
+    data class DiscoverGenre(val genre: String?) : SearchAction
+    data object DiscoverMore : SearchAction
 }
 
 @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -79,12 +111,17 @@ class SearchViewModel @Inject constructor(
     private val artwork: ArtworkLookup,
     private val assistant: MediaAssistant,
     private val addonSearch: dev.yourstream.ui.screens.AddonSearch,
+    private val memory: SearchMemory,
 ) : ViewModel() {
     private val query = saved.getMutableStateFlow(QUERY, "")
+    private val retry = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private val recent = kotlinx.coroutines.flow.MutableStateFlow(memory.recent())
+    private val discover = kotlinx.coroutines.flow.MutableStateFlow(DiscoverUiState())
+    private var discoverJob: kotlinx.coroutines.Job? = null
 
     private data class Out(val results: UiState<SearchResults>?, val suggestions: List<String>, val interpretation: List<String>, val brain: BrainAnswer? = null)
 
-    private val results = query.debounce(DEBOUNCE_MS).distinctUntilChanged().flatMapLatest { q ->
+    private val results = combine(query.debounce(DEBOUNCE_MS), retry) { q, n -> q to n }.distinctUntilChanged().flatMapLatest { (q, _) ->
         flow {
             if (q.isBlank()) { emit(Out(null, emptyList(), emptyList())); return@flow }
             emit(Out(UiState.Loading, emptyList(), emptyList()))
@@ -117,25 +154,96 @@ class SearchViewModel @Inject constructor(
         return BrainAnswer(r.message, MediaBrain.understood(r.interpretation), tiles, r.total, play)
     }
 
-    /** Network search in the add-ons, after typing pauses a little longer than the local one. */
-    private val addonHits = query.debounce(ADDON_DEBOUNCE_MS).distinctUntilChanged().mapLatest { q ->
-        if (q.trim().length < 2) emptyList() else runCatching { addonSearch.search(q.trim()) }.getOrDefault(emptyList())
-    }.onStart { emit(emptyList()) }
+    private data class Addons(val q: String, val sections: dev.yourstream.ui.screens.AddonSections?, val loading: Boolean)
 
-    val state: StateFlow<SearchUiState> = combine(query, results, addonHits) { q, r, a -> SearchUiState(q, r.results, r.suggestions, r.interpretation, r.brain, if (q.isBlank()) emptyList() else a) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState(query.value))
+    /** Network search in the add-ons, after typing pauses a little longer than the local one. */
+    private val addonHits = combine(query.debounce(ADDON_DEBOUNCE_MS), retry) { q, n -> q.trim() to n }.distinctUntilChanged().flatMapLatest { (q, _) ->
+        flow {
+            if (q.length < 2) { emit(Addons(q, null, false)); return@flow }
+            emit(Addons(q, null, true))
+            emit(Addons(q, runCatching { addonSearch.sections(q) }.getOrElse { dev.yourstream.ui.screens.AddonSections(emptyList(), failed = true) }, false))
+        }
+    }.onStart { emit(Addons("", null, false)) }
+
+    val state: StateFlow<SearchUiState> = combine(query, results, addonHits, recent, discover) { q, r, a, rec, d ->
+        // Add-on answers for an older query are not shown under a new one.
+        val fresh = a.q == q.trim()
+        SearchUiState(q, r.results, r.suggestions, r.interpretation, r.brain,
+            a.sections.takeIf { fresh && q.isNotBlank() }, (a.loading || !fresh) && q.trim().length >= 2, rec, d)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState(query.value, recent = recent.value))
+
+    init { loadDiscover() }
 
     fun onAction(action: SearchAction) {
         when (action) {
             is SearchAction.QueryChanged -> query.value = action.text
             is SearchAction.PickSuggestion -> query.value = query.value.trimEnd().substringBeforeLast(' ', "").let { if (it.isEmpty()) action.text else "$it ${action.text}" }
             SearchAction.Clear -> query.value = ""
+            SearchAction.Submit -> remember(query.value)
+            is SearchAction.PickRecent -> { query.value = action.text; remember(action.text) }
+            is SearchAction.RemoveRecent -> saveRecent(recent.value.filterNot { it.equals(action.text, ignoreCase = true) })
+            SearchAction.Retry -> retry.value++
+            is SearchAction.DiscoverType -> choose(DiscoverChoice(action.type))
+            is SearchAction.DiscoverCatalog -> choose(DiscoverChoice(discover.value.type, action.key))
+            is SearchAction.DiscoverGenre -> choose(DiscoverChoice(discover.value.type, discover.value.catalog?.key, action.genre))
+            SearchAction.DiscoverMore -> loadMore()
+        }
+    }
+
+    /** Recent searches: newest first, no repeats (any case), at most [RECENT_MAX]. */
+    private fun remember(text: String) {
+        val q = text.trim().takeIf { it.isNotEmpty() } ?: return
+        saveRecent((listOf(q) + recent.value.filterNot { it.equals(q, ignoreCase = true) }).take(RECENT_MAX))
+    }
+
+    private fun saveRecent(list: List<String>) { recent.value = list; memory.saveRecent(list) }
+
+    private fun loadDiscover() {
+        discoverJob?.cancel()
+        discoverJob = viewModelScope.launch {
+            val catalogs = runCatching { addonSearch.catalogs() }.getOrDefault(emptyList())
+            discover.value = DiscoverUiState(catalogs, loadingCatalogs = false)
+            if (catalogs.isNotEmpty()) choose(memory.discover())
+        }
+    }
+
+    /**
+     * Applies [want] where it fits what the add-ons offer: an unknown type falls back to the
+     * first, a catalog of another type to that type's first, a genre the catalog lacks to all
+     * genres (or its first, when it requires one). Then loads the first page.
+     */
+    private fun choose(want: DiscoverChoice) {
+        val d = discover.value
+        val type = want.type?.takeIf { it in d.types } ?: d.types.firstOrNull() ?: return
+        val catalog = d.catalogs.firstOrNull { it.key == want.catalog && it.type == type } ?: d.catalogs.first { it.type == type }
+        val genre = want.genre?.takeIf { it in catalog.genres } ?: catalog.genres.firstOrNull()?.takeIf { catalog.genreRequired }
+        memory.saveDiscover(DiscoverChoice(type, catalog.key, genre))
+        discover.value = d.copy(type = type, catalog = catalog, genre = genre, tiles = emptyList(), loading = true, loadingMore = false, nextSkip = null, failed = false)
+        discoverJob?.cancel()
+        discoverJob = viewModelScope.launch {
+            val page = runCatching { addonSearch.page(catalog, genre, 0) }
+            discover.value = discover.value.copy(tiles = page.getOrNull()?.tiles.orEmpty(), nextSkip = page.getOrNull()?.nextSkip, loading = false, failed = page.isFailure)
+        }
+    }
+
+    private fun loadMore() {
+        val d = discover.value
+        val skip = d.nextSkip ?: return
+        val catalog = d.catalog ?: return
+        if (d.loading || d.loadingMore) return
+        discover.value = d.copy(loadingMore = true)
+        discoverJob = viewModelScope.launch {
+            val page = runCatching { addonSearch.page(catalog, d.genre, skip) }.getOrNull()
+            val now = discover.value
+            val seen = now.tiles.map { it.card.key }.toSet()
+            discover.value = now.copy(tiles = now.tiles + page?.tiles.orEmpty().filter { it.card.key !in seen }, nextSkip = page?.nextSkip, loadingMore = false)
         }
     }
 
     companion object {
         const val DEBOUNCE_MS = 250L
         const val ADDON_DEBOUNCE_MS = 600L
+        const val RECENT_MAX = 10
         private const val QUERY = "query"
         private const val ARTWORK_FOR = 24
         /** The first hit is a "top result" when it scores this much above the second. */

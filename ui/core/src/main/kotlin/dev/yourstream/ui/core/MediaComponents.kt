@@ -240,11 +240,13 @@ fun <T> MediaRow(
     style: CardStyle = CardStyle.POSTER,
     actions: (T) -> List<CardAction> = { emptyList() },
     onSeeAll: (() -> Unit)? = null,
+    /** Where the row's titles come from, shown by the title ("From Telegram"). */
+    tag: String? = null,
 ) {
     val d = LocalDimens.current
     val reserve = items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
-        SectionHeader(title, onSeeAll)
+        SectionHeader(title, onSeeAll, tag = tag)
         CompositionLocalProvider(LocalReserveCaption provides reserve) {
             LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
                 items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }

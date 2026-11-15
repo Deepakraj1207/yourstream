@@ -22,21 +22,77 @@ fun interface HomeCatalogs {
     fun rows(): Flow<List<dev.yourstream.ui.screens.home.CatalogRow>>
 }
 
-/** Titles from the add-ons' search (Stremio "search" catalogs, then TMDB/Cinemeta). */
-fun interface AddonSearch {
-    suspend fun search(query: String): List<Tile>
+/**
+ * The add-ons for the Search tab: search results in one row per add-on and type (Stremio
+ * "search" catalogs, else TMDB/Cinemeta), and Discover, their catalogs to browse by type,
+ * catalog and genre.
+ */
+interface AddonSearch {
+    suspend fun sections(query: String): AddonSections
+    suspend fun catalogs(): List<DiscoverCatalog> = emptyList()
+    suspend fun page(catalog: DiscoverCatalog, genre: String?, skip: Int): DiscoverPage = DiscoverPage(emptyList(), null)
 }
+
+/** One search row: [addon] null for the TMDB/Cinemeta fallback. */
+data class SearchRow(val key: String, val addon: String?, val type: dev.yourstream.catalog.api.CatalogType, val tiles: List<Tile>)
+
+/** [searchable]: some add-on offers search; [failed]: every add-on that does failed. */
+data class AddonSections(val rows: List<SearchRow>, val searchable: Boolean = true, val failed: Boolean = false)
+
+/** A catalog Discover can show; [genreRequired]: the add-on only answers with a genre. */
+data class DiscoverCatalog(
+    val key: String, val name: String, val addon: String, val type: dev.yourstream.catalog.api.CatalogType,
+    val genres: List<String> = emptyList(), val genreRequired: Boolean = false,
+)
+
+data class DiscoverPage(val tiles: List<Tile>, val nextSkip: Int?)
 
 @Module
 @InstallIn(SingletonComponent::class)
 object ScreensModule {
+    private const val SEARCH_ROW_SIZE = 30
+
     @Provides
-    fun addonSearch(addons: dev.yourstream.catalog.sync.CatalogAddons): AddonSearch = AddonSearch { q ->
-        val manager = addons.manager()
-        val found = manager.search(q)
-        // Library-only answers are already in the search results.
-        if (found.source == dev.yourstream.catalog.api.CatalogSource.Local) emptyList()
-        else manager.withLibraryPresence(found.value.distinctBy { it.ref.id }.take(30)).map { (item, p) -> Presentation.tile(item, p) }
+    fun searchMemory(prefs: dev.yourstream.ui.screens.search.SearchPrefs): dev.yourstream.ui.screens.search.SearchMemory = prefs
+
+    @Provides
+    fun addonSearch(addons: dev.yourstream.catalog.sync.CatalogAddons): AddonSearch = object : AddonSearch {
+        override suspend fun sections(query: String): AddonSections = coroutineScope {
+            val manager = addons.manager()
+            val found = manager.searchSections(query)
+            val rows = found.sections.map { s ->
+                async {
+                    val items = s.items.distinctBy { it.ref.id }.take(SEARCH_ROW_SIZE)
+                    val tiles = runCatching { manager.withLibraryPresence(items) }.getOrElse { items.map { it to null } }.map { (item, p) -> Presentation.tile(item, p) }
+                    SearchRow("${s.provider?.value ?: "external"}:${s.type}", s.providerName, s.type, tiles)
+                }
+            }.awaitAll().filter { it.tiles.isNotEmpty() }
+            AddonSections(rows, found.searchable, found.failed)
+        }
+
+        override suspend fun catalogs(): List<DiscoverCatalog> {
+            val names = addons.addons.value.associate { it.id to it.name }
+            return addons.manager().catalogs().filter { c ->
+                // Search-only catalogs, and ones needing something other than a genre, cannot be browsed.
+                c.extras.none { it.isRequired && it.name != "genre" }
+            }.map { c ->
+                DiscoverCatalog(catalogKey(c), c.name, names[c.provider.value] ?: c.provider.value, c.type, c.genres,
+                    genreRequired = c.extras.any { it.isRequired && it.name == "genre" })
+            }
+        }
+
+        override suspend fun page(catalog: DiscoverCatalog, genre: String?, skip: Int): DiscoverPage {
+            val manager = addons.manager()
+            val c = manager.catalogs().firstOrNull { catalogKey(it) == catalog.key } ?: return DiscoverPage(emptyList(), null)
+            return when (val r = manager.page(c, skip, genre)) {
+                is dev.yourstream.core.common.AppResult.Ok -> {
+                    val items = r.value.value.items.distinctBy { it.ref.id }
+                    val tiles = runCatching { manager.withLibraryPresence(items) }.getOrElse { items.map { it to null } }.map { (item, p) -> Presentation.tile(item, p) }
+                    DiscoverPage(tiles, r.value.value.nextSkip)
+                }
+                is dev.yourstream.core.common.AppResult.Err -> throw IllegalStateException(r.error.message)
+            }
+        }
     }
 
     private const val MAX_CATALOG_ROWS = 12

@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -195,17 +200,78 @@ class ScreensTest {
         compose.onNodeWithTag("sort").assertDoesNotExist()
     }
 
+    /** Nuvio's layout: rows, the user's Telegram titles first (top hit leading), then each add-on's. */
     @Test
-    fun searchShowsTopResultAndCount() {
+    fun searchShowsTelegramTitlesFirstThenAddonRows() {
         val top = Tile(MediaCardModel("hit:1:0", "Doraemon"), OpenTarget.Details(1))
         val rest = listOf(Tile(MediaCardModel("hit:2:0", "Doraemon: Nobita"), OpenTarget.Details(2)))
+        val addon = Tile(MediaCardModel("cat:cinemeta:tt1", "Doraemon the Movie"), OpenTarget.Details(3))
         val opened = mutableListOf<OpenTarget>()
-        set { SearchScreen(SearchUiState("doremon", UiState.Content(SearchResults(top, rest, 2)), interpretation = listOf("doremon → doraemon")), {}, { opened += it }) }
-        compose.onNodeWithTag("results-count").assertTextEquals("2 results")
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set {
+            SearchScreen(SearchUiState("doremon", UiState.Content(SearchResults(top, rest, 2)), interpretation = listOf("doremon → doraemon"),
+                addons = AddonSections(listOf(SearchRow("cinemeta:MOVIE", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf(addon))))),
+                { actions += it }, { opened += it })
+        }
         compose.onNodeWithText("doremon → doraemon").assertExists()
-        compose.onNodeWithTag("top-result").performClick()
+        compose.onNodeWithText("FROM TELEGRAM", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("search").performScrollToNode(hasTestTag("addon-results:cinemeta:MOVIE"))
+        compose.onNodeWithTag("addon-results:cinemeta:MOVIE").assertExists()
+        compose.onNodeWithText("Cinemeta · Movies", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("search").performScrollToIndex(0)
+        compose.onNodeWithText("Doraemon").performClick()
         assertEquals(listOf<OpenTarget>(OpenTarget.Details(1)), opened)
+        assertEquals(listOf<dev.yourstream.ui.screens.search.SearchAction>(dev.yourstream.ui.screens.search.SearchAction.Submit), actions, "an opened result is a meant search")
+        compose.onNodeWithTag("search-clear").assertExists()
         assertTouchTargets()
+    }
+
+    @Test
+    fun searchSaysWhyThereIsNothing() {
+        var state by mutableStateOf(SearchUiState("zzz", UiState.Empty(dev.yourstream.ui.core.EmptyKind.NO_RESULTS), addons = AddonSections(emptyList())))
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set { SearchScreen(state, { actions += it }, {}) }
+        compose.onNodeWithText("No results found").assertExists()
+        state = state.copy(addons = AddonSections(emptyList(), searchable = false))
+        compose.onNodeWithText("No searchable catalogs").assertExists()
+        state = state.copy(addons = AddonSections(emptyList(), failed = true))
+        compose.onNodeWithText("Search failed").assertExists()
+        compose.onNodeWithTag("search-failed-retry").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.search.SearchAction>(dev.yourstream.ui.screens.search.SearchAction.Retry), actions)
+        // Still asking the add-ons: no verdict yet.
+        state = state.copy(addons = null, addonsLoading = true)
+        compose.onNodeWithTag("addons-loading").assertExists()
+        compose.onNodeWithTag("search-empty").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptySearchShowsRecentSearchesAndDiscover() {
+        val movie = { k: String -> Tile(MediaCardModel(k, k), OpenTarget.Details(1)) }
+        val top = DiscoverCatalog("cat:a:MOVIE:top", "Top", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Drama"))
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set {
+            SearchScreen(SearchUiState(recent = listOf("vikram"),
+                discover = dev.yourstream.ui.screens.search.DiscoverUiState(listOf(top), loadingCatalogs = false, type = top.type, catalog = top,
+                    tiles = (1..5).map { movie("t$it") })), { actions += it }, {})
+        }
+        compose.onNodeWithTag("discover").assertTextEquals("Discover")
+        compose.onNodeWithTag("discover-context").assertTextEquals("Alpha · Movies")
+        compose.onNodeWithTag("discover-catalog").assertTextContains("Top")
+        // A poster grid, row by row (two columns on this width), paged as it scrolls.
+        compose.onAllNodesWithTag("discover-tile").assertCountEquals(2)
+        compose.onNodeWithTag("search").performScrollToNode(hasText("t5"))
+        compose.onNodeWithTag("search").performScrollToIndex(0)
+        // Recent searches show while the field is focused.
+        compose.onNodeWithText("Recent Searches").assertDoesNotExist()
+        compose.onNodeWithTag("search-field").performClick()
+        compose.onNodeWithTag("recent:vikram").performClick()
+        compose.onNodeWithTag("recent-remove:vikram").performClick()
+        compose.onNodeWithTag("discover-genre").performClick()
+        compose.onNodeWithTag("discover-genre:Drama").performClick()
+        assertEquals(listOf(
+            dev.yourstream.ui.screens.search.SearchAction.PickRecent("vikram"), dev.yourstream.ui.screens.search.SearchAction.RemoveRecent("vikram"),
+            dev.yourstream.ui.screens.search.SearchAction.DiscoverGenre("Drama"),
+        ), actions)
     }
 
     @Test

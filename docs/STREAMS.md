@@ -47,6 +47,28 @@ are listed in, so groups do not jump around as answers arrive. Add-ons that foun
 not answer, are named under the list. A newer request (another episode, a refresh) cancels the
 older one: a slow answer for the previous episode can no longer replace the current list.
 
+**The user's Telegram files are a stream source (0.12).** A catalog title the user also has
+on Telegram is one poster (with a blue "Telegram" badge), not a second library poster. Its title
+page lists a "Telegram" group first, above the add-ons, even when it answers last
+(`StreamGroup.TELEGRAM`). Movies list the item's media versions. Episodes are found by season and
+number, including double episodes such as S02E15-E16 (`LibraryDao.episodeIdByNumber`). Rows show
+the resolution, file name, size, piece count for split files, and audio languages. Tapping one
+opens the library player, so resume, track choice and split files work as before. Matched
+Telegram titles with an IMDb id open the same Cinemeta title page. Unmatched files keep their
+own Details page. "In your library" on the title page still opens Details (download, Fix match).
+
+**Sort & filter (0.12).** A chip before the add-on chips opens a sheet (`StreamFilterSheet.kt`).
+- Sort within each source: best quality (height from the name, "4K"/"UHD", or the file's known
+  resolution, then size), largest, smallest, or source order.
+- Filter: quality (4K / 1080p / 720p / SD), source (Telegram / add-ons), type (direct / torrent),
+  and audio language (from the stream's languages or a name such as "Tamil" in its text).
+- "Show N streams" counts before you apply. The choice is saved in settings and applies to every
+  title. The add-on chips count what is left after filtering.
+- If filters hide everything, the page says how many streams are hidden and offers Clear filters,
+  which keeps the sort.
+- Nuvio has no stream sorting; this sheet is this app's own design.
+- Logic: `StreamFilter.apply` (pure). Tests: `StreamSourcesTest`.
+
 Stream entries keep what playback needs: `url` + `behaviorHints.proxyHeaders`, or `infoHash` +
 `fileIdx` + `sources`, or a `magnet:` link (parsed into a hash and trackers, hex or base32),
 plus `behaviorHints.filename` / `videoSize`.
