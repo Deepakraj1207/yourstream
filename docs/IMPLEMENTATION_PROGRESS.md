@@ -822,3 +822,11 @@ Status: NEEDS REAL-DEVICE TESTING.
   shell keeps that inset for every tab); the rating badge shows "★" (the add-on's rating may not be
   IMDb's).
 * Status: NEEDS REAL-DEVICE TESTING.
+
+## v0.11.5 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction (Nuvio navigation bar, hero carousel,
+automatic poster matching without Check matches, row-height fix). Checked on the published files:
+`releases/latest` is v0.11.5 and not a pre-release; the arm64 APK's SHA-256 matches
+`SHA256SUMS.txt`; `aapt2` shows versionCode 22, versionName 0.11.5; `apksigner` shows the pinned
+release certificate (`35249306…07b2`). Status: NEEDS REAL-DEVICE TESTING.
