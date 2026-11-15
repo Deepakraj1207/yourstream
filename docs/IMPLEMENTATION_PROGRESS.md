@@ -795,3 +795,12 @@ public pages) was used as the reference for labels and options; no code was copi
   `swipeToSeekCoversMoreOfLongerVideos`; existing player tests unchanged and passing. Not built:
   chapters, audio/subtitle delay, amplification, libmpv, watch party (listed in docs/UI.md).
   Status: NEEDS REAL-DEVICE TESTING (gestures, lock, Sources switching on a real title).
+
+## v0.11.4 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction, with the Nuvio-style player, Layout
+and Add-ons pages, Cinemeta as the only built-in add-on, the opening logo and the startup fix.
+Checked on the published files: `releases/latest` is v0.11.4 and not a pre-release; the arm64
+APK's SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 21, versionName 0.11.4;
+`apksigner` shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
+Status: NEEDS REAL-DEVICE TESTING.
