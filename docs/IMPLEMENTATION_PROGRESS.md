@@ -929,3 +929,16 @@ From the user's screen recording and screenshots of 0.12.1:
 * **The TMDB score showed "67".** It is now "6.7", out of 10 like IMDb.
 * Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
   TESTING.
+
+## v0.12.2 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction (device report 8: no startup hero
+swap, TMDB logos in the carousel, no box behind logos, TMDB score out of 10).
+
+Checked on the published files (run 26):
+- `releases/latest` is v0.12.2 and is not a pre-release.
+- The arm64 APK's SHA-256 (`1f4f7c88…c27a`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 26 and versionName 0.12.2.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
