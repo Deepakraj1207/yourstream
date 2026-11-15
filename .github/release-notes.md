@@ -1,3 +1,22 @@
+## What's new in 0.11.4
+
+- **Player like Nuvio's:** lock button (hides the controls and ignores touches until you unlock),
+  labelled buttons (Fit, speed, Subs, Audio, Episodes), time pills, **Sources** to switch to
+  another file of the same title without losing your place, **swipe sideways to seek**, and
+  **Subtitles → Style** (size, colour, position, bold, background).
+- **Settings → Layout like Nuvio's:** Home layout (hero, "Popular · Movies" labels, hide
+  unreleased titles, and every add-on catalog: hide, reorder, rename), Continue Watching (wide or
+  poster cards, resume or open details), Poster card style (width, corners, labels, live preview),
+  Streams (size badges, add-on logos), Detail page (Cinematic background, episodes as a row,
+  overview and cast), Navigation bar (Adaptive, Panel Grid, Floating with glow, Classic).
+- **Add-ons page like Nuvio's:** overview, logo and version on each card, move up / down (also
+  orders Home's rows and the stream groups), refresh, settings page for configurable add-ons,
+  delete with a confirmation.
+- **Only Cinemeta is built in.** Every other add-on is added by you (the built-in Indian catalogs
+  are gone after this update; add them again with their links if you used them).
+- **Opening logo** when the app starts (a tap skips it).
+- Fixed: a full-screen "Connect Telegram" flashed at launch before switching to the normal Home.
+
 ## What's new in 0.11.3
 
 - **4K movies split into pieces play as one movie.** Files like "Movie.2160p.mkv.001", ".002",
