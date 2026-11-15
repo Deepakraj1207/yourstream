@@ -4,21 +4,13 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dev.yourstream.metadata.sync.MatchStatus
-import dev.yourstream.metadata.sync.MetadataRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-
-/** How many titles wait for the user's match check (live). */
-fun interface ReviewQueue {
-    fun count(): Flow<Int>
-}
 
 /** Catalog rows for Home, from the user's add-ons. */
 fun interface HomeCatalogs {
@@ -72,10 +64,5 @@ object ScreensModule {
                 dev.yourstream.ui.screens.home.CatalogRow(catalogKey(c), layout.nameOf(catalogKey(c), c.name), tiles, c.type, unreleased)
             }
         }.awaitAll().filterNotNull()
-    }
-
-    @Provides
-    fun reviewQueue(metadata: MetadataRepository): ReviewQueue = ReviewQueue {
-        metadata.statusCounts().map { it[MatchStatus.NEEDS_REVIEW.name] ?: 0 }.catch { emit(0) }
     }
 }

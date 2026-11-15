@@ -68,7 +68,6 @@ class HomeViewModel @Inject constructor(
     private val artwork: ArtworkLookup,
     private val actions: TileActionHandler,
     private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
-    private val reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
     private val indexingMonitor: IndexingMonitor,
     private val homeCatalogs: HomeCatalogs,
 ) : ViewModel() {
@@ -131,17 +130,13 @@ class HomeViewModel @Inject constructor(
         .onStart { emit(UiState.Loading) }
         .catch { emit(UiState.Error(it.toUiError())) }
 
-    private val review: Flow<Int> = reviewQueue.count()
-
     // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
-    private val extras = combine(forYou, review, catalogs) { f, r, c -> Extras(f, r, c) }
+    private val extras = combine(forYou, catalogs) { f, c -> Extras(f, c) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val catalogs: List<CatalogRow>?)
+    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
-        // Lowest-priority banner: only when nothing more urgent is shown.
-        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, IndexingStatus(), e.catalogs.orEmpty(),
-            catalogsLoading = e.catalogs == null)
+        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

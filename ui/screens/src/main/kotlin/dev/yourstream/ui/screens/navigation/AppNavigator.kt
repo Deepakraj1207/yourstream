@@ -49,7 +49,6 @@ class AppNavigator(private val nav: NavHostController) {
     fun sources() = nav.navigate(SourcesRoute)
     fun languages() = nav.navigate(LanguagesRoute)
     fun libraryStatus() = nav.navigate(LibraryStatusRoute) { launchSingleTop = true }
-    fun review() = nav.navigate(MatchReviewRoute) { launchSingleTop = true }
     fun fixMatch(itemId: Long) = nav.navigate(FixMatchRoute(itemId))
     fun stats() = nav.navigate(StatsRoute) { launchSingleTop = true }
     fun settingsPage(page: dev.yourstream.ui.screens.settings.SettingsPage) = nav.navigate(SettingsPageRoute(page.name)) { launchSingleTop = true }

@@ -147,25 +147,39 @@ class LibraryMetadataServiceTest {
     }
 
     @Test
-    fun uncertainMatchesAreSuggestedButNotApplied() = runTest {
+    fun uncertainMatchesAreDecidedAutomaticallyAndFixMatchStillWins() = runTest {
+        // Since 0.11.5 there is no review queue: the app picks the strongest candidate itself
+        // (the user's decision). "Fix match" (confirm) still overrides it and locks the item.
         provider.add("The Thing", 1982, MetadataType.MOVIE, popularity = 20.0)
         provider.add("The Thing", 2011, MetadataType.MOVIE, popularity = 15.0)
         val id = item("The Thing", null)
         val s = service()
-        assertEquals(1, s.processPending().needsReview)
-        assertEquals("NEEDS_REVIEW", dao.match(id)!!.status)
-        assertNull(dao.itemMetadata(id), "nothing applied without the user")
-        val review = MetadataRepository(db, s, MetadataProviderManager(listOf(provider), RoomMetadataCache(db), clock, NoOpLogger)).reviewQueue().first()
-        assertEquals(listOf(1982, 2011), review.single().candidates.map { it.candidate.year })
+        assertEquals(1, s.processPending().accepted)
+        assertEquals("ACCEPTED", dao.match(id)!!.status)
+        assertEquals(1982, dao.itemMetadata(id)!!.year)
 
-        // The user picks 2011.
-        val ref = review.single().candidates.first { it.candidate.year == 2011 }.candidate.ref
+        // The user fixes it to 2011.
+        val ref = MetadataRef(provider.id, MetadataType.MOVIE, "The Thing-2011")
         assertTrue(s.confirm(id, ref) is AppResult.Ok)
         assertEquals("MANUAL", dao.match(id)!!.status)
         assertEquals(2011, dao.itemMetadata(id)!!.year)
         assertTrue(library.item(id)!!.locked, "user decisions lock the item")
         clock.now += 365L * 24 * 3600 * 1000
         assertEquals(0, s.processPending().processed, "manual matches are never revisited")
+    }
+
+    @Test
+    fun titlesLeftForReviewByOlderVersionsAreDecidedNow() = runTest {
+        provider.add("Leo", 2023, MetadataType.MOVIE)
+        val id = item("Leo", 2023)
+        // As 0.11.4 left it: waiting for the user, next attempt a week away.
+        dao.putMatch(dev.yourstream.core.database.entity.MetadataMatchEntity(
+            itemId = id, status = "NEEDS_REVIEW", provider = null, externalId = null, externalType = null, imdbId = null, confidence = 0.7,
+            candidates = "[]", inputSignature = "MOVIE|Leo|2023", attempts = 1, matchedAt = null, updatedAt = clock.now,
+            nextAttemptAt = clock.now + 7L * 24 * 3600 * 1000, lastError = null,
+        ))
+        assertEquals(1, service().processPending().accepted)
+        assertEquals("ACCEPTED", dao.match(id)!!.status)
     }
 
     @Test

@@ -92,12 +92,10 @@ class ViewModelTest {
         ArtworkLookup(media),
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
         assistant,
-        ReviewQueue { review },
         IndexingMonitor(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
         HomeCatalogs { flowOf(emptyList()) },
     )
 
-    private val review = MutableStateFlow(0)
     private val brainAsked = mutableListOf<String>()
     private val assistant = object : dev.yourstream.assistant.engine.MediaAssistant {
         override suspend fun ask(text: String): dev.yourstream.assistant.engine.AssistantResponse {
@@ -136,14 +134,10 @@ class ViewModelTest {
         assertEquals("Vikram" to HeroItem.Kind.NEW, hero.title to hero.kind)
         assertEquals(OpenTarget.Play(PlaybackTarget(7)), hero.primary, "a movie plays straight from the hero")
 
-        // Local recommendations with their reason; the review banner only when nothing is more urgent.
+        // Local recommendations with their reason (no "check matches" banner since 0.11.5).
         val forYou = (vm.state.value.forYou as UiState.Content).value
         assertEquals("Tamil, action", forYou.basis)
         assertEquals(TileCaption.Reason("Tamil · action"), forYou.tiles.single().caption)
-        review.value = 2
-        advanceUntilIdle()
-        assertEquals(HomeBanner.REVIEW, vm.state.value.banner)
-        assertEquals(2, vm.state.value.reviewCount)
     }
 
     @Test

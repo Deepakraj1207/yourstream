@@ -7,7 +7,7 @@ import dev.yourstream.ui.screens.TileAction
 import dev.yourstream.ui.screens.navigation.OpenTarget
 
 /** Something the user should do or know before the rows make sense. */
-enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, REVIEW }
+enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE }
 
 /** One catalog from an add-on, as a Home row. */
 data class CatalogRow(
@@ -46,8 +46,6 @@ data class HomeUiState(
     /** Titles in the library (null while unknown). */
     val libraryCount: Int? = null,
     val forYou: UiState<ForYou> = UiState.Loading,
-    /** Titles waiting for the user's match check. */
-    val reviewCount: Int = 0,
     /** Chats being indexed right now (the status bar at the top). */
     val indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
     val catalogs: List<CatalogRow> = emptyList(),

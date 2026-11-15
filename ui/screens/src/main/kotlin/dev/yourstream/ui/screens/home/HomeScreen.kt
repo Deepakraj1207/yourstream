@@ -55,10 +55,10 @@ class HomeRows(
 )
 
 @Composable
-fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit = {}, vm: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val rows = HomeRows(vm.recentlyAdded.collectAsLazyPagingItems(), vm.series.collectAsLazyPagingItems())
-    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
+    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources)
 }
 
 /** Stateless: renders [HomeUiState] + [HomeRows]; every user intent goes out through the callbacks. */
@@ -71,12 +71,11 @@ fun HomeScreen(
     onSeeAll: (HomeSection) -> Unit,
     onSignIn: () -> Unit,
     onChooseSources: () -> Unit,
-    onReview: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
         // Pinned above the rows: what indexing is doing (the rows below update live).
         // Indexing progress floats above the navigation on every tab (IndexingPill).
-        HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
+        HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources)
     }
 }
 
@@ -89,7 +88,6 @@ private fun HomeContent(
     onSeeAll: (HomeSection) -> Unit,
     onSignIn: () -> Unit,
     onChooseSources: () -> Unit,
-    onReview: () -> Unit,
 ) {
     val blocking = state.blocking
     // Settings → Layout → Home rows.
@@ -143,7 +141,7 @@ private fun HomeContent(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
-        state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
+        state.banner?.let { b -> item(key = "banner") { Banner(b, onSignIn, onChooseSources) } }
         if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
@@ -215,12 +213,11 @@ private fun LazyListScope.paged(
 }
 
 @Composable
-private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit) {
+private fun Banner(banner: HomeBanner, onSignIn: () -> Unit, onChooseSources: () -> Unit) {
     val (text, action) = when (banner) {
         HomeBanner.NOT_SIGNED_IN -> stringResource(R.string.home_banner_signed_out) to onSignIn
         HomeBanner.NO_SOURCES -> stringResource(R.string.home_banner_no_sources) to onChooseSources
         HomeBanner.OFFLINE -> stringResource(R.string.home_banner_offline) to null
-        HomeBanner.REVIEW -> androidx.compose.ui.res.pluralStringResource(R.plurals.home_banner_review, reviewCount, reviewCount) to onReview
     }
     val m = Modifier.padding(horizontal = LocalDimens.current.gutter).testTag("banner")
     if (action != null) {

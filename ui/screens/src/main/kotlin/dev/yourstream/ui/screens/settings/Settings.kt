@@ -70,8 +70,6 @@ data class SettingsUiState(
     val signedIn: Boolean = false,
     val enabledSources: Int = 0,
     val languages: String = "",
-    /** Titles waiting for a match check. */
-    val reviewCount: Int = 0,
     /** Multi-device progress sync: on/off (it is optional and off until the user turns it on). */
     val syncOn: Boolean = false,
 )
@@ -82,22 +80,18 @@ class SettingsViewModel @Inject constructor(
     users: TelegramUserRepository,
     index: MediaIndexRepository,
     private val tracks: TrackPreferenceStore,
-    reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
     sync: dev.yourstream.sync.ProgressSync,
 ) : ViewModel() {
     private val languages = MutableStateFlow("")
 
-    private val review = reviewQueue.count()
-
-    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages, combine(review, sync.status) { r, s -> r to s.enabled }) { a, user, chats, langs, (r, syncOn) ->
+    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages, sync.status) { a, user, chats, langs, syncStatus ->
         SettingsUiState(
             signedInAs = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
             signedIn = a == AuthState.Ready,
             // Telegram chats only: folders on the device have their own row.
             enabledSources = chats.count { it.enabled && !dev.yourstream.media.api.LocalSourceIds.isLocal(it.chatId) },
             languages = langs,
-            reviewCount = r,
-            syncOn = syncOn,
+            syncOn = syncStatus.enabled,
         )
     }.catch { emit(SettingsUiState()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -162,7 +156,6 @@ private const val SOURCE_URL = "https://github.com/Deepakraj1207/yourstream"
 /** The advanced screens reachable from Settings. */
 data class SettingsLinks(
     val libraryStatus: (() -> Unit)? = null,
-    val review: (() -> Unit)? = null,
     val stats: (() -> Unit)? = null,
     val sync: (() -> Unit)? = null,
     val addons: (() -> Unit)? = null,

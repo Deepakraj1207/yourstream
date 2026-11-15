@@ -45,15 +45,29 @@ class MatchingTest {
     }
 
     @Test
-    fun twoEquallyPlausibleAnswersGoToReview() = runTest {
-        // Same title, no year, similar popularity: we cannot know which one the file is.
+    fun twoPlausibleAnswersAreDecidedWithoutAskingTheUser() = runTest {
+        // Same title, no year: the user used to be asked. Since 0.11.5 the app decides (the user's
+        // decision: "poster detection is your job"), taking the stronger candidate; "Fix match"
+        // on the title page corrects a wrong one.
         tmdb.add("The Thing", 1982, popularity = 20.0)
         tmdb.add("The Thing", 2011, popularity = 15.0)
         val m = match("The Thing")
-        assertEquals(MatchDecision.NEEDS_REVIEW, m.decision)
+        assertEquals(MatchDecision.ACCEPTED, m.decision)
         assertTrue(m.candidates.all { it.breakdown.ambiguityPenalty > 0 }, "both rivals penalised, order kept")
         assertEquals(1982, m.best!!.candidate.year)
         assertEquals(2, m.candidates.size)
+    }
+
+    @Test
+    fun theSameFilmListedTwiceIsNotADoubt() = runTest {
+        // "OM! Crush on Me" / "Om! Crush on Me", both 2021: one film, two entries.
+        tmdb.add("OM! Crush on Me", 2021, popularity = 5.0)
+        tmdb.add("Om! Crush on Me", 2021, popularity = 4.0)
+        tmdb.add("Lean on Me", 1989, popularity = 9.0)
+        val m = match("Crush on Me", 2021)
+        assertEquals(MatchDecision.ACCEPTED, m.decision, "${m.candidates}")
+        assertEquals(0.0, m.best!!.breakdown.ambiguityPenalty)
+        assertEquals(2021, m.best!!.candidate.year)
     }
 
     @Test
@@ -89,7 +103,8 @@ class MatchingTest {
         tmdb.add("Drishyam", 2015, language = "hi", popularity = 10.0)
         val hindi = match("Drishyam", langs = listOf("hi"))
         assertEquals(2015, hindi.best!!.candidate.year, "the Hindi remake ranks first for a Hindi file")
-        assertEquals(MatchDecision.NEEDS_REVIEW, hindi.decision, "…but a remake pair without a year is still for the user to confirm")
+        // Decided by the app since 0.11.5 (no "check matches" step any more).
+        assertEquals(MatchDecision.ACCEPTED, hindi.decision)
     }
 
     @Test

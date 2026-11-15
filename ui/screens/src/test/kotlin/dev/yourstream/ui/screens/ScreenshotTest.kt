@@ -92,7 +92,7 @@ class ScreenshotTest {
             Tile(MediaCardModel("fy:32", "Super Deluxe", "2019"), OpenTarget.Details(32), 32, caption = TileCaption.Reason("Tamil · ★ 8.3")),
             Tile(MediaCardModel("fy:33", "Soorarai Pottru", "2020"), OpenTarget.Details(33), 33, caption = TileCaption.Reason("Tamil · drama · ★ 8.7")),
         ))
-        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s), {}, {}, {}, {}, {})
+        HomeScreen(HomeUiState(null, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou)), HomeRows(r, s), {}, {}, {}, {}, {})
     }
 
     private fun firstRun(name: String, step: dev.yourstream.ui.screens.firstrun.FirstRunStep, state: dev.yourstream.ui.screens.firstrun.FirstRunUiState, dark: Boolean = true) =
@@ -147,7 +147,7 @@ class ScreenshotTest {
         val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
         val catalog = dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Tamil Movies", series.map { it.copy(caption = TileCaption.InLibrary) })
         HomeScreen(
-            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
+            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC),
                 IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), catalogs = listOf(catalog)),
             HomeRows(r, none), {}, {}, {}, {}, {},
         )
@@ -240,8 +240,8 @@ class ScreenshotTest {
             navStyle = dev.yourstream.ui.screens.settings.NavStyle.FLOATING, navGlow = true))) { home() }
 
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
-        SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
-        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}, storage = {}),
+        SettingsUiState("Asha Kumar", true, 3, "Tamil, English"), version,
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, storage = {}),
         updateLine = "Version $version · up to date", onUpdate = {}, onSourceCode = {}, onReset = {},
         securedHosts = listOf("api.themoviedb.org"),
     )
@@ -370,7 +370,7 @@ class ScreenshotTest {
                     dev.yourstream.ui.screens.library.SourceSync(2, "Kids Cartoons", true, 260, 0, null, 42),
                 ),
                 files = 1240, titles = 240, movies = 180, series = 60, matched = 204, review = 12, unmatched = 18, providers = listOf("TMDB", "Cinemeta"),
-            ), {}, {}, {}, {}, now = 5 * 60_000,
+            ), {}, {}, {}, now = 5 * 60_000,
         )
     }
 

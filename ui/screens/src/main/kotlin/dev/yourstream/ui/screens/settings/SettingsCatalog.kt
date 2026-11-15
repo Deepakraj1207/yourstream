@@ -172,10 +172,6 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     add(entry("library-status", co, R.string.settings_group_library, R.string.settings_status, "indexing sync matching progress", shown = { it.links.libraryStatus != null }) {
         SettingRow(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), AppIcons.Episodes, onClick = host.links.libraryStatus)
     })
-    add(entry("review", co, R.string.settings_group_library, R.string.settings_review, "matches titles wrong", shown = { it.links.review != null && it.state.reviewCount > 0 }) {
-        SettingRow(stringResource(R.string.settings_review), pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
-            Icons.Filled.Warning, onClick = host.links.review)
-    })
 
     // ---- Playback
     val pl = SettingsPage.PLAYBACK
