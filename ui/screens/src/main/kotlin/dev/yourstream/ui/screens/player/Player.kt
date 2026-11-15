@@ -106,10 +106,15 @@ data class PlayerUiState(
     /** Where playback resumed (offers "Start over"); null when it started from the beginning. */
     val resumedFromMs: Long? = null,
     val episodes: EpisodesPanel? = null,
+    /** Other files of this title or episode (versions), for the Sources panel; empty with one file. */
+    val sources: List<SourceOption> = emptyList(),
 ) {
     val loading: Boolean get() = status == PlaybackStatus.PREPARING || status == PlaybackStatus.BUFFERING
     val ended: Boolean get() = status == PlaybackStatus.ENDED
 }
+
+/** A file that plays this title or episode: "1080p · Tamil · 2.1 GB · Film.1080p.mkv". */
+data class SourceOption(val mediaId: Long, val label: String, val detail: String, val playing: Boolean)
 
 sealed interface PlayerAction {
     data object TogglePlay : PlayerAction
@@ -126,6 +131,8 @@ sealed interface PlayerAction {
     data object StartOver : PlayerAction
     data object DismissResume : PlayerAction
     data object Retry : PlayerAction
+    /** Switch to another file of the same title (Sources), at the current position. */
+    data class PlaySource(val mediaId: Long) : PlayerAction
 }
 
 /** Everything around playback that the controller does not know: neighbours, resume, episodes. */
@@ -135,6 +142,8 @@ data class PlayerExtras(
     val next: EpisodeLink? = null,
     val resumedFromMs: Long? = null,
     val openError: UiError? = null,
+    /** The title's playable files (versions), for the Sources panel. */
+    val versions: List<dev.yourstream.library.api.MediaVersion> = emptyList(),
 )
 
 /**
@@ -152,6 +161,7 @@ class PlayerViewModel @Inject constructor(
     private val episodes: EpisodeRepository,
     series: SeriesRepository,
     private val active: dev.yourstream.playback.media3.ActivePlayback,
+    private val media: dev.yourstream.library.api.MediaRepository,
 ) : ViewModel() {
     private val route = saved.toRoute<PlayerRoute>()
     private val target: PlaybackTarget = route.target
@@ -189,6 +199,10 @@ class PlayerViewModel @Inject constructor(
             }
         }
         target.episodeId?.let { episodeId -> viewModelScope.launch { loadNeighbours(episodeId) } }
+        viewModelScope.launch {
+            val versions = runCatching { target.episodeId?.let { episodes.versions(it) } ?: media.versions(target) }.getOrDefault(emptyList())
+            extras.update { it.copy(versions = dev.yourstream.playback.media3.LibraryMediaSourceResolver.rank(versions)) }
+        }
         viewModelScope.launch { trackSession() }
         // The media notification and lock screen show what plays, and control this player.
         viewModelScope.launch {
@@ -212,6 +226,13 @@ class PlayerViewModel @Inject constructor(
             PlayerAction.StartOver -> { controller.seekTo(0); extras.update { it.copy(resumedFromMs = null) } }
             PlayerAction.DismissResume -> extras.update { it.copy(resumedFromMs = null) }
             PlayerAction.Retry -> controller.retry()
+            is PlayerAction.PlaySource -> viewModelScope.launch {
+                val at = controller.state.value.positionMs
+                when (val r = controller.open(target, action.mediaId, at)) {
+                    is AppResult.Err -> extras.update { it.copy(openError = r.error.toUiError()) }
+                    is AppResult.Ok -> extras.update { it.copy(openError = null) }
+                }
+            }
         }
     }
 
@@ -272,6 +293,14 @@ class PlayerViewModel @Inject constructor(
             previous = x.previous, next = x.next,
             resumedFromMs = x.resumedFromMs,
             episodes = episodes,
+            sources = x.versions.takeIf { it.size > 1 }.orEmpty().map { v ->
+                SourceOption(
+                    v.mediaId,
+                    listOfNotNull(v.resolution?.let { "${it}p" }, v.quality, v.languages.joinToString("/").ifEmpty { null }).joinToString(" · ").ifEmpty { v.fileName },
+                    listOf("%.1f GB".format(Locale.ROOT, v.sizeBytes / 1e9), v.fileName).joinToString(" · "),
+                    playing = v.mediaId == s.media?.mediaId,
+                )
+            },
         )
 
         fun link(e: Episode) = EpisodeLink(e.label, e.title, OpenTarget.Play(e.target))

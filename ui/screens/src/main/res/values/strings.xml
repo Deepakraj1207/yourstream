@@ -809,4 +809,27 @@
     <string name="layout_nav_glow_detail">Soft light around the floating bar.</string>
     <string name="layout_glow_on">Glow on</string>
     <string name="layout_glow_off">Glow off</string>
+    <!-- Player, Nuvio-style controls -->
+    <string name="player_lock">Lock controls</string>
+    <string name="player_unlock">Unlock controls</string>
+    <string name="player_tap_to_unlock">Tap to unlock</string>
+    <string name="player_pill_subs">Subs</string>
+    <string name="player_pill_audio">Audio</string>
+    <string name="player_pill_sources">Sources (%1$d)</string>
+    <string name="player_sources">Sources</string>
+    <string name="player_style">Style</string>
+    <string name="player_style_size">Size</string>
+    <string name="player_style_color">Colour</string>
+    <string name="player_style_offset">Position</string>
+    <string name="player_style_bold">Bold</string>
+    <string name="player_style_box">Dark background (instead of an outline)</string>
+    <string name="player_style_reset">Reset defaults</string>
+    <string name="player_color_white">White</string>
+    <string name="player_color_yellow">Yellow</string>
+    <string name="player_color_cyan">Cyan</string>
+    <string name="player_color_green">Green</string>
+    <string name="player_offset_low">Low</string>
+    <string name="player_offset_normal">Normal</string>
+    <string name="player_offset_raised">Raised</string>
+    <string name="player_offset_high">High</string>
 </resources>

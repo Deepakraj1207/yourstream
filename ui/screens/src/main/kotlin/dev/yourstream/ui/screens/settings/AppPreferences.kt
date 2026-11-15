@@ -118,6 +118,11 @@ data class AppSettings(
     val subtitleScale: Float = 1f,
     /** Subtitles on a dark box (else white text with a black outline). */
     val subtitleBox: Boolean = false,
+    /** Subtitle text colour (ARGB), one of [SUBTITLE_COLORS]. */
+    val subtitleColor: Int = SUBTITLE_COLORS.first(),
+    val subtitleBold: Boolean = false,
+    /** Distance of subtitles from the bottom, as a fraction of the video's height ([SUBTITLE_OFFSETS]). */
+    val subtitleOffset: Float = 0.08f,
     /**
      * Torrent results from stream add-ons play with the built-in torrent engine. Off until the
      * user agrees (peers see the device's IP address): [TorrentConsentDialog].
@@ -152,6 +157,10 @@ data class AppSettings(
         val HOLD_SPEEDS = listOf(1.5f, 2f, 3f)
         val SUBTITLE_SCALES = listOf(0.8f, 1f, 1.25f, 1.5f, 1.8f)
         val BUFFER_OPTIONS = listOf(30, 60, 120, 300)
+        /** White, yellow, cyan, green. */
+        val SUBTITLE_COLORS = listOf(0xFFFFFFFF.toInt(), 0xFFFFEB3B.toInt(), 0xFF4DD0E1.toInt(), 0xFF81C784.toInt())
+        /** Low, normal (Media3's default), raised, high. */
+        val SUBTITLE_OFFSETS = listOf(0.03f, 0.08f, 0.15f, 0.25f)
     }
 }
 
@@ -189,6 +198,9 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("background_playback", s.backgroundPlayback)
             .putFloat("subtitle_scale", s.subtitleScale)
             .putBoolean("subtitle_box", s.subtitleBox)
+            .putInt("subtitle_color", s.subtitleColor)
+            .putBoolean("subtitle_bold", s.subtitleBold)
+            .putFloat("subtitle_offset", s.subtitleOffset)
             .putBoolean("torrents", s.torrentStreaming)
             .putBoolean("secure_dns", s.secureDns)
             .putBoolean("secure_dns_fallback", s.secureDnsFallback)
@@ -253,6 +265,9 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         backgroundPlayback = prefs.getBoolean("background_playback", true),
         subtitleScale = prefs.getFloat("subtitle_scale", 1f).takeIf { it in AppSettings.SUBTITLE_SCALES } ?: 1f,
         subtitleBox = prefs.getBoolean("subtitle_box", false),
+        subtitleColor = prefs.getInt("subtitle_color", AppSettings.SUBTITLE_COLORS.first()).takeIf { it in AppSettings.SUBTITLE_COLORS } ?: AppSettings.SUBTITLE_COLORS.first(),
+        subtitleBold = prefs.getBoolean("subtitle_bold", false),
+        subtitleOffset = prefs.getFloat("subtitle_offset", 0.08f).takeIf { it in AppSettings.SUBTITLE_OFFSETS } ?: 0.08f,
         // Off unless the user turned it on (before 0.11 it defaulted to on without asking).
         torrentStreaming = prefs.getBoolean("torrents", false),
         secureDns = prefs.getBoolean("secure_dns", false),

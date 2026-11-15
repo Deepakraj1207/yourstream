@@ -786,3 +786,12 @@ public pages) was used as the reference for labels and options; no code was copi
 * **Layout like Nuvio's** (docs/UI.md). Tests: `LayoutSettingsTest` (7), screenshots.
 * Status: NEEDS REAL-DEVICE TESTING (all of the above; the opening logo's look and timing in
   particular).
+
+* **Player like Nuvio's** (docs/UI.md "Player controls"). Reason: the user asked for Nuvio's
+  functionality, control panel and options. Lock, labelled pills, time pills, Sources (other files
+  of the title, switched at the current position), sideways swipe-to-seek, subtitle style menu
+  (size, colour, position, bold, background), edge zones for system gestures; both players.
+  Tests: `PlayerScreenTest.nuvioControlsLockPillsSourcesAndSubtitleStyle`,
+  `swipeToSeekCoversMoreOfLongerVideos`; existing player tests unchanged and passing. Not built:
+  chapters, audio/subtitle delay, amplification, libmpv, watch party (listed in docs/UI.md).
+  Status: NEEDS REAL-DEVICE TESTING (gestures, lock, Sources switching on a real title).

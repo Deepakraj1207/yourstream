@@ -10,7 +10,7 @@ coroutines = "1.11.0"
 # TDLib 1.8.69, prebuilt for Android by tdl-coroutines (Apache-2.0). Only :telegram:tdlib uses it.
 tdl = "17.0.0"
 coreKtx = "1.19.1"
-coreSplashscreen = "1.0.1"
+coreSplashscreen = "1.2.0"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
 composeBom = "2026.09.00"

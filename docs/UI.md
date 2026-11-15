@@ -345,3 +345,25 @@ The user asked for Nuvio's Layout page with its options working. The hub lists, 
 Not built: Nuvio's Collections (custom folders of catalogs), its card depth effect, custom poster
 sources, badge-URL ("fusion") rules, trailers and ratings sections: they depend on features this app
 does not have.
+
+## Player controls (Nuvio-style, since 0.11.4)
+
+Both players (Telegram files and add-on streams) share `PlayerChrome.kt`:
+
+* **Top bar**: back, title and episode line, quality badge (library player), **lock**, rotate.
+* **Centre**: rewind / play-pause / forward, the jump size under each (−10 / +10, from Settings).
+* **Bottom**: timeline, **time pills** (position; speed · length), then **labelled pills**: previous /
+  next episode, Fit / Fill / Zoom, speed (1×), Subs, Audio, Episodes, **Sources (n)** (other files
+  of the title: switches at the current position), Quality. The stream player has Fit, speed,
+  Subs, Audio.
+* **Lock**: hides every control and ignores touches; back does nothing; a tap shows the unlock
+  button ("Tap to unlock") for a few seconds.
+* **Gestures**: tap (controls), double-tap left/right (seek), swipe up/down left (brightness) and
+  right (volume), **swipe sideways to seek** (a full-width swipe moves 60 s under 30 min, 90 s up to
+  an hour, 120 s beyond, with the target time shown while swiping), hold (faster). Swipes starting
+  within 24 dp of an edge are left to the system's back / home gestures.
+* **Subtitles → Style**: size, colour, position from the bottom, bold, dark background or outline,
+  reset. Kept in the settings, applied right away.
+
+Not built (from Nuvio's player): chapters (Media3 does not expose MKV chapters), audio delay and
+amplification, subtitle delay, the libmpv engine, watch party, intro submission, external player.

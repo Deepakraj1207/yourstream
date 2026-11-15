@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioManager
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
@@ -59,11 +60,15 @@ fun VideoFit.label(): String = stringResource(
 /** A short on-screen message (brightness 60 %, volume 8/15, "Zoom", "2× speed"). */
 data class PlayerHint(val icon: ImageVector?, val text: String, val level: Float? = null, val id: Long = System.nanoTime())
 
+/** Phases of a sideways swipe-to-seek. */
+enum class SwipePhase { START, MOVE, END, CANCEL }
+
 /**
- * VLC/MX-style touch gestures over the video:
- * tap toggles the controls; double-tap the left/right third seeks; swipe up/down on the left
- * half changes the screen brightness, on the right half the volume; press and hold plays at 2×
- * until released.
+ * Touch gestures over the video (Nuvio / VLC style):
+ * tap toggles the controls; double-tap the left/right half seeks; swipe up/down on the left half
+ * changes the screen brightness, on the right half the volume; swipe sideways seeks
+ * ([onSwipeSeek], with the fraction of the width swiped); press and hold plays faster until
+ * released. Swipes that start at the screen's edges are left to the system (back / home gestures).
  */
 fun Modifier.playerGestures(
     context: Context,
@@ -73,7 +78,20 @@ fun Modifier.playerGestures(
     onHint: (PlayerHint) -> Unit,
     brightnessLabel: String,
     volumeLabel: String,
+    onSwipeSeek: ((SwipePhase, Float) -> Unit)? = null,
 ): Modifier = this
+    .pointerInput(onSwipeSeek != null) {
+        val swipe = onSwipeSeek ?: return@pointerInput
+        val edge = SYSTEM_EDGE.toPx()
+        var active = false
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { o -> active = o.x > edge && o.x < size.width - edge; total = 0f; if (active) swipe(SwipePhase.START, 0f) },
+            onDragEnd = { if (active) swipe(SwipePhase.END, total / size.width); active = false },
+            onDragCancel = { if (active) swipe(SwipePhase.CANCEL, 0f); active = false },
+            onHorizontalDrag = { change, dx -> if (active) { change.consume(); total += dx; swipe(SwipePhase.MOVE, total / size.width) } },
+        )
+    }
     .pointerInput(Unit) {
         var holding = false
         detectTapGestures(
@@ -91,8 +109,11 @@ fun Modifier.playerGestures(
         val activity = context as? Activity
         var leftSide = true
         var level = 0f
+        var active = false
+        val edge = SYSTEM_EDGE.toPx()
         detectVerticalDragGestures(
             onDragStart = { o ->
+                active = o.y > edge && o.y < size.height - edge
                 leftSide = o.x < size.width / 2
                 level = if (leftSide) {
                     activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
@@ -102,6 +123,7 @@ fun Modifier.playerGestures(
                 }
             },
             onVerticalDrag = { change, dy ->
+                if (!active) return@detectVerticalDragGestures
                 change.consume()
                 // A full-height swipe goes from 0 to 100 %.
                 level = (level - dy / size.height).coerceIn(0f, 1f)
@@ -143,3 +165,6 @@ fun RestoreBrightnessOnExit() {
         onDispose { activity.window?.let { w -> w.attributes = w.attributes.apply { screenBrightness = -1f } } }
     }
 }
+
+/** Swipes starting this close to an edge belong to the system (back and home gestures). */
+private val SYSTEM_EDGE = 24.dp

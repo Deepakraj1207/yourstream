@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -315,12 +316,17 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
     var tracks by remember { mutableStateOf(false) }
     var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
     var scrub by remember { mutableStateOf<Float?>(null) }
+    // Nuvio's lock, and swipe-to-seek (where the swipe started, where it would land).
+    var locked by rememberSaveable { mutableStateOf(false) }
+    var swipeFrom by remember { mutableStateOf<Long?>(null) }
+    var swipeTo by remember { mutableStateOf<Long?>(null) }
+    val prefs: dev.yourstream.ui.screens.settings.AppPreferencesViewModel = hiltViewModel()
     val inPip by dev.yourstream.ui.screens.player.inPictureInPicture()
     val fitLabel = fit.label()
     val first = remember { mutableStateOf(true) }
     LaunchedEffect(fit) { if (first.value) first.value = false else hint = PlayerHint(AppIcons.AspectRatio, fitLabel) }
     LaunchedEffect(controls, poke, state.playing, tracks) { if (controls && state.playing && !tracks) { delay(3_000); controls = false } }
-    BackHandler { if (tracks) tracks = false else onBack() }
+    BackHandler { if (locked) Unit else if (tracks) tracks = false else onBack() }
 
     val context = LocalActivity.current ?: LocalContext.current
     val brightness = stringResource(R.string.player_brightness)
@@ -331,6 +337,10 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("stream-player")) {
         PlayerSurface(vm.player, state.playing, fit)
         if (inPip) return@Box
+        if (locked) {
+            dev.yourstream.ui.screens.player.LockedOverlay { locked = false; show() }
+            return@Box
+        }
         Box(
             Modifier.fillMaxSize().playerGestures(
                 context,
@@ -342,8 +352,27 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                 },
                 onHint = { hint = it },
                 brightnessLabel = brightness, volumeLabel = volume,
+                onSwipeSeek = { phase, fraction ->
+                    if (state.durationMs <= 0) return@playerGestures
+                    when (phase) {
+                        dev.yourstream.ui.screens.player.SwipePhase.START -> { swipeFrom = state.positionMs; swipeTo = state.positionMs }
+                        dev.yourstream.ui.screens.player.SwipePhase.MOVE -> swipeFrom?.let { from -> swipeTo = dev.yourstream.ui.screens.player.swipeSeekTarget(from, state.durationMs, fraction) }
+                        dev.yourstream.ui.screens.player.SwipePhase.END -> { swipeTo?.let { vm.seekTo(it) }; swipeFrom = null; swipeTo = null }
+                        dev.yourstream.ui.screens.player.SwipePhase.CANCEL -> { swipeFrom = null; swipeTo = null }
+                    }
+                },
             ),
         )
+        val from = swipeFrom
+        val to = swipeTo
+        if (from != null && to != null) {
+            val delta = to - from
+            Surface(shape = MaterialTheme.shapes.extraLarge, color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White,
+                modifier = Modifier.align(Alignment.Center).testTag("swipe-seek")) {
+                Text("${timeLabel(to)}  (${if (delta >= 0) "+" else "−"}${timeLabel(kotlin.math.abs(delta))})", style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            }
+        }
         val t = state.torrent
         val preparing = t != null && (t.phase == TorrentPhase.STARTING || t.phase == TorrentPhase.METADATA)
         if ((state.buffering || preparing) && state.error == null) {
@@ -370,8 +399,7 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                         Text(vm.route.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         vm.route.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1) }
                     }
-                    TopIcon(AppIcons.AspectRatio, stringResource(R.string.player_fit)) { fit = fit.next(); show() }
-                    if (state.audio.size > 1 || state.subtitles.isNotEmpty()) TopIcon(AppIcons.Subtitles, stringResource(R.string.stream_tracks)) { tracks = true }
+                    dev.yourstream.ui.screens.player.LockButton { locked = true; tracks = false }
                     TopIcon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate)) { landscape = !landscape; show() }
                 }
                 // Centre: back 10 s, play/pause, forward 10 s.
@@ -398,28 +426,35 @@ fun StreamPlayerDestination(onBack: () -> Unit, vm: StreamPlayerViewModel = hilt
                         colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
                         modifier = Modifier.testTag("stream-seek"),
                     )
+                    // Time pills (Nuvio's); the torrent's peers and speed between them.
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(timeLabel(scrub?.let { (it * duration).toLong() } ?: state.positionMs), color = Color.White, style = MaterialTheme.typography.labelLarge)
-                        Text(" / " + timeLabel(state.durationMs), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
+                        dev.yourstream.ui.screens.player.TimePill(timeLabel(scrub?.let { (it * duration).toLong() } ?: state.positionMs), "stream-position")
                         Spacer(Modifier.weight(1f))
                         state.torrent?.let { st ->
                             Text(torrentLine(st), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1, modifier = Modifier.padding(end = 12.dp).testTag("stream-torrent-line"))
+                                maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp).testTag("stream-torrent-line"))
                         }
-                        Surface(
-                            shape = MaterialTheme.shapes.small, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
-                            modifier = Modifier.clickable {
-                                val next = SPEEDS[(SPEEDS.indexOf(state.speed).takeIf { it >= 0 } ?: 0).plus(1) % SPEEDS.size]
-                                vm.setSpeed(next); show()
-                            }.testTag("stream-speed"),
-                        ) { Text("${state.speed}×".replace(".0×", "×"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
+                        Spacer(Modifier.weight(1f))
+                        dev.yourstream.ui.screens.player.TimePill(timeLabel(state.durationMs), "stream-duration")
+                    }
+                    // Labelled actions: resize, speed, subtitles & audio.
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        dev.yourstream.ui.screens.player.ActionPill(fit.label(), "stream-fit", AppIcons.AspectRatio) { fit = fit.next(); show() }
+                        dev.yourstream.ui.screens.player.ActionPill("${state.speed}×".replace(".0×", "×"), "stream-speed", AppIcons.Speed, active = state.speed != 1f) {
+                            val next = SPEEDS[(SPEEDS.indexOf(state.speed).takeIf { it >= 0 } ?: 0).plus(1) % SPEEDS.size]
+                            vm.setSpeed(next); show()
+                        }
+                        if (state.subtitles.isNotEmpty()) dev.yourstream.ui.screens.player.ActionPill(stringResource(R.string.player_pill_subs), "stream-subs", AppIcons.Subtitles,
+                            active = state.subtitles.any { it.selected }) { tracks = true }
+                        if (state.audio.size > 1) dev.yourstream.ui.screens.player.ActionPill(stringResource(R.string.player_pill_audio), "stream-audio", AppIcons.Audio) { tracks = true }
                     }
                 }
             }
         }
         PlayerHintBubble(hint, onDone = { if (speedBeforeHold == null) hint = null }, Modifier.align(Alignment.Center))
 
-        if (tracks) TracksPanel(state, onAudio = { vm.select(it, C.TRACK_TYPE_AUDIO) }, onSubtitle = { vm.select(it, C.TRACK_TYPE_TEXT) }, onClose = { tracks = false })
+        if (tracks) TracksPanel(state, onAudio = { vm.select(it, C.TRACK_TYPE_AUDIO) }, onSubtitle = { vm.select(it, C.TRACK_TYPE_TEXT) }, onClose = { tracks = false },
+            settings = settings, onSettings = { new -> prefs.update { new } })
 
         state.error?.let { e ->
             Surface(color = Color.Black.copy(alpha = 0.85f), contentColor = Color.White, modifier = Modifier.fillMaxSize()) {
@@ -448,10 +483,27 @@ private fun RoundIcon(icon: ImageVector, label: String, size: androidx.compose.u
 }
 
 @Composable
-private fun TracksPanel(state: StreamPlayerState, onAudio: (StreamTrack) -> Unit, onSubtitle: (StreamTrack?) -> Unit, onClose: () -> Unit) {
+private fun TracksPanel(
+    state: StreamPlayerState, onAudio: (StreamTrack) -> Unit, onSubtitle: (StreamTrack?) -> Unit, onClose: () -> Unit,
+    settings: dev.yourstream.ui.screens.settings.AppSettings, onSettings: (dev.yourstream.ui.screens.settings.AppSettings) -> Unit,
+) {
+    var style by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(onClick = onClose), contentAlignment = Alignment.CenterEnd) {
         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.padding(16.dp).widthIn(max = 360.dp).heightIn(max = 480.dp).clickable(enabled = false) {}) {
+            // Subtitles → Style: size, colour, bold, background, position.
+            if (style) {
+                Column(Modifier.padding(vertical = 12.dp)) {
+                    PanelTitle(stringResource(R.string.player_style))
+                    dev.yourstream.ui.screens.player.SubtitleStyle(settings, onSettings)
+                }
+                return@Surface
+            }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
+                if (state.subtitles.isNotEmpty()) {
+                    androidx.compose.material3.TextButton(onClick = { style = true }, modifier = Modifier.padding(horizontal = 12.dp).testTag("stream-subtitle-style")) {
+                        Text(stringResource(R.string.player_style))
+                    }
+                }
                 if (state.audio.isNotEmpty()) {
                     PanelTitle(stringResource(R.string.stream_audio))
                     state.audio.forEach { t -> Choice(t.label, t.selected) { onAudio(t) } }
