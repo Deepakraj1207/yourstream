@@ -1,3 +1,19 @@
+## What's new in 0.11.3
+
+- **4K movies split into pieces play as one movie.** Files like "Movie.2160p.mkv.001", ".002",
+  ".003" (cut to fit Telegram's upload limit) now show as one version ("9 pieces") and stream as
+  one file: full length, seeking anywhere, audio and subtitle tracks, resume. The next piece
+  starts downloading before the current one ends. A missing piece is named instead of failing
+  midway. "Download" saves every piece. Split archives (.7z.001, .part1.rar) are not supported.
+- **Add-ons: refresh button** (or pull down): asks every add-on again, picks up new names and
+  catalogs, and says how many answered.
+- **Streams grouped by add-on:** each add-on's streams appear as soon as it answers, under its
+  name, with chips to show all or one add-on and a refresh button. Add-ons that found nothing or
+  did not answer are named.
+- **New manga navigation bar** ("Panel Grid"): slanted comic panels, the current one inked.
+- Fixed: switching episodes while a slow add-on answered could show the previous episode's
+  streams.
+
 ## What's new in 0.11.2
 
 - **Fixed: Telegram sign-in could keep loading forever.** Closing the app quickly a few times
