@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import dev.yourstream.catalog.api.AddonStream
 import dev.yourstream.catalog.sync.CatalogAddon
 import dev.yourstream.ui.core.WindowLayout
@@ -54,6 +55,78 @@ class AddonsAndStreamsTest {
         compose.onNodeWithTag("addons-refreshed").assertTextContains("the add-on answered", substring = true)
         state = state.copy(refreshed = RefreshResult(2, 3))
         compose.onNodeWithTag("addons-refreshed").assertTextContains("2 of 3 add-ons answered", substring = true)
+    }
+
+    private fun card(id: String, name: String, builtIn: Boolean = false, enabled: Boolean = true, configurable: Boolean = false, reachable: Boolean? = true) = AddonRow(
+        CatalogAddon(id, name, if (builtIn) null else "https://$id.example.com/manifest.json", builtIn, enabled), catalogs = 3, reachable = reachable,
+        info = dev.yourstream.ui.screens.settings.AddonDetails("1.0.6", null, "Indian regional catalogs", listOf("movie", "series"),
+            listOf("stream", "catalog", "meta"), idRules = 1, configurable = configurable),
+    )
+
+    private fun scrollTo(tag: String) = compose.onNodeWithTag("addons").performScrollToNode(androidx.compose.ui.test.hasTestTag(tag))
+
+    /** [text] somewhere inside the node tagged [tag]. */
+    private fun has(tag: String, text: String) = compose.onNode(
+        androidx.compose.ui.test.hasTestTag(tag) and androidx.compose.ui.test.hasAnyDescendant(androidx.compose.ui.test.hasText(text, substring = true)),
+        useUnmergedTree = true,
+    ).assertExists()
+
+    @Test
+    fun addonCardsLikeNuvio() {
+        var state by mutableStateOf(AddonsUiState(listOf(
+            card("cinemeta", "Cinemeta", builtIn = true),
+            card("regional", "Indian Regional Catalog", configurable = true),
+            card("streams", "IndiaStreams", enabled = false),
+        )))
+        val actions = mutableListOf<AddonsAction>()
+        compose.setContent { YourStreamTheme(WindowLayout.COMPACT) { AddonsScreen(state, { actions += it }, {}) } }
+
+        // Overview: add-ons, active, catalogs of the active ones.
+        has("addons-overview", "3"); has("addons-overview", "Active"); has("addons-overview", "6")
+
+        // Card: version, chips, description and summary line.
+        scrollTo("addon:regional")
+        has("addon:regional", "Version 1.0.6")
+        has("addon-status:regional", "Active")
+        scrollTo("addon:streams")
+        has("addon-status:streams", "Disabled")
+        scrollTo("addon:regional")
+        compose.onNodeWithTag("addon-summary:regional").assertTextContains("Movie / Series • stream, catalog, meta • 1 id rule")
+        // Up only when not first, down only when not last; settings only when configurable; built-ins cannot be deleted.
+        scrollTo("addon:cinemeta")
+        compose.onNodeWithTag("addon-up:cinemeta").assertDoesNotExist()
+        scrollTo("addon:streams")
+        compose.onNodeWithTag("addon-down:streams").assertDoesNotExist()
+        scrollTo("addon:regional")
+        compose.onNodeWithTag("addon-configure:regional").assertExists()
+        compose.onNodeWithTag("addon-configure:streams").assertDoesNotExist()
+        scrollTo("addon:cinemeta")
+        compose.onNodeWithTag("addon-remove:cinemeta").assertDoesNotExist()
+        scrollTo("addon:regional")
+
+        compose.onNodeWithTag("addon-up:regional").performClick()
+        compose.onNodeWithTag("addon-down:regional").performClick()
+        compose.onNodeWithTag("addon-refresh:regional").performClick()
+        // Delete asks first.
+        compose.onNodeWithTag("addon-remove:regional").performClick()
+        compose.onNodeWithTag("addon-delete-dialog").assertExists()
+        compose.onNodeWithTag("addon-delete-yes").performClick()
+        assertEquals(listOf(AddonsAction.Move("regional", -1), AddonsAction.Move("regional", 1), AddonsAction.RefreshOne("regional"),
+            AddonsAction.Remove("regional")), actions)
+
+        // Refreshing one card: a spinner in place of its refresh button, status "Refreshing".
+        state = state.copy(addons = state.addons.map { if (it.addon.id == "regional") it.copy(refreshing = true) else it })
+        compose.onNodeWithTag("addon-refresh:regional").assertDoesNotExist()
+        has("addon-status:regional", "Refreshing")
+        state = state.copy(addons = state.addons.map { if (it.addon.id == "regional") it.copy(refreshing = false, reachable = false) else it })
+        has("addon-status:regional", "Unavailable")
+    }
+
+    @Test
+    fun summaryLine() {
+        val d = dev.yourstream.ui.screens.settings.AddonDetails(types = listOf("movie"), resources = listOf("stream"), idRules = 2, p2p = true)
+        assertEquals("Movie • stream • 2 id rules • P2P", dev.yourstream.ui.screens.settings.addonSummary(d, "2 id rules"))
+        assertEquals(null, dev.yourstream.ui.screens.settings.addonSummary(dev.yourstream.ui.screens.settings.AddonDetails(), "0 id rules"))
     }
 
     private fun stream(addon: String, name: String, url: String? = "https://example.com/$name.mkv", hash: String? = null) =

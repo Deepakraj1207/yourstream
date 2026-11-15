@@ -6,18 +6,23 @@ public Stremio add-on protocol, which is also what Nuvio add-ons use.
 
 ## Add-ons page
 
-| Tab | What it holds |
-| --- | --- |
-| **Stremio** | Cinemeta (the only built-in add-on since 0.11.4; switchable) and Stremio add-ons the user added. |
-| **Nuvio** | Nuvio add-ons the user added. Same protocol as Stremio add-ons; kept apart because that is where users find them. |
+Laid out like Nuvio's (the user's request, 15 Nov 2026): an overview (add-ons, active, catalogs of
+the active ones), the install box ("Add-on URL", "Install add-on"), then one card per add-on in the
+user's order. Each card: the manifest's logo (a puzzle piece without one), name, "Version x", an
+on/off switch; buttons to move it up / down (`CatalogAddons.move`: Home's catalog rows and a title's
+stream groups follow this order, kept across restarts), refresh it, open its settings page
+(configurable add-ons: `behaviorHints.configurable` / `configurationRequired`, opened at the
+manifest link with `/configure`), and delete it (asks first; Cinemeta, the only built-in, can only
+be switched off). Chips: Disabled / Refreshing / Active / Unavailable, "N resources", "N catalogs",
+"Configurable"; then the description and a summary line ("Movie / Series • stream, catalog, meta •
+1 id rule • P2P"). Since 0.11.4 there are no Stremio / Nuvio tabs: both are the same protocol.
 
 Nuvio plugins (JavaScript scrapers for streaming websites, which usually have no rights to what
-they show) are not supported and have no tab (removed in 0.11.2). A plugin-repository link (a
-manifest with `scrapers`) is recognised and explained instead of failing obscurely.
+they show) are not supported. A plugin-repository link (a manifest with `scrapers`) is recognised
+and explained instead of failing obscurely.
 
-Each add-on card shows what its manifest offers (streams, catalogs, details). Links may be
-`https://…`, `stremio://…` or with or without `/manifest.json`; plain `http://` is accepted only
-for add-ons on the user's own network (localhost, private ranges, Tailscale, `*.local`).
+Links may be `https://…`, `stremio://…` or with or without `/manifest.json`; plain `http://` is
+accepted only for add-ons on the user's own network (localhost, private ranges, Tailscale, `*.local`).
 
 **Refresh** (top-bar button, or pull down; like Nuvio's): every add-on's manifest is fetched again
 at once (`CatalogAddons.refresh`). Each card shows "Checking…" until its add-on answers. An add-on

@@ -174,6 +174,20 @@ class CatalogAddons @Inject constructor(
     @Synchronized
     fun remove(id: String) = update(_addons.value.filterNot { it.id == id && !it.builtIn })
 
+    /**
+     * Moves an add-on one place up ([by] = -1) or down (+1). The order is the user's priority:
+     * Home's catalog rows and a title's stream groups follow it. Kept across restarts.
+     */
+    @Synchronized
+    fun move(id: String, by: Int) {
+        val list = _addons.value.toMutableList()
+        val from = list.indexOfFirst { it.id == id }
+        val to = from + by
+        if (from < 0 || to !in list.indices) return
+        list.add(to, list.removeAt(from))
+        update(list)
+    }
+
     private fun provider(a: CatalogAddon): CatalogProvider? =
         if (a.builtIn) builtIns.firstOrNull { it.id.value == a.id }
         else a.manifestUrl?.let { url -> customProviders.getOrPut(url) { factory.custom(url, a.name) } }
@@ -183,7 +197,7 @@ class CatalogAddons @Inject constructor(
         val custom = list.filter { !it.builtIn }.joinToString("\n") {
             listOf(it.manifestUrl, it.name, if (it.enabled) "1" else "0", it.source.name.lowercase()).joinToString(SEP)
         }
-        prefs.edit().putStringSet(KEY_DISABLED, disabled).putString(KEY_CUSTOM, custom).apply()
+        prefs.edit().putStringSet(KEY_DISABLED, disabled).putString(KEY_CUSTOM, custom).putString(KEY_ORDER, list.joinToString("\n") { it.id }).apply()
         _addons.value = list
     }
 
@@ -198,14 +212,20 @@ class CatalogAddons @Inject constructor(
             val source = if (parts.getOrNull(3) == "nuvio") AddonSource.NUVIO else AddonSource.STREMIO
             CatalogAddon(p.id.value, parts.getOrNull(1) ?: url, url, builtIn = false, enabled = parts.getOrNull(2) != "0", source = source)
         }
-        return builtIn + custom
+        // The user's order (move up / down); add-ons it does not name (new built-ins) keep theirs at the end.
+        val order = prefs.getString(KEY_ORDER, null)?.lines()?.filter { it.isNotBlank() }.orEmpty()
+        return (builtIn + custom).sortedBy { a -> order.indexOf(a.id).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
     companion object {
         private const val KEY_DISABLED = "disabled_builtin"
         private const val KEY_CUSTOM = "custom"
+        private const val KEY_ORDER = "order"
         private const val SEP = "\t"
         const val CINEMETA = "https://v3-cinemeta.strem.io/manifest.json"
+
+        /** An add-on's settings page: its link with "/configure" in place of "/manifest.json" (Stremio convention). */
+        fun configureUrl(manifestUrl: String): String = manifestUrl.removeSuffix("/manifest.json") + "/configure"
 
         /**
          * "stremio://host/x" or "https://host/x/" → "https://host/x/manifest.json"; null if not a

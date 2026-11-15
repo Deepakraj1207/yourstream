@@ -153,13 +153,18 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {})
     }
 
-    private fun addonsState() = dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false), 12, true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:nuvio.example.com", "Example Nuvio Add-on", "https://nuvio.example.com/manifest.json", false, true,
-            dev.yourstream.catalog.sync.AddonSource.NUVIO), 0, true, streams = true),
-    ), added = "Example Streams")
+    private fun addonsState(): dev.yourstream.ui.screens.settings.AddonsUiState {
+        fun d(version: String, description: String, types: List<String>, resources: List<String>, rules: Int, configurable: Boolean = false) =
+            dev.yourstream.ui.screens.settings.AddonDetails(version, null, description, types, resources, rules, configurable)
+        return dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true,
+                info = d("3.0.13", "The official add-on for movie and series catalogs", listOf("movie", "series"), listOf("catalog", "meta"), 1)),
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true,
+                info = d("1.2.0", "Streams for movies and series from example sources.", listOf("movie", "series"), listOf("stream"), 2, configurable = true)),
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:catalog.example.com", "Example Catalogs", "https://catalog.example.com/manifest.json", false, false), 3, true,
+                info = d("1.0.6", "Regional movie and series catalogs.", listOf("movie", "series"), listOf("catalog", "meta"), 1)),
+        ))
+    }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneDetails() = shot("phone-details", WindowLayout.COMPACT, TopLevel.LIBRARY) {

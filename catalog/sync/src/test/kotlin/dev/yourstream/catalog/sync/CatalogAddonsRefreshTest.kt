@@ -95,6 +95,24 @@ class CatalogAddonsRefreshTest {
     }
 
     @Test
+    fun movingAnAddonChangesTheOrderEverywhereAndIsKept() = runTest {
+        val urls = listOf("a", "b", "c").map { "https://$it.example.com/manifest.json" }
+        urls.forEach { manifests[it] = it.substringAfter("//").substringBefore('.').uppercase() }
+        val store = store()
+        urls.forEach { assertIs<AppResult.Ok<CatalogAddon>>(store.add(it)) }
+        assertEquals(listOf("A", "B", "C"), store.addons.value.map { it.name })
+        val c = store.addons.value.last().id
+        store.move(c, -1)
+        store.move(c, -1)
+        assertEquals(listOf("C", "A", "B"), store.addons.value.map { it.name })
+        store.move(c, -1)
+        assertEquals(listOf("C", "A", "B"), store.addons.value.map { it.name }, "already first")
+        assertEquals(listOf("C", "A", "B"), store().addons.value.map { it.name }, "kept after a restart")
+        assertEquals(store.addons.value.map { it.id }, store.manager().catalogs().map { it.provider.value }, "Home's rows follow the order")
+        assertEquals("https://a.example.com/x/configure", CatalogAddons.configureUrl("https://a.example.com/x/manifest.json"))
+    }
+
+    @Test
     fun anAddonThatDoesNotAnswerIsLeftAsItWas() = runTest {
         val url = "https://beta.example.com/manifest.json"
         manifests[url] = "Beta"
