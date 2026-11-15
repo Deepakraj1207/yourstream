@@ -70,6 +70,7 @@ class HomeViewModel @Inject constructor(
     private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
     private val indexingMonitor: IndexingMonitor,
     private val homeCatalogs: HomeCatalogs,
+    private val heroSource: dev.yourstream.ui.screens.HeroSlides = dev.yourstream.ui.screens.HeroSlides { kotlinx.coroutines.flow.flowOf(emptyList()) },
 ) : ViewModel() {
     private val retry = MutableStateFlow(0)
 
@@ -130,13 +131,16 @@ class HomeViewModel @Inject constructor(
         .onStart { emit(UiState.Loading) }
         .catch { emit(UiState.Error(it.toUiError())) }
 
-    // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
-    private val extras = combine(forYou, catalogs) { f, c -> Extras(f, c) }
+    /** The hero carousel from the user's hero catalogs (empty while loading or with none picked). */
+    private val heroSlides: Flow<List<HeroSlide>> = heroSource.slides().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?)
+    // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
+    private val extras = combine(forYou, catalogs, heroSlides) { f, c, h -> Extras(f, c, h) }
+
+    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?, val hero: List<HeroSlide>)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
-        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null)
+        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null, heroSlides = e.hero)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

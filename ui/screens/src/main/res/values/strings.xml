@@ -835,4 +835,13 @@
     <string name="player_offset_normal">Normal</string>
     <string name="player_offset_raised">Raised</string>
     <string name="player_offset_high">High</string>
+    <!-- Home hero carousel -->
+    <string name="hero_movie">Movie</string>
+    <string name="hero_series">Series</string>
+    <string name="hero_view_details">View Details</string>
+    <string name="layout_group_hero">Hero catalogs</string>
+    <string name="layout_hero_catalogs">Hero catalogs</string>
+    <string name="layout_hero_selected">%1$d of %2$d selected</string>
+    <string name="layout_hero_none">No hero sources selected: the hero shows what to continue or your newest title.</string>
+    <string name="layout_hero_limit">Up to %1$d catalogs. Their first titles take turns in the carousel at the top of Home.</string>
 </resources>

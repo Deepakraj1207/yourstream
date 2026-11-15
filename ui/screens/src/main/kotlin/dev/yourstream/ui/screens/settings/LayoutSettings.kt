@@ -1,6 +1,7 @@
 package dev.yourstream.ui.screens.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -107,6 +108,7 @@ internal fun layoutEntries(): List<SettingEntry> = buildList {
         { it.homeRows.series }) { s, v -> s.copy(homeRows = s.homeRows.copy(series = v)) })
     add(homeToggle("catalogs", R.string.layout_group_rows, R.string.settings_home_catalogs, R.string.settings_home_catalogs_detail, { AppIcons.Explore },
         { it.homeRows.catalogs }) { s, v -> s.copy(homeRows = s.homeRows.copy(catalogs = v)) })
+    add(entry("home-hero-catalogs", home, R.string.layout_group_hero, R.string.layout_hero_catalogs, "hero carousel banner top", shown = { it.prefs.homeRows.hero }) { HeroCatalogList() })
     add(entry("home-catalog-list", home, R.string.layout_group_catalogs, R.string.layout_catalogs, "catalog rename reorder hide") { CatalogList() })
 
     // ---- Continue Watching
@@ -326,7 +328,7 @@ private fun PosterPreview(l: LayoutSettings) {
 // ---------------------------------------------------------------- Home layout → Catalogs
 
 /** One add-on catalog as the Home layout page lists it. */
-data class CatalogChoice(val key: String, val name: String, val addon: String, val type: CatalogType, val shown: Boolean, val customName: String?)
+data class CatalogChoice(val key: String, val name: String, val addon: String, val type: CatalogType, val shown: Boolean, val customName: String?, val hero: Boolean = false)
 
 @HiltViewModel
 class HomeCatalogsViewModel @Inject constructor(
@@ -350,12 +352,50 @@ class HomeCatalogsViewModel @Inject constructor(
 
     private fun arrange(list: List<CatalogChoice>, l: HomeCatalogLayout) =
         list.sortedBy { c -> l.order.indexOf(c.key).let { if (it < 0) Int.MAX_VALUE else it } }
-            .map { it.copy(shown = it.key !in l.hidden, customName = l.names[it.key]) }
+            .map { it.copy(shown = it.key !in l.hidden, customName = l.names[it.key], hero = it.key in l.hero) }
 
     fun setShown(key: String, shown: Boolean) = prefs.update { l -> l.copy(hidden = if (shown) l.hidden - key else l.hidden + key) }
     fun move(key: String, by: Int) = prefs.update { l -> l.move(catalogs.value.orEmpty().map { it.key }, key, by) }
     fun rename(key: String, name: String) = prefs.update { l -> l.copy(names = if (name.isBlank()) l.names - key else l.names + (key to name.trim())) }
     fun reset() = prefs.reset()
+    fun setHero(key: String, on: Boolean) = prefs.update { it.withHero(key, on) }
+}
+
+/**
+ * Settings → Layout → Home layout → Hero catalogs (Nuvio's): "N of M selected", opening to every
+ * catalog with a switch; at most [HomeCatalogLayout.HERO_LIMIT].
+ */
+@Composable
+private fun HeroCatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
+    val list by vm.catalogs.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    val all = list.orEmpty()
+    val selected = all.count { it.hero }
+    Column(Modifier.fillMaxWidth().testTag("hero-catalogs")) {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = all.isNotEmpty()) { open = !open }.padding(horizontal = 16.dp, vertical = 12.dp)
+                .testTag("hero-catalogs-toggle"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.layout_hero_selected, selected, all.size), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(if (selected == 0) R.string.layout_hero_none else R.string.layout_hero_limit, HomeCatalogLayout.HERO_LIMIT),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
+        }
+        if (open) all.forEach { c ->
+            val canTurnOn = c.hero || selected < HomeCatalogLayout.HERO_LIMIT
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp).testTag("hero-catalog:${c.key}"), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(c.customName ?: c.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(c.addon, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                Switch(checked = c.hero, onCheckedChange = { vm.setHero(c.key, it) }, enabled = canTurnOn,
+                    modifier = Modifier.focusHighlight().testTag("hero-catalog-on:${c.key}"))
+            }
+        }
+    }
 }
 
 @Composable

@@ -138,11 +138,17 @@ private fun HomeContent(
     val d = LocalDimens.current
     LazyColumn(
         Modifier.fillMaxSize().testTag("home"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
+        // The hero carousel starts at the very top (full width, like Nuvio's).
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            top = if (shown.hero && state.heroSlides.isNotEmpty()) 0.dp else if (LocalWindowLayout.current.isTv) 32.dp else 16.dp,
+            bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
         state.banner?.let { b -> item(key = "banner") { Banner(b, onSignIn, onChooseSources) } }
-        if (shown.hero) item(key = "hero") {
+        // Settings → Layout → Home layout → Hero catalogs: a carousel from them, else the library hero.
+        if (shown.hero && state.heroSlides.isNotEmpty()) item(key = "hero-carousel") { HeroCarousel(state.heroSlides, onOpen) }
+        else if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
                 is UiState.Content -> HeroBanner(heroModel(h.value), { onOpen(h.value.primary) }, { onOpen(h.value.secondary) }, primaryFocus = heroFocus)

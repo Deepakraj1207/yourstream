@@ -804,3 +804,21 @@ Checked on the published files: `releases/latest` is v0.11.4 and not a pre-relea
 APK's SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 21, versionName 0.11.4;
 `apksigner` shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 4 (15 Nov 2026)
+
+* **Rows jumping while scrolling** (the user's recording): fixed with one poster text height.
+  Test: `RowHeightTest`.
+* **Posters matched automatically; Check matches removed.** Reason: the user wants matching to be
+  the app's job. One 65% threshold (else the file name's title stays), duplicates of the same film
+  are not doubt, titles left waiting are decided again; the queue screen, Home banner, Settings row
+  and library status step are gone; "Fix match" stays. Tests: `MatchingTest`, `LibraryMetadataServiceTest`.
+* **Nuvio's navigation bar in the classic theme**, with Nuvio's Adaptive / Always expanded /
+  Always compact / Classic options (plus Panel Grid for the manga look) and Glass glow. Tests:
+  `LayoutSettingsTest.adaptiveBarShrinksWhileScrollingDownAndGrowsBack`, floating bar test.
+  Not copied: Nuvio's profile picture on the last tab (this app's last tab is Settings).
+* **Hero carousel from hero catalogs** (Nuvio's). Tests: `HeroCarouselTest`,
+  `homeShowsTheHeroCarouselWhenHeroCatalogsAreChosen`. The hero starts below the status bar (the
+  shell keeps that inset for every tab); the rating badge shows "★" (the add-on's rating may not be
+  IMDb's).
+* Status: NEEDS REAL-DEVICE TESTING.

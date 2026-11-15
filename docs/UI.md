@@ -335,12 +335,12 @@ The user asked for Nuvio's Layout page with its options working. The hub lists, 
 
 | Section | Page | Options (what they change) |
 | --- | --- | --- |
-| Home | Home layout | Show hero; Show catalog type ("Popular · Movies" on add-on rows); Hide unreleased content (titles from future years left out of add-on rows); rows (For you, Recently added, Series, add-on catalogs); **Catalogs**: every catalog of the enabled add-ons with a switch, move up / down and rename, plus Reset to default (`HomeCatalogPrefs`, applied when Home's rows load). |
+| Home | Home layout | Show hero; **Hero catalogs** (0.11.5: up to 3 add-on catalogs feeding a Nuvio-style carousel at the top of Home: full-width artwork, title, "Movie • Romance • 2h 11m • 2026", rating and language badges, View Details, dots; swipe or 6 s auto-advance, still with reduced motion; none chosen: the library hero); Show catalog type ("Popular · Movies" on add-on rows); Hide unreleased content (titles from future years left out of add-on rows); rows (For you, Recently added, Series, add-on catalogs); **Catalogs**: every catalog of the enabled add-ons with a switch, move up / down and rename, plus Reset to default (`HomeCatalogPrefs`, applied when Home's rows load). |
 | Home | Continue Watching | Show Continue Watching; card style Wide / Poster; on select Resume playing / Open details. |
 | Home | Poster card style | Live preview; width Compact 104 … Large 140 dp (other layouts scale with it); corner radius look's own / Sharp 0 … Pill 16; Hide labels; Reset. Applied app-wide through `LocalCardLook` and the theme's poster width. Old Small / Medium / Large carry over (104 / 120 / 140). |
 | Streams | Streams | Size badges (file size from `behaviorHints.videoSize`); badge position Top / Bottom; Add-on logo next to each stream group (from the manifest already fetched, no extra request). |
 | Detail page | Detail page | Background Normal / Cinematic (artwork blurred behind add-on title pages and library details); episode cards List / Horizontal; Overview and Cast shown or hidden. |
-| Navigation | Navigation bar | Style Adaptive (Panel Grid in the manga style, the classic bar otherwise) / Panel Grid / Floating / Classic; Glow (floating only); Tab names. |
+| Navigation | Navigation bar | Nuvio's styles (0.11.5): Adaptive (Nuvio's floating bar over the content, shrinking to an icons-only pill while scrolling down and growing back when scrolling up; Panel Grid in the manga look) / Always expanded / Always compact / Panel Grid / Classic (Material bar under the content); Glass glow; Tab names; live preview. |
 
 Not built: Nuvio's Collections (custom folders of catalogs), its card depth effect, custom poster
 sources, badge-URL ("fusion") rules, trailers and ratings sections: they depend on features this app
@@ -367,3 +367,10 @@ Both players (Telegram files and add-on streams) share `PlayerChrome.kt`:
 
 Not built (from Nuvio's player): chapters (Media3 does not expose MKV chapters), audio delay and
 amplification, subtitle delay, the libmpv engine, watch party, intro submission, external player.
+
+## Poster cards keep one height (0.11.5)
+
+A poster's text block has a fixed height (two title lines, subtitle, and a caption line when any
+card of that row or grid has one: `LocalReserveCaption`). Before, a row's height followed its
+tallest visible card, so rows grew and shrank while scrolling sideways and pushed the rows below
+up and down (seen in the user's screen recording). Test: `RowHeightTest`.

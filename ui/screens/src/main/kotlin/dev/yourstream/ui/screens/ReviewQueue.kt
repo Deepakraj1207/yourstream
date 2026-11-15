@@ -12,6 +12,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
+/** Home's hero carousel, from the catalogs the user picked for it (empty: none picked). */
+fun interface HeroSlides {
+    fun slides(): Flow<List<dev.yourstream.ui.screens.home.HeroSlide>>
+}
+
 /** Catalog rows for Home, from the user's add-ons. */
 fun interface HomeCatalogs {
     fun rows(): Flow<List<dev.yourstream.ui.screens.home.CatalogRow>>
@@ -46,6 +51,41 @@ object ScreensModule {
     fun homeCatalogs(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs): HomeCatalogs = HomeCatalogs {
         kotlinx.coroutines.flow.combine(addons.addons.map { list -> list.filter { it.enabled }.map { it.id } }.distinctUntilChanged(), layout.layout) { e, l -> e to l }
             .mapLatest { (enabled, l) -> if (enabled.isEmpty()) emptyList() else catalogRows(addons.manager(), l) }
+    }
+
+    private const val HERO_SLIDES = 10
+
+    /**
+     * The hero carousel: the first titles of each hero catalog (with artwork), taken in turn so
+     * every picked catalog shows up, at most [HERO_SLIDES]. Reloaded when the choice or the
+     * add-ons change; catalog pages come from the catalog cache (the rows load them too).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Provides
+    fun heroSlides(addons: dev.yourstream.catalog.sync.CatalogAddons, layout: dev.yourstream.ui.screens.home.HomeCatalogPrefs): HeroSlides = HeroSlides {
+        kotlinx.coroutines.flow.combine(addons.addons.map { list -> list.filter { it.enabled }.map { it.id } }.distinctUntilChanged(),
+            layout.layout.map { it.hero }.distinctUntilChanged()) { e, h -> e to h }
+            .mapLatest { (enabled, hero) -> if (enabled.isEmpty() || hero.isEmpty()) emptyList() else heroSlides(addons.manager(), hero) }
+    }
+
+    private suspend fun heroSlides(manager: dev.yourstream.catalog.core.CatalogManager, hero: List<String>) = coroutineScope {
+        val byKey = manager.catalogs().associateBy(::catalogKey)
+        val perCatalog = hero.mapNotNull { byKey[it] }.map { c ->
+            async {
+                val items = (manager.page(c) as? dev.yourstream.core.common.AppResult.Ok)?.value?.value?.items.orEmpty()
+                    .filter { it.posterUrl != null || it.backdropUrl != null }.distinctBy { it.ref.id }.take(HERO_SLIDES)
+                val presence = runCatching { manager.withLibraryPresence(items) }.getOrElse { items.map { it to null } }
+                presence.map { (item, p) ->
+                    dev.yourstream.ui.screens.home.HeroSlide(
+                        "hero:${catalogKey(c)}:${item.ref.id}", item.title, item.posterUrl, item.backdropUrl, item.ref.type,
+                        item.genres.firstOrNull(), item.runtimeMinutes, item.year, item.rating,
+                        item.languages.ifEmpty { c.languages }, Presentation.tile(item, p).open,
+                    )
+                }
+            }
+        }.awaitAll()
+        // In turn: first of each catalog, then the second of each, …
+        (0 until HERO_SLIDES).flatMap { i -> perCatalog.mapNotNull { it.getOrNull(i) } }.distinctBy { it.title to it.year }.take(HERO_SLIDES)
     }
 
     /** The key Home and the settings use for a catalog. */

@@ -239,6 +239,17 @@ class ScreenshotTest {
         settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
             navStyle = dev.yourstream.ui.screens.settings.NavStyle.EXPANDED, navGlow = true))) { home() }
 
+    /** The hero carousel from hero catalogs, with the floating bar (classic dark). */
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeHeroCarousel() = shot("phone-home-hero-carousel", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false) {
+        val r = flowOf(PagingData.from(movies, done)).collectAsLazyPagingItems()
+        val s = flowOf(PagingData.from(series, done)).collectAsLazyPagingItems()
+        val slides = listOf("Immortal", "Jailer 2", "Lenin Pandiyan", "Thedal").mapIndexed { i, t ->
+            dev.yourstream.ui.screens.home.HeroSlide("hero:$i", t, null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Romance", 131, 2026, 7.0, listOf("ta"), OpenTarget.Details(i.toLong()))
+        }
+        HomeScreen(HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Content(continueTiles), 240, heroSlides = slides), HomeRows(r, s), {}, {}, {}, {}, {})
+    }
+
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneHomeCompactNav() = shot("phone-home-compact-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
         settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(

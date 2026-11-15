@@ -18,7 +18,23 @@ data class HomeCatalogLayout(
     val hidden: Set<String> = emptySet(),
     val order: List<String> = emptyList(),
     val names: Map<String, String> = emptyMap(),
+    /**
+     * Catalogs feeding Home's hero carousel (Nuvio's "Hero catalogs"), at most [HERO_LIMIT]; none:
+     * the hero shows what to continue or the newest title of the library.
+     */
+    val hero: List<String> = emptyList(),
 ) {
+    /** [key] added to or removed from the hero catalogs (adding beyond [HERO_LIMIT] does nothing). */
+    fun withHero(key: String, on: Boolean): HomeCatalogLayout = when {
+        !on -> copy(hero = hero - key)
+        key in hero || hero.size >= HERO_LIMIT -> this
+        else -> copy(hero = hero + key)
+    }
+
+    companion object {
+        const val HERO_LIMIT = 3
+    }
+
     fun <T> arrange(items: List<T>, key: (T) -> String): List<T> =
         items.filter { key(it) !in hidden }.sortedBy { i -> order.indexOf(key(i)).let { if (it < 0) Int.MAX_VALUE else it } }
 
@@ -48,12 +64,13 @@ class HomeCatalogPrefs @Inject constructor(@ApplicationContext context: Context)
             .putStringSet("hidden", l.hidden)
             .putString("order", l.order.joinToString("\n"))
             .putString("names", JSONObject(l.names).toString())
+            .putString("hero", l.hero.joinToString("\n"))
             .apply()
         _layout.value = l
     }
 
-    /** "Reset to default": every catalog shown, in the add-ons' order, under its own name. */
-    fun reset() = update { HomeCatalogLayout() }
+    /** "Reset to default": every catalog shown, in the add-ons' order, under its own name (hero choice kept). */
+    fun reset() = update { HomeCatalogLayout(hero = it.hero) }
 
     private fun load(): HomeCatalogLayout {
         val names = runCatching {
@@ -64,6 +81,7 @@ class HomeCatalogPrefs @Inject constructor(@ApplicationContext context: Context)
             hidden = prefs.getStringSet("hidden", emptySet()).orEmpty(),
             order = prefs.getString("order", "").orEmpty().lines().filter { it.isNotBlank() },
             names = names,
+            hero = prefs.getString("hero", "").orEmpty().lines().filter { it.isNotBlank() },
         )
     }
 }

@@ -24,6 +24,25 @@ data class CatalogRow(
 data class ForYou(val basis: String?, val tiles: List<dev.yourstream.ui.screens.Tile>)
 
 /** The featured title. [kind] decides the wording; the targets come from the domain's entries. */
+/**
+ * One slide of Home's hero carousel (from the user's hero catalogs, Settings → Layout → Home
+ * layout): artwork, the title, "Movie · Romance · 2h 11m · 2026", rating and languages.
+ */
+data class HeroSlide(
+    val key: String,
+    val title: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val type: dev.yourstream.catalog.api.CatalogType,
+    val genre: String?,
+    val runtimeMinutes: Int?,
+    val year: Int?,
+    val rating: Double?,
+    /** ISO codes ("ta"), shown as "TA". */
+    val languages: List<String>,
+    val open: OpenTarget,
+)
+
 data class HeroItem(
     val kind: Kind,
     val key: String,
@@ -55,6 +74,8 @@ data class HomeUiState(
      * panel a moment later.
      */
     val catalogsLoading: Boolean = false,
+    /** The hero carousel's slides (from the hero catalogs); empty: the library hero. */
+    val heroSlides: List<HeroSlide> = emptyList(),
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?
