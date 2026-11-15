@@ -1,3 +1,17 @@
+## What's new in 0.11.5
+
+- **Navigation like Nuvio's** in the classic theme: a floating bar over the content, the current
+  tab in a lighter capsule. **Adaptive** (default) shrinks it to icons while you scroll down and
+  brings it back when you scroll up; also Always expanded, Always compact, Classic, and Panel Grid
+  for the manga look (Settings → Layout → Navigation bar, with a preview and Glass glow).
+- **Hero carousel**: pick up to 3 catalogs in Settings → Layout → Home layout → Hero catalogs, and
+  Home opens on a full-width carousel of their titles (title, genre, length, year, rating,
+  View Details). Without hero catalogs, the hero shows what to continue or your newest title.
+- **Posters are matched automatically.** "Check matches" is gone: the best match is applied when it
+  is clearly right, otherwise the title keeps its file name. Titles that were waiting are matched
+  now. "Fix match" on a title still corrects a wrong one.
+- Fixed: rows below jumped up and down while you scrolled posters sideways.
+
 ## What's new in 0.11.4
 
 - **Player like Nuvio's:** lock button (hides the controls and ignores touches until you unlock),
