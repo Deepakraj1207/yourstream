@@ -896,3 +896,17 @@ shown: the other scores in the user's screenshot come from MDBList, which needs 
 Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
 TESTING.
 
+
+## v0.12.1 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction. It contains:
+- the fix for the crash while streams loaded (device report 6);
+- the title page like Nuvio's, from TMDB, with Play opening the streams (device report 7).
+
+Checked on the published files (run 25):
+- `releases/latest` is v0.12.1 and is not a pre-release.
+- The arm64 APK's SHA-256 (`db372d27…e5aa`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 25 and versionName 0.12.1.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
