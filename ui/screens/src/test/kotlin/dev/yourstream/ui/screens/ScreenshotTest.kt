@@ -364,6 +364,9 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayer() = playerShot("phone-player", WindowLayout.COMPACT, playerState)
 
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phonePlayerPortrait() = playerShot("phone-player-portrait", WindowLayout.COMPACT, playerState)
+
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayerAudio() = playerShot("phone-player-audio", WindowLayout.COMPACT, playerState.copy(resumedFromMs = null), open = "audio")
 

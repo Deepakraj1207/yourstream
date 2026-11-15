@@ -1,5 +1,12 @@
 package dev.yourstream.ui.screens.player
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.offset
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -472,42 +479,61 @@ private fun Controls(
 ) {
     val seekStepMs = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekMs
     val seekSeconds = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekSeconds
-    val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
-    Box(Modifier.fillMaxSize()) {
-        // Top: back, title, quality.
-        Row(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().background(TopScrim).padding(horizontal = gutter, vertical = if (tv) 27.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (!tv) {
-                IconButton(onClick = onBack, modifier = Modifier.focusHighlight().testTag("player-back")) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.player_back), tint = Color.White)
+    // One edge for everything: the title, the resume note, the times, the timeline and the
+    // buttons all start and end on the same gutter. Icon buttons (48 dp, icon 24 dp) sit 12 dp
+    // further out, so their icons line up with that edge too.
+    val gutter = if (tv) 48.dp else if (compact) 20.dp else 28.dp
+    val iconInset = 12.dp
+    Box(
+        Modifier.fillMaxSize()
+            // Landscape phones: keep clear of the camera cutout and the gesture area.
+            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.displayCutout
+                .union(androidx.compose.foundation.layout.WindowInsets.navigationBars)
+                .only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)),
+    ) {
+        // Top: back, title, quality, lock, rotate; the resume note under the title.
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(TopScrim).padding(top = if (tv) 27.dp else 8.dp, bottom = 16.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = if (tv) gutter else gutter - iconInset, end = if (tv) gutter else gutter - iconInset).heightIn(min = 56.dp).testTag("player-top"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (!tv) {
+                    IconButton(onClick = onBack, modifier = Modifier.focusHighlight().testTag("player-back")) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.player_back), tint = Color.White)
+                    }
+                }
+                Column(Modifier.weight(1f).padding(start = if (tv) 0.dp else 4.dp)) {
+                    Text(state.title, color = Color.White, style = if (tv) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                    state.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                state.quality?.badge?.let { b ->
+                    // A pill like the others, as tall as the icons beside it.
+                    Surface(
+                        shape = CircleShape, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp).heightIn(min = 36.dp).focusHighlight(CircleShape).clickable { openPanel(PlayerPanel.INFO) }.testTag("quality-badge"),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(b, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        }
+                    }
+                }
+                onLock?.let { LockButton(it) }
+                onRotate?.let { rotate ->
+                    IconButton(onClick = rotate, modifier = Modifier.focusHighlight().testTag("rotate")) {
+                        Icon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate), tint = Color.White)
+                    }
                 }
             }
-            Column(Modifier.weight(1f)) {
-                Text(state.title, color = Color.White, style = if (tv) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
-                state.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            }
-            state.quality?.badge?.let { b ->
-                Surface(
-                    shape = MaterialTheme.shapes.small, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
-                    modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).clickable { openPanel(PlayerPanel.INFO) }.testTag("quality-badge"),
-                ) { Text(b, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
-            }
-            onLock?.let { LockButton(it) }
-            onRotate?.let { rotate ->
-                IconButton(onClick = rotate, modifier = Modifier.focusHighlight().testTag("rotate")) {
-                    Icon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate), tint = Color.White)
-                }
+            state.resumedFromMs?.let { r ->
+                ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.padding(start = gutter, top = 8.dp))
             }
         }
 
-        state.resumedFromMs?.let { r -> ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
-
-        // Centre: large touch transport (phones and tablets).
+        // Centre: rewind, play, forward on one line, play exactly in the middle.
         if (!tv) {
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 32.dp else 56.dp)) {
+            Row(Modifier.align(Alignment.Center).testTag("player-center"), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 40.dp else 64.dp)) {
                 SeekButton(AppIcons.FastRewind, stringResource(R.string.player_rewind), "−$seekSeconds", "rewind") { seek(-seekStepMs) }
                 Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                     if (state.loading) Buffering(Modifier) else PlayPause(state, 80.dp, playFocus, onAction)
@@ -516,12 +542,19 @@ private fun Controls(
             }
         }
 
-        // Bottom: timeline, times, buttons.
+        // Bottom: the times over the ends of the timeline, then the actions, centred.
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(BottomScrim).padding(horizontal = gutter).padding(top = 32.dp, bottom = if (tv) 27.dp else 8.dp),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(BottomScrim).padding(top = 40.dp, bottom = if (tv) 27.dp else 10.dp),
         ) {
             val duration = state.durationMs ?: 0
             val seekLabel = stringResource(R.string.player_seek_bar)
+            Row(Modifier.fillMaxWidth().padding(horizontal = gutter).testTag("player-times"), verticalAlignment = Alignment.CenterVertically) {
+                TimePill(timeLabel(state.positionMs), "position")
+                Spacer(Modifier.weight(1f))
+                if (duration > 0) TimePill(
+                    if (state.speed != 1f) "${PlayerViewModel.speedLabel(state.speed)} · ${timeLabel(duration)}" else timeLabel(duration), "duration",
+                )
+            }
             if (duration > 0) {
                 Timeline(
                     state.positionMs, duration, state.bufferedMs,
@@ -529,50 +562,73 @@ private fun Controls(
                     onScrubEnd = { onAction(PlayerAction.ScrubEnd(it)) },
                     timeLabel = ::timeLabel,
                     onInteraction = poke,
-                    modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("seek")
+                    modifier = Modifier.padding(horizontal = gutter).focusHighlight(MaterialTheme.shapes.small).testTag("seek")
                         .semantics { contentDescription = seekLabel },
                 )
             }
-            // Time pills under the timeline (Nuvio's), the playing speed beside the length.
-            Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                TimePill(timeLabel(state.positionMs), "position")
-                Spacer(Modifier.weight(1f))
-                if (duration > 0) TimePill(
-                    if (state.speed != 1f) "${PlayerViewModel.speedLabel(state.speed)} · ${timeLabel(duration)}" else timeLabel(duration), "duration",
-                )
-            }
-            // Labelled actions (Nuvio's pills): resize, speed, subtitles, audio, episodes, sources, quality.
-            Row(
-                Modifier.fillMaxWidth().padding(top = 4.dp).horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (tv) 12.dp else 8.dp),
-            ) {
-                state.previous?.let { p -> BarIcon(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
-                if (tv) {
-                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
-                    PlayPause(state, 56.dp, playFocus, onAction)
-                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
-                }
-                state.next?.let { n -> BarIcon(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
-                onFit?.let { f -> ActionPill(fitLabel, "aspect", AppIcons.AspectRatio) { f(); poke() } }
-                ActionPill(PlayerViewModel.speedLabel(state.speed), "speed", AppIcons.Speed, active = state.speed != 1f) { openPanel(PlayerPanel.SPEED) }
-                if (state.subtitles.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_subs), "subtitles", AppIcons.Subtitles, active = state.selectedSubtitle != null) { openPanel(PlayerPanel.SUBTITLES) }
-                if (state.audio.size > 1) ActionPill(stringResource(R.string.player_pill_audio), "audio", AppIcons.Audio) { openPanel(PlayerPanel.AUDIO) }
-                if (state.episodes != null) ActionPill(stringResource(R.string.player_episodes), "episodes", AppIcons.Episodes) { openPanel(PlayerPanel.EPISODES) }
-                if (state.sources.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_sources, state.sources.size), "sources") { openPanel(PlayerPanel.SOURCES) }
-                // On phones the quality badge in the top bar opens the info panel.
-                if (!compact || state.quality?.badge == null) ActionPill(stringResource(R.string.player_quality), "info", Icons.Filled.Info) { openPanel(PlayerPanel.INFO) }
+            // Labelled actions (Nuvio's pills), centred. Phones wrap them onto a second centred
+            // line when they do not fit (portrait); TV keeps one row the remote moves along.
+            ActionsRow(tv, gutter) {
+                    state.previous?.let { p -> IconPill(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
+                    if (tv) {
+                        BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
+                        PlayPause(state, 56.dp, playFocus, onAction)
+                        BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
+                    }
+                    onFit?.let { f -> ActionPill(fitLabel, "aspect", AppIcons.AspectRatio) { f(); poke() } }
+                    ActionPill(PlayerViewModel.speedLabel(state.speed), "speed", AppIcons.Speed, active = state.speed != 1f) { openPanel(PlayerPanel.SPEED) }
+                    if (state.subtitles.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_subs), "subtitles", AppIcons.Subtitles, active = state.selectedSubtitle != null) { openPanel(PlayerPanel.SUBTITLES) }
+                    if (state.audio.size > 1) ActionPill(stringResource(R.string.player_pill_audio), "audio", AppIcons.Audio) { openPanel(PlayerPanel.AUDIO) }
+                    if (state.episodes != null) ActionPill(stringResource(R.string.player_episodes), "episodes", AppIcons.Episodes) { openPanel(PlayerPanel.EPISODES) }
+                    if (state.sources.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_sources, state.sources.size), "sources") { openPanel(PlayerPanel.SOURCES) }
+                    // On phones the quality badge in the top bar opens the info panel.
+                    if (!compact || state.quality?.badge == null) ActionPill(stringResource(R.string.player_quality), "info", Icons.Filled.Info) { openPanel(PlayerPanel.INFO) }
+                    state.next?.let { n -> IconPill(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
             }
         }
     }
 }
 
-/** Rewind / forward in the centre, with how far it jumps under the icon. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ActionsRow(tv: Boolean, gutter: androidx.compose.ui.unit.Dp, content: @Composable () -> Unit) {
+    if (tv) {
+        // Composed with the screen (not in a later layout pass): Play must exist when the
+        // player asks for focus on it as it opens.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = gutter).testTag("player-actions"),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) { content() }
+    } else {
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = gutter).testTag("player-actions"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) { content() }
+    }
+}
+
+/**
+ * Rewind / forward in the centre, with how far it jumps under the icon. The amount hangs below
+ * the circle without taking space, so the circles stay level with the play button.
+ */
 @Composable
 private fun SeekButton(icon: ImageVector, label: String, amount: String, tag: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        RoundIcon(icon, label, 56.dp, Modifier.testTag(tag), onClick)
-        Text(amount, color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 2.dp))
+    Box(contentAlignment = Alignment.Center) {
+        RoundIcon(icon, label, 60.dp, Modifier.testTag(tag), onClick)
+        Text(amount, color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y = 22.dp).testTag("$tag-amount"))
     }
+}
+
+/** An icon-only pill (previous / next episode), the same height and colour as the labelled pills. */
+@Composable
+private fun IconPill(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape, color = Color.Black.copy(alpha = 0.45f), contentColor = Color.White,
+        modifier = Modifier.size(PillTouch).focusHighlight(CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding((PillTouch - PillHeight) / 2).semantics { contentDescription = label }.testTag(tag),
+    ) { Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) } }
 }
 
 @Composable
@@ -685,7 +741,8 @@ private fun BoxScope.Panel(
         else Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(400.dp)).testTag("panel:${panel.name.lowercase()}"),
     ) {
         Column(Modifier.padding(vertical = 12.dp)) {
-            Row(Modifier.padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Panel content sits on a 24 dp edge: the title, the options, the close icon.
+            Row(Modifier.padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
                 // Subtitles → Style (size, colour, bold, background, position).
                 if (panel == PlayerPanel.SUBTITLES && onSettings != null) {
@@ -727,7 +784,7 @@ private fun Options(options: List<Pair<String?, String>>, selected: String?, onS
             Row(
                 Modifier.fillMaxWidth().then(if (i == initial) Modifier.focusRequester(focus) else Modifier)
                     .selectable(selected = id == selected, role = Role.RadioButton, onClick = { onSelect(id) })
-                    .focusHighlight().padding(horizontal = 16.dp, vertical = 4.dp).testTag("option:$label"),
+                    .focusHighlight().padding(start = 22.dp, end = 24.dp, top = 4.dp, bottom = 4.dp).testTag("option:$label"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = id == selected, onClick = null)

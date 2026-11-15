@@ -959,3 +959,25 @@ Status: NEEDS REAL-DEVICE TESTING.
   manga hero. Test: `HeroCarouselTest.mangaLookDrawsInkedPanels`; screenshot `phone-manga-hero`.
 * Gate: 690 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
   TESTING.
+
+## Player alignment (15 Nov 2026)
+
+The user asked for a better player with better alignment. Checked on rendered phone (landscape
+and portrait) and TV screenshots:
+* **One edge for everything.** Before, the back arrow, title, resume note, seek bar, times and
+  buttons each started at a different inset. Now the title, resume note, times, timeline and
+  buttons share one gutter (20 dp phones, 28 dp tablets, 48 dp TV). Icon buttons sit 12 dp
+  further out, so their icons line up with it. Landscape keeps clear of the camera cutout.
+* **Centre transport level:** the −10/+10 labels hang below their circles without taking space,
+  so rewind, play and forward share one centre line.
+* **Times over the ends of the timeline**, not a row below it with a gap.
+* **Bottom row:** previous and next are round pills like the labelled ones. All pills are drawn
+  44 dp tall (48 dp touch area) and centred. On phones they wrap onto a second centred line when
+  they do not fit (portrait); on TV they stay one scrolling row.
+* **Quality badge:** now a pill as tall as the icons beside it.
+* **Panels:** the title, options, close icon and subtitle-style controls share one 24 dp edge.
+* **Regression caught by `PlayerScreenTest.tvTransportPanelsAndBack` and fixed:** the TV row
+  first used `BoxWithConstraints`, which composes later, so Play was not focused when the player
+  opened.
+* New screenshot `phone-player-portrait`. Gate: 691 tests, 0 failures; lint 0 errors, 15
+  warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING.

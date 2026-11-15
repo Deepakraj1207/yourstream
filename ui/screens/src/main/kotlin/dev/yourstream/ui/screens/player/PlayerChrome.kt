@@ -59,17 +59,22 @@ import kotlinx.coroutines.delay
 
 private val PillColor = Color.Black.copy(alpha = 0.45f)
 
-/** A labelled action on the player's bottom bar. At least 48 dp tall (its touch area). */
+/** The drawn height of every pill on the player's bar; each answers touches over [PillTouch]. */
+internal val PillHeight = 44.dp
+internal val PillTouch = 48.dp
+
+/** A labelled action on the player's bottom bar: drawn [PillHeight] tall, touched over 48 dp. */
 @Composable
 fun ActionPill(label: String, tag: String, icon: ImageVector? = null, active: Boolean = false, onClick: () -> Unit) {
     Surface(
         shape = CircleShape,
         color = if (active) Color.White else PillColor,
         contentColor = if (active) Color.Black else Color.White,
-        modifier = Modifier.heightIn(min = 48.dp).padding(vertical = 4.dp).focusHighlight(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick).testTag(tag),
+        // The touch area (48 dp) includes the 2 dp around the drawn pill.
+        modifier = Modifier.heightIn(min = PillTouch).focusHighlight(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick).padding(vertical = (PillTouch - PillHeight) / 2).testTag(tag),
     ) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.heightIn(min = PillHeight).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp)) }
             Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
@@ -130,7 +135,7 @@ fun LockedOverlay(onUnlock: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SubtitleStyle(settings: AppSettings, onChange: (AppSettings) -> Unit) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp).testTag("subtitle-style"),
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp).testTag("subtitle-style"),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         StyleChips(stringResource(R.string.player_style_size), AppSettings.SUBTITLE_SCALES.map { it to "${(it * 100).toInt()}%" }, settings.subtitleScale, "style-size") {
             onChange(settings.copy(subtitleScale = it))
