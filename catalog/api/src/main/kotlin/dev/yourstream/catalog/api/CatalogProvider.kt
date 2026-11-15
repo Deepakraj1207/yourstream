@@ -16,6 +16,9 @@ interface CatalogProvider {
     /** Shown next to its results (attribution). */
     val attribution: String
 
+    /** The manifest already fetched in this session, if any (no network). */
+    val knownInfo: CatalogProviderInfo? get() = null
+
     /** Fetches the provider's self-description (manifest). Success = available. */
     suspend fun describe(): AppResult<CatalogProviderInfo>
 

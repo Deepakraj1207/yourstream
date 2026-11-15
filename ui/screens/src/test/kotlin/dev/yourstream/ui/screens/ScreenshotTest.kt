@@ -67,8 +67,13 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
-        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } } }
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(),
+                     settings: dev.yourstream.ui.screens.settings.AppSettings = dev.yourstream.ui.screens.settings.AppSettings(), content: @Composable () -> Unit) {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
+                YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } }
+            }
+        }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -222,6 +227,17 @@ class ScreenshotTest {
     fun phoneSettingsLayout() = shot("phone-settings-layout", WindowLayout.COMPACT, null, dark = false, manga = false) {
         dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT, settingsHost("0.10.0"), {})
     }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsLayoutPosters() = shot("phone-settings-layout-posters", WindowLayout.COMPACT, null, dark = true, manga = false) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT_POSTERS, settingsHost("0.10.0"), {})
+    }
+
+    /** Home with the floating navigation bar and its glow (Settings → Layout → Navigation bar). */
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeFloatingNav() = shot("phone-home-floating-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
+        settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
+            navStyle = dev.yourstream.ui.screens.settings.NavStyle.FLOATING, navGlow = true))) { home() }
 
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
         SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,

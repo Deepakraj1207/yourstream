@@ -53,6 +53,11 @@ fun DetailsRoute(onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, onFixMatch: (
 
 @Composable
 fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOpen: (OpenTarget) -> Unit, onBack: () -> Unit, onFixMatch: ((Long) -> Unit)? = null) {
+    // Settings → Layout → Detail page → Background: Cinematic puts the poster, blurred, behind the page.
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    if (dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout.detailBackground == dev.yourstream.ui.screens.settings.DetailBackground.CINEMATIC) {
+        dev.yourstream.ui.screens.addon.CinematicBackground((state.content as? dev.yourstream.ui.core.UiState.Content)?.value?.posterUrl)
+    }
     ScreenScaffold("", onBack = onBack) {
         StateContent(state.content, Modifier.fillMaxSize(), onRetry = { onAction(DetailsAction.Retry) }) { c ->
             val gutter = LocalWindowLayout.current.gutter
@@ -125,6 +130,7 @@ fun DetailsScreen(state: DetailsUiState, onAction: (DetailsAction) -> Unit, onOp
             // Remote users land on the main action.
             LaunchedEffect(c.itemId) { if (c.primary != null) runCatching { primaryFocus.requestFocus() } }
         }
+    }
     }
 }
 

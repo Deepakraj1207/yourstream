@@ -328,3 +328,20 @@ speed labels are pure functions in `PlayerViewModel` (tested).
    `StateContent` for its state.
 4. Register `composable<XxxRoute>` in `AppNavHost`, wiring callbacks to `AppNavigator`.
 5. Test the mapping (pure), the ViewModel (fakes) and the screen (Compose).
+
+## Settings → Layout (Nuvio's structure, since 0.11.4)
+
+The user asked for Nuvio's Layout page with its options working. The hub lists, in Nuvio's order:
+
+| Section | Page | Options (what they change) |
+| --- | --- | --- |
+| Home | Home layout | Show hero; Show catalog type ("Popular · Movies" on add-on rows); Hide unreleased content (titles from future years left out of add-on rows); rows (For you, Recently added, Series, add-on catalogs); **Catalogs**: every catalog of the enabled add-ons with a switch, move up / down and rename, plus Reset to default (`HomeCatalogPrefs`, applied when Home's rows load). |
+| Home | Continue Watching | Show Continue Watching; card style Wide / Poster; on select Resume playing / Open details. |
+| Home | Poster card style | Live preview; width Compact 104 … Large 140 dp (other layouts scale with it); corner radius look's own / Sharp 0 … Pill 16; Hide labels; Reset. Applied app-wide through `LocalCardLook` and the theme's poster width. Old Small / Medium / Large carry over (104 / 120 / 140). |
+| Streams | Streams | Size badges (file size from `behaviorHints.videoSize`); badge position Top / Bottom; Add-on logo next to each stream group (from the manifest already fetched, no extra request). |
+| Detail page | Detail page | Background Normal / Cinematic (artwork blurred behind add-on title pages and library details); episode cards List / Horizontal; Overview and Cast shown or hidden. |
+| Navigation | Navigation bar | Style Adaptive (Panel Grid in the manga style, the classic bar otherwise) / Panel Grid / Floating / Classic; Glow (floating only); Tab names. |
+
+Not built: Nuvio's Collections (custom folders of catalogs), its card depth effect, custom poster
+sources, badge-URL ("fusion") rules, trailers and ratings sections: they depend on features this app
+does not have.

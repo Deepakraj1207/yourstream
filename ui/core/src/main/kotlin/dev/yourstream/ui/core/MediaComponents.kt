@@ -1,5 +1,7 @@
 package dev.yourstream.ui.core
 
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -85,6 +87,19 @@ data class MediaCardModel(
 enum class CardStyle { POSTER, WIDE }
 
 /**
+ * How cards look app-wide (Settings → Layout → Poster card style): the corner radius (null: the
+ * look's own shape) and whether posters show their title underneath.
+ */
+@Immutable
+data class CardLook(val cornerRadius: Dp? = null, val hideLabels: Boolean = false)
+
+val LocalCardLook = staticCompositionLocalOf { CardLook() }
+
+@Composable
+private fun cardShape(): androidx.compose.ui.graphics.Shape =
+    LocalCardLook.current.cornerRadius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it) } ?: MaterialTheme.shapes.medium
+
+/**
  * The shared frame of every card: focus lift + border, click, long press / Menu key / "more"
  * button → [actions] menu, one merged accessibility node with the actions as custom actions.
  */
@@ -122,11 +137,13 @@ private fun CardFrame(
 fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
+            val shape = cardShape()
+            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).inkPanel(shape).clip(shape)) {
                 Artwork(model.posterUrl, model.title, Modifier.fillMaxSize())
                 Overlays(model)
             }
-            Column(Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
+            // Hidden labels: the title stays in the card's accessibility description.
+            if (!LocalCardLook.current.hideLabels) Column(Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
                 Text(model.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 model.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 // Why it is here ("Tamil · action · ★ 7.6", "Next episode"), when the screen gives a reason.
@@ -140,7 +157,8 @@ fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 fun WideCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
+        val shape = cardShape()
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(shape).clip(shape)) {
             Artwork(model.posterUrl, model.title, Modifier.fillMaxSize(), showInitials = false)
             Box(Modifier.fillMaxSize().background(BottomScrim))
             Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {

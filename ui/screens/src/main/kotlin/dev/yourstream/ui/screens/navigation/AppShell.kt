@@ -72,7 +72,10 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
     ) {
     YourStreamTheme(
         layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA,
-        amoled = settings.amoledBlack, posterScale = settings.posterSize.scale,
+        amoled = settings.amoledBlack, posterScale = settings.layout.posterScale,
+    ) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        dev.yourstream.ui.core.LocalCardLook provides dev.yourstream.ui.core.CardLook(settings.layout.posterRadius?.let { it.dp }, settings.layout.hideLabels),
     ) {
         Surface(Modifier.fillMaxSize()) {
             val nav = rememberNavController()
@@ -96,6 +99,7 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
             // A newer version on the Releases page: offered once per session (not over the player).
             if (!fullScreen && !androidx.compose.ui.platform.LocalInspectionMode.current) dev.yourstream.ui.screens.update.UpdatePrompt()
         }
+    }
     }
     }
 }
@@ -194,9 +198,10 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
 /**
  * The phone's navigation, with the [MAIN_TABS]: the manga style's printed strip
  * ([MangaNavigationBar]), or a Material 3 navigation bar in the classic style. Each item is a
- * full-height tab ("tab" role, selected state for screen readers). Tab names show under every
- * icon, or only under the selected one (Settings → Appearance → Tab names); the names stay in the
- * accessibility tree either way.
+ * full-height tab ("tab" role, selected state for screen readers). The style is chosen in Settings →
+ * Layout → Navigation bar (Adaptive: Panel Grid in the manga style, this classic bar otherwise;
+ * or Panel Grid, Floating, Classic). Tab names show under every icon, or only under the selected
+ * one; the names stay in the accessibility tree either way.
  *
  * The classic bar is built from M3's own container colours, elevation, insets and
  * [NavigationBarItem]s, without the 8 dp gaps `NavigationBar` puts between items (with six tabs
@@ -204,10 +209,14 @@ private fun TvShell(current: TopLevel?, onSelect: (TopLevel) -> Unit, content: @
  */
 @Composable
 fun MainNavigationBar(current: TopLevel?, onSelect: (TopLevel) -> Unit, modifier: Modifier = Modifier) {
-    val labels = dev.yourstream.ui.screens.settings.LocalAppSettings.current.dockLabels
-    if (dev.yourstream.ui.core.LocalMangaStyle.current) {
-        MangaNavigationBar(current, onSelect, labels, modifier)
-        return
+    val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
+    val labels = settings.dockLabels
+    // Settings → Layout → Navigation bar → Style. Adaptive follows the look.
+    when (settings.layout.navStyle) {
+        dev.yourstream.ui.screens.settings.NavStyle.PANELS -> { MangaNavigationBar(current, onSelect, labels, modifier); return }
+        dev.yourstream.ui.screens.settings.NavStyle.FLOATING -> { FloatingNavigationBar(current, onSelect, labels, settings.layout.navGlow, modifier); return }
+        dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE -> if (dev.yourstream.ui.core.LocalMangaStyle.current) { MangaNavigationBar(current, onSelect, labels, modifier); return }
+        dev.yourstream.ui.screens.settings.NavStyle.CLASSIC -> Unit
     }
     Surface(
         color = androidx.compose.material3.NavigationBarDefaults.containerColor,

@@ -47,6 +47,7 @@ class StremioCatalogProvider(
 
     @Volatile private var activeBase: String = definition.baseUrls.first()
     @Volatile private var info: CatalogProviderInfo? = null
+    override val knownInfo: CatalogProviderInfo? get() = info
 
     // ------------------------------------------------------------------ manifest
 

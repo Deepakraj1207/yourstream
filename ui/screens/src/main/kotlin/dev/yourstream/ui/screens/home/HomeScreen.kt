@@ -94,7 +94,17 @@ private fun HomeContent(
     val blocking = state.blocking
     // Settings → Layout → Home rows.
     val shown = dev.yourstream.ui.screens.settings.LocalAppSettings.current.homeRows
-    val catalogs = if (shown.catalogs) state.catalogs else emptyList()
+    val layout = dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout
+    val movies = stringResource(R.string.nav_movies)
+    val seriesLabel = stringResource(R.string.nav_series)
+    // Settings → Layout → Home layout: "Popular · Movies", and titles not out yet left out.
+    val catalogs = (if (shown.catalogs) state.catalogs else emptyList()).map { c ->
+        val type = when (c.type) { dev.yourstream.catalog.api.CatalogType.MOVIE -> movies; dev.yourstream.catalog.api.CatalogType.SERIES -> seriesLabel; null -> null }
+        c.copy(
+            title = if (layout.showCatalogType && type != null) "${c.title} · $type" else c.title,
+            tiles = if (layout.hideUnreleased) c.tiles.filter { it.card.key !in c.unreleased } else c.tiles,
+        )
+    }.filter { it.tiles.isNotEmpty() }
     if (blocking != null) {
         val setupAction = when (blocking) {
             EmptyKind.NOT_SIGNED_IN -> onSignIn
@@ -141,7 +151,7 @@ private fun HomeContent(
                 else -> Unit
             }
         }
-        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
+        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction, layout)
         (state.forYou as? UiState.Content)?.value?.takeIf { shown.forYou }?.let { f ->
             item(key = "for-you") {
                 Column(Modifier.testTag("for-you")) {
@@ -178,12 +188,18 @@ private fun heroModel(h: HeroItem) = HeroModel(
 private fun LazyListScope.continueWatching(
     state: UiState<List<Tile>>, card: (Tile) -> dev.yourstream.ui.core.MediaCardModel, actions: (Tile) -> List<dev.yourstream.ui.core.CardAction>,
     onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onAction: (HomeAction) -> Unit,
+    layout: dev.yourstream.ui.screens.settings.LayoutSettings,
 ) {
+    // Settings → Layout → Continue Watching: card style, and what a tap does.
+    val style = if (layout.continueStyle == dev.yourstream.ui.screens.settings.ContinueStyle.POSTER) CardStyle.POSTER else CardStyle.WIDE
+    val open: (Tile) -> OpenTarget = { t ->
+        if (layout.continueOpens == dev.yourstream.ui.screens.settings.ContinueOpens.DETAILS && t.itemId != null) OpenTarget.Details(t.itemId) else t.open
+    }
     item(key = "continue") {
         when (state) {
-            UiState.Loading -> SkeletonRow(stringResource(R.string.home_continue), CardStyle.WIDE)
-            is UiState.Content -> MediaRow(stringResource(R.string.home_continue), state.value, card, { onOpen(it.open) },
-                style = CardStyle.WIDE, actions = actions, onSeeAll = { onSeeAll(HomeSection.CONTINUE_WATCHING) })
+            UiState.Loading -> SkeletonRow(stringResource(R.string.home_continue), style)
+            is UiState.Content -> MediaRow(stringResource(R.string.home_continue), state.value, card, { onOpen(open(it)) },
+                style = style, actions = actions, onSeeAll = { onSeeAll(HomeSection.CONTINUE_WATCHING) })
             is UiState.Error -> ErrorState(state.error, Modifier.fillMaxWidth().padding(16.dp)) { onAction(HomeAction.Retry) }
             is UiState.Empty -> Unit
         }

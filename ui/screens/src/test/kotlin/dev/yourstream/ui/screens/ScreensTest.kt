@@ -270,20 +270,19 @@ class ScreensTest {
         compose.onNodeWithTag("pref-theme").performClick()
         compose.onNodeWithTag("choice:Dark").performClick()
         assertEquals(dev.yourstream.ui.screens.settings.ThemeMode.DARK, prefs.theme)
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
-        compose.onNodeWithTag("pref-dock-labels").performClick()
-        assertEquals(false, prefs.dockLabels)
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reduce-motion"))
         compose.onNodeWithTag("pref-reduce-motion").performClick()
         assertEquals(true, prefs.reduceMotion)
-        page = SettingsPage.LAYOUT
+        // Home rows, poster size and tab names moved to Layout's own pages (Nuvio's structure,
+        // the user's request of 15 Nov 2026): see LayoutSettingsTest.
+        page = SettingsPage.LAYOUT_HOME
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-home-hero"))
         compose.onNodeWithTag("pref-home-hero").performClick()
         assertEquals(false, prefs.homeRows.hero)
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-poster-size"))
-        compose.onNodeWithTag("pref-poster-size").performClick()
-        compose.onNodeWithTag("choice:Large").performClick()
-        assertEquals(dev.yourstream.ui.screens.settings.PosterSize.LARGE, prefs.posterSize)
+        page = SettingsPage.LAYOUT_NAVIGATION
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
+        compose.onNodeWithTag("pref-dock-labels").performClick()
+        assertEquals(false, prefs.dockLabels)
         page = SettingsPage.ADVANCED
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reset"))
         compose.onNodeWithTag("pref-reset").performClick()

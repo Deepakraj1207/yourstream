@@ -763,3 +763,26 @@ in raw pieces. Checked on the published files: `releases/latest` is v0.11.3; the
 SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 20, versionName 0.11.3; `apksigner`
 shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
 Status: NEEDS REAL-DEVICE TESTING (above all, real 4K movies in pieces from a channel).
+
+## Device report 3 (15 Nov 2026): Layout, add-ons, startup, opening logo
+
+Requests: Layout page like Nuvio's with its options working; add-ons page like Nuvio's; Cinemeta
+as the only default add-on; the full-screen sign-in shown briefly at launch; an opening logo; a
+player like Nuvio's (separate entry). Nuvio's current source (NuvioMedia/NuvioMobile, read through
+public pages) was used as the reference for labels and options; no code was copied.
+
+* **Only Cinemeta built in.** Reason: the user adds add-ons themselves. `catalog.providers` now
+  defaults to `none`. Users who relied on the Indian catalogs add them by link.
+* **Startup flash fixed.** Reason: Home showed a full-screen "Connect Telegram" while the add-on
+  rows loaded, then the sign-in panel above them. Now the panel and placeholder rows show while
+  loading. Test: `signInPanelDoesNotJumpFromFullScreenWhileAddonRowsLoad`.
+* **Opening logo.** Android's launch screen (core-splashscreen) with the app's bubble on ink, then
+  `LaunchIntro` (about 1 s; tap skips; still with animations off). Tests: `LaunchIntroTest`. The
+  test renderer cannot draw the logo vector mid-animation: the look is checked on a device only.
+* **Add-ons page like Nuvio's.** Overview, install box, cards with logo, version, switch, move
+  up / down (the order drives Home's rows and stream groups), refresh, settings page, delete with
+  confirmation, chips, description and summary line. Tests: `AddonsAndStreamsTest`,
+  `CatalogAddonsRefreshTest.movingAnAddonChangesTheOrderEverywhereAndIsKept`, manifest test.
+* **Layout like Nuvio's** (docs/UI.md). Tests: `LayoutSettingsTest` (7), screenshots.
+* Status: NEEDS REAL-DEVICE TESTING (all of the above; the opening logo's look and timing in
+  particular).

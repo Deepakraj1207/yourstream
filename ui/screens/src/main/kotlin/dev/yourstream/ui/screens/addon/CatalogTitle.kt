@@ -3,6 +3,10 @@ package dev.yourstream.ui.screens.addon
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -92,6 +96,8 @@ data class StreamGroup(
     val error: String? = null,
     val id: String = addon,
     val loading: Boolean = false,
+    /** The add-on's logo (from its manifest), shown next to its name. */
+    val logo: String? = null,
 ) {
     companion object {
         /**
@@ -224,7 +230,7 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
             val providers = addons.streamProviders()
             if (providers.isEmpty()) { _state.update { it.copy(loadingStreams = false, noStreamAddons = true) }; return@launch }
             val keys = providers.map { it.id.value }
-            _state.update { s -> s.copy(streams = providers.map { p -> StreamGroup(p.displayName, emptyList(), id = p.id.value, loading = true) }) }
+            _state.update { s -> s.copy(streams = providers.map { p -> StreamGroup(p.displayName, emptyList(), id = p.id.value, loading = true, logo = addons.logo(p.id.value)) }) }
             fun answer(key: String, g: StreamGroup?) = _state.update { s ->
                 val next = if (g == null) s.streams.filterNot { it.id == key } else s.streams.map { if (it.id == key) g else it }
                 // Listed order first (stable), then the display order.
@@ -240,9 +246,10 @@ class CatalogTitleViewModel @Inject constructor(saved: SavedStateHandle, private
                             if (e is kotlinx.coroutines.CancellationException) throw e
                             AppResult.Err(dev.yourstream.core.common.AppError.Network())
                         }
+                        val logo = addons.logo(key)
                         answer(key, when (r) {
-                            is AppResult.Ok -> StreamGroup(p.displayName, r.value, id = key)
-                            is AppResult.Err -> StreamGroup(p.displayName, emptyList(), r.error.message, id = key)
+                            is AppResult.Ok -> StreamGroup(p.displayName, r.value, id = key, logo = logo)
+                            is AppResult.Err -> StreamGroup(p.displayName, emptyList(), r.error.message, id = key, logo = logo)
                         })
                     }
                 }
@@ -297,9 +304,13 @@ fun CatalogTitleScreen(
     onStream: (AddonStream) -> Unit,
 ) {
     val d = LocalDimens.current
-    ScreenScaffold("", onBack = onBack) {
+    val layout = dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout
+    Box(Modifier.fillMaxSize()) {
+    // Settings → Layout → Detail page → Background: Cinematic puts the artwork, blurred, behind the page.
+    if (layout.detailBackground == dev.yourstream.ui.screens.settings.DetailBackground.CINEMATIC) CinematicBackground(state.poster ?: state.meta?.backdropUrl)
+    ScreenScaffold("", onBack = onBack, modifier = Modifier.background(androidx.compose.ui.graphics.Color.Transparent)) {
         LazyColumn(Modifier.fillMaxSize().testTag("catalog-title"), contentPadding = PaddingValues(bottom = 32.dp)) {
-            item { Header(state, onOpenLibrary) }
+            item { Header(state, onOpenLibrary, layout.showOverview, layout.showCast) }
             if (state.series) {
                 if (state.loadingMeta) item { Loading() }
                 else if (state.seasons.isEmpty()) item { Note(stringResource(R.string.addon_no_episodes)) }
@@ -308,7 +319,11 @@ fun CatalogTitleScreen(
                         ChipRow(state.seasons.map { ChipOption(it, if (it == 0) stringResource(R.string.addon_specials) else stringResource(R.string.addon_season, it)) },
                             state.season, { onAction(CatalogTitleAction.SelectSeason(it)) }, Modifier.padding(vertical = 8.dp))
                     }
-                    items(state.episodes, key = { "ep:" + it.id }) { e ->
+                    if (layout.episodeCards == dev.yourstream.ui.screens.settings.EpisodeCards.HORIZONTAL) {
+                        // Episodes as a row of cards; the chosen episode's streams under the row.
+                        item(key = "episode-row") { EpisodeCardsRow(state.episodes, state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(it)) } }
+                        if (state.episode != null) item(key = "episode-streams") { Streams(state, torrents, onAction, onStream, Modifier.padding(horizontal = d.gutter)) }
+                    } else items(state.episodes, key = { "ep:" + it.id }) { e ->
                         EpisodeRow(e, selected = e.id == state.episode?.id) { onAction(CatalogTitleAction.SelectEpisode(e)) }
                         if (e.id == state.episode?.id) Streams(state, torrents, onAction, onStream, Modifier.padding(start = d.gutter + 16.dp, end = d.gutter))
                     }
@@ -319,10 +334,50 @@ fun CatalogTitleScreen(
             }
         }
     }
+    }
+}
+
+/** The title's artwork, blurred and darkened, behind the whole page (Cinematic background). */
+@Composable
+internal fun CinematicBackground(url: String?) {
+    if (url == null) return
+    val base = MaterialTheme.colorScheme.background
+    Box(Modifier.fillMaxSize().testTag("cinematic-background")) {
+        Artwork(url, "", Modifier.fillMaxSize().blur(36.dp).graphicsLayer { alpha = 0.55f }, showInitials = false)
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(
+            0f to base.copy(alpha = 0.35f), 0.45f to base.copy(alpha = 0.8f), 1f to base,
+        )))
+    }
+}
+
+/** Episodes as 16:9 cards in a row (Settings → Layout → Detail page → Episode cards: Horizontal). */
+@Composable
+private fun EpisodeCardsRow(episodes: List<CatalogVideo>, selected: String?, onSelect: (CatalogVideo) -> Unit) {
+    val d = LocalDimens.current
+    androidx.compose.foundation.lazy.LazyRow(
+        Modifier.testTag("episode-cards"), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(d.cardGap),
+    ) {
+        items(episodes, key = { "epc:" + it.id }) { e ->
+            val chosen = e.id == selected
+            Column(
+                Modifier.width(220.dp).clip(MaterialTheme.shapes.medium).focusHighlight().clickable { onSelect(e) }.testTag("episode:${e.id}"),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.medium)
+                    .then(if (chosen) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier)) {
+                    Artwork(e.thumbnail, e.title ?: "E${e.episode}", Modifier.fillMaxSize(), showInitials = false)
+                }
+                Text(listOfNotNull(e.episode?.let { "$it." }, e.title).joinToString(" "), style = MaterialTheme.typography.titleSmall,
+                    color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                e.released?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+    }
 }
 
 @Composable
-private fun Header(state: CatalogTitleUiState, onOpenLibrary: (Long) -> Unit) {
+private fun Header(state: CatalogTitleUiState, onOpenLibrary: (Long) -> Unit, showOverview: Boolean = true, showCast: Boolean = true) {
     val d = LocalDimens.current
     Row(Modifier.padding(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         Artwork(state.poster, state.title, Modifier.width(d.posterWidth).aspectRatio(2f / 3f).clip(MaterialTheme.shapes.medium))
@@ -338,8 +393,8 @@ private fun Header(state: CatalogTitleUiState, onOpenLibrary: (Long) -> Unit) {
             }
         }
     }
-    state.meta?.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = d.gutter, vertical = 8.dp)) }
-    state.meta?.cast?.takeIf { it.isNotEmpty() }?.let {
+    state.meta?.description?.takeIf { showOverview }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = d.gutter, vertical = 8.dp)) }
+    state.meta?.cast?.takeIf { showCast && it.isNotEmpty() }?.let {
         Text(stringResource(R.string.addon_cast, it.take(6).joinToString(", ")), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = d.gutter))
     }
@@ -437,6 +492,10 @@ private fun GroupHeader(g: StreamGroup) {
         Modifier.fillMaxWidth().padding(top = 8.dp).semantics(mergeDescendants = true) { heading() }.testTag("stream-group:${g.id}"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Settings → Layout → Streams → Add-on logo.
+        if (dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout.addonLogo && g.logo != null) {
+            Artwork(g.logo, g.addon, Modifier.size(24.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).testTag("stream-logo:${g.id}"), showInitials = false)
+        }
         Text(g.addon, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (!g.loading) {
@@ -471,8 +530,13 @@ private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(s.name.replace('\n', ' '), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(96.dp), maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Settings → Layout → Streams: size badge, above or below the description.
+                val layout = dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout
+                val size = s.sizeBytes?.takeIf { layout.sizeBadges && it > 0 }
+                if (size != null && layout.badgesOnTop) SizeBadge(size)
                 s.description?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+                if (size != null && !layout.badgesOnTop) SizeBadge(size)
                 when {
                     s.playable -> Unit
                     s.isTorrent && torrents -> Text(stringResource(R.string.addon_stream_torrent), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
@@ -484,6 +548,21 @@ private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream)
             if (s.playable || (s.isTorrent && torrents)) Icon(Icons.Filled.PlayArrow, stringResource(R.string.action_play))
         }
     }
+}
+
+/** "1.4 GB" on a stream result. */
+@Composable
+private fun SizeBadge(bytes: Long) {
+    androidx.compose.material3.Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.testTag("stream-size")) {
+        Text(sizeLabel(bytes), style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+    }
+}
+
+/** 1 500 000 000 → "1.4 GB"; under a GB in MB (pure; tested). */
+internal fun sizeLabel(bytes: Long): String {
+    val gb = bytes / (1024.0 * 1024 * 1024)
+    return if (gb >= 1) "%.1f GB".format(java.util.Locale.ROOT, gb) else "%d MB".format(java.util.Locale.ROOT, (bytes / (1024 * 1024)).coerceAtLeast(1))
 }
 
 @Composable

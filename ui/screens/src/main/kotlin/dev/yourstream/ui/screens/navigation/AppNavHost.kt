@@ -147,7 +147,8 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SettingsPageRoute> { entry ->
             val name = entry.toRoute<SettingsPageRoute>().page
             val settingsPage = dev.yourstream.ui.screens.settings.SettingsPage.entries.firstOrNull { it.name == name } ?: dev.yourstream.ui.screens.settings.SettingsPage.APPEARANCE
-            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage, onBack = back)
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage,
+                onPage = navigator::settingsPage, onBack = back)
         }
         page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         page<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }

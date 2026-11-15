@@ -152,6 +152,7 @@ fun SettingsRoute(
         securedHosts = secured,
         indexing = indexing,
         onIndexing = { indexingVm.set(it) },
+        onPage = onPage,
     )
     if (page == null) SettingsScreen(host, onPage) else SettingsPageScreen(page, host, onBack)
 }
@@ -197,6 +198,8 @@ data class SettingsHost(
     /** When background indexing may run (Content & discovery → Indexing). */
     val indexing: dev.yourstream.media.api.model.IndexingPolicy = dev.yourstream.media.api.model.IndexingPolicy(),
     val onIndexing: (dev.yourstream.media.api.model.IndexingPolicy) -> Unit = {},
+    /** Opens another Settings page (Layout's own pages). */
+    val onPage: (SettingsPage) -> Unit = {},
 )
 
 /** The indexing policy for Settings (it lives with the indexer: background workers read it). */
@@ -226,7 +229,7 @@ fun SettingsScreen(host: SettingsHost, onPage: (SettingsPage) -> Unit = {}) {
             if (query.isBlank()) {
                 item(key = "profile") { Profile(host.state, host.onAccount) }
                 SettingsSection.entries.forEach { section ->
-                    val pages = SettingsPage.entries.filter { it.section == section }
+                    val pages = SettingsPage.entries.filter { it.section == section && it.parent == null }
                     val direct = SETTINGS.filter { it.page == null && it.section == section && it.shown(host) }
                     if (pages.isEmpty() && direct.isEmpty()) return@forEach
                     item(key = "section:${section.name}") { SettingsGroup(stringResource(section.title)) }
@@ -333,8 +336,6 @@ private fun SettingsDialogs(dialog: SettingsDialog, host: SettingsHost, onClose:
             { onPrefs(prefs.copy(style = it)) }, onClose)
         SettingsDialog.THEME -> Choose(stringResource(R.string.settings_theme), ThemeMode.entries.map { it to themeLabel(it) }, prefs.theme,
             { onPrefs(prefs.copy(theme = it)) }, onClose)
-        SettingsDialog.POSTER -> Choose(stringResource(R.string.settings_poster_size), PosterSize.entries.map { it to posterSizeLabel(it) }, prefs.posterSize,
-            { onPrefs(prefs.copy(posterSize = it)) }, onClose)
         SettingsDialog.BUFFER -> Choose(stringResource(R.string.settings_buffer), AppSettings.BUFFER_OPTIONS.map { it to bufferLabel(it) }, prefs.streamBufferSeconds,
             { onPrefs(prefs.copy(streamBufferSeconds = it)) }, onClose)
         SettingsDialog.TORRENT_CONSENT -> TorrentConsentDialog(onEnable = { onPrefs(prefs.copy(torrentStreaming = true)) }, onClose = onClose)

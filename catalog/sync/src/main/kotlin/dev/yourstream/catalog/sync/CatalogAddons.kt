@@ -139,6 +139,9 @@ class CatalogAddons @Inject constructor(
         return info
     }
 
+    /** An add-on's logo from the manifest fetched in this session (no network; null when not known). */
+    fun logo(id: String): String? = _addons.value.firstOrNull { it.id == id }?.let { a -> synchronized(this) { provider(a) }?.knownInfo?.logo }
+
     /** Enabled add-ons that answer "how can I watch X?" (Stremio stream resource). */
     suspend fun streamProviders(): List<StreamProvider> =
         synchronized(this) { _addons.value.filter { it.enabled }.mapNotNull { provider(it) as? StreamProvider } }

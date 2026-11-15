@@ -10,7 +10,15 @@ import dev.yourstream.ui.screens.navigation.OpenTarget
 enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, REVIEW }
 
 /** One catalog from an add-on, as a Home row. */
-data class CatalogRow(val key: String, val title: String, val tiles: List<dev.yourstream.ui.screens.Tile>)
+data class CatalogRow(
+    val key: String,
+    val title: String,
+    val tiles: List<dev.yourstream.ui.screens.Tile>,
+    /** What the catalog holds, for "Popular · Movies" (Settings → Layout → Show catalog type). */
+    val type: dev.yourstream.catalog.api.CatalogType? = null,
+    /** Cards of titles from future years (not out yet), for "Hide unreleased content". */
+    val unreleased: Set<String> = emptySet(),
+)
 
 /** Unwatched picks from the local watch profile; [basis] says what it is built from. */
 data class ForYou(val basis: String?, val tiles: List<dev.yourstream.ui.screens.Tile>)
