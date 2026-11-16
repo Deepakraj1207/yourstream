@@ -7,15 +7,46 @@ import dev.yourstream.ui.screens.TileAction
 import dev.yourstream.ui.screens.navigation.OpenTarget
 
 /** Something the user should do or know before the rows make sense. */
-enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE, REVIEW }
+enum class HomeBanner { NOT_SIGNED_IN, NO_SOURCES, OFFLINE }
 
 /** One catalog from an add-on, as a Home row. */
-data class CatalogRow(val key: String, val title: String, val tiles: List<dev.yourstream.ui.screens.Tile>)
+data class CatalogRow(
+    val key: String,
+    val title: String,
+    val tiles: List<dev.yourstream.ui.screens.Tile>,
+    /** What the catalog holds, for "Popular · Movies" (Settings → Layout → Show catalog type). */
+    val type: dev.yourstream.catalog.api.CatalogType? = null,
+    /** Cards of titles from future years (not out yet), for "Hide unreleased content". */
+    val unreleased: Set<String> = emptySet(),
+)
 
 /** Unwatched picks from the local watch profile; [basis] says what it is built from. */
 data class ForYou(val basis: String?, val tiles: List<dev.yourstream.ui.screens.Tile>)
 
 /** The featured title. [kind] decides the wording; the targets come from the domain's entries. */
+/**
+ * One slide of Home's hero carousel (from the user's hero catalogs, Settings → Layout → Home
+ * layout): artwork, the title, "Movie · Romance · 2h 11m · 2026", rating and languages.
+ */
+data class HeroSlide(
+    val key: String,
+    val title: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val type: dev.yourstream.catalog.api.CatalogType,
+    val genre: String?,
+    val runtimeMinutes: Int?,
+    val year: Int?,
+    val rating: Double?,
+    /** ISO codes ("ta"), shown as "TA". */
+    val languages: List<String>,
+    val open: OpenTarget,
+    /** The title's logo (TMDB), drawn instead of the title text. */
+    val logoUrl: String? = null,
+    /** Artwork without the title printed on it (TMDB), so the logo is not shown twice. */
+    val textlessPosterUrl: String? = null,
+)
+
 data class HeroItem(
     val kind: Kind,
     val key: String,
@@ -38,11 +69,19 @@ data class HomeUiState(
     /** Titles in the library (null while unknown). */
     val libraryCount: Int? = null,
     val forYou: UiState<ForYou> = UiState.Loading,
-    /** Titles waiting for the user's match check. */
-    val reviewCount: Int = 0,
     /** Chats being indexed right now (the status bar at the top). */
     val indexing: dev.yourstream.ui.screens.IndexingStatus = dev.yourstream.ui.screens.IndexingStatus(),
     val catalogs: List<CatalogRow> = emptyList(),
+    /**
+     * The add-on catalogs are still loading. Home then keeps the layout it will have once they
+     * arrive (setup panel above rows), instead of a full-screen "Sign in" that turns into the
+     * panel a moment later.
+     */
+    val catalogsLoading: Boolean = false,
+    /** The hero carousel's slides (from the hero catalogs); empty: the library hero. */
+    val heroSlides: List<HeroSlide> = emptyList(),
+    /** The hero catalogs are still loading: a placeholder of the carousel's size, not the library hero. */
+    val heroLoading: Boolean = false,
 ) {
     /** Nothing at all in the library: one full-screen state with the right next step. */
     val blocking: EmptyKind?

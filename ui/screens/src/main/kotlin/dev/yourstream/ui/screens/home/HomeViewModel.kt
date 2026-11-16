@@ -68,9 +68,9 @@ class HomeViewModel @Inject constructor(
     private val artwork: ArtworkLookup,
     private val actions: TileActionHandler,
     private val assistant: dev.yourstream.assistant.engine.MediaAssistant,
-    private val reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
     private val indexingMonitor: IndexingMonitor,
     private val homeCatalogs: HomeCatalogs,
+    private val heroSource: dev.yourstream.ui.screens.HeroSlides = dev.yourstream.ui.screens.HeroSlides { kotlinx.coroutines.flow.flowOf(emptyList()) },
 ) : ViewModel() {
     private val retry = MutableStateFlow(0)
 
@@ -113,7 +113,9 @@ class HomeViewModel @Inject constructor(
 
 
     /** Rows from the user's catalog add-ons (Settings → Add-ons); reloaded when they change. */
-    private val catalogs: Flow<List<CatalogRow>> = homeCatalogs.rows().onStart { emit(emptyList()) }.catch { emit(emptyList()) }
+    /** Null while the first answer is loading. */
+    // The source keeps its last rows while Home is away (HomeSources): no reload on return.
+    private val catalogs: Flow<List<CatalogRow>?> = homeCatalogs.rows().catch { emit(emptyList()) }
 
     /**
      * Recommendations from the local watch profile (nothing leaves the device), recomputed when the
@@ -129,16 +131,18 @@ class HomeViewModel @Inject constructor(
         .onStart { emit(UiState.Loading) }
         .catch { emit(UiState.Error(it.toUiError())) }
 
-    private val review: Flow<Int> = reviewQueue.count()
+    /** The hero carousel from the user's hero catalogs (empty while loading or with none picked). */
+    // Null until the first answer: Home then keeps the carousel's space instead of flashing the
+    // library hero and swapping it out a moment later.
+    private val heroSlides: Flow<List<HeroSlide>?> = heroSource.slides().catch { emit(emptyList()) }
 
     // Indexing progress is shown by the shell's pill; Home does not re-render on every page read.
-    private val extras = combine(forYou, review, catalogs) { f, r, c -> Extras(f, r, c) }
+    private val extras = combine(forYou, catalogs, heroSlides) { f, c, h -> Extras(f, c, h) }
 
-    private data class Extras(val forYou: UiState<ForYou>, val review: Int, val catalogs: List<CatalogRow>)
+    private data class Extras(val forYou: UiState<ForYou>, val catalogs: List<CatalogRow>?, val hero: List<HeroSlide>?)
 
     val state: StateFlow<HomeUiState> = combine(banner, hero, continueWatching, count, extras) { b, h, cw, n, e ->
-        // Lowest-priority banner: only when nothing more urgent is shown.
-        HomeUiState(b ?: HomeBanner.REVIEW.takeIf { e.review > 0 }, h, cw, n, e.forYou, e.review, IndexingStatus(), e.catalogs)
+        HomeUiState(b, h, cw, n, e.forYou, IndexingStatus(), e.catalogs.orEmpty(), catalogsLoading = e.catalogs == null, heroSlides = e.hero.orEmpty(), heroLoading = e.hero == null)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

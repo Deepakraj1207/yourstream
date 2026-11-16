@@ -47,6 +47,7 @@ class StremioCatalogProvider(
 
     @Volatile private var activeBase: String = definition.baseUrls.first()
     @Volatile private var info: CatalogProviderInfo? = null
+    override val knownInfo: CatalogProviderInfo? get() = info
 
     // ------------------------------------------------------------------ manifest
 
@@ -109,8 +110,15 @@ class StremioCatalogProvider(
             }
             CatalogDescriptor(id, entry.id, type, entry.name, definition.catalogLanguages(entry), definition.catalogTags(entry), extras)
         }
+        val resourcePrefixes = m.array("resources").mapNotNull { it as? JsonObject }.flatMap { it.strings("idPrefixes") }
+        val hints = m.obj("behaviorHints")
         return CatalogProviderInfo(id, m.str("name") ?: displayName, m.str("version"), m.str("description"), catalogs,
-            resources.distinct(), metaPrefixes.distinct(), base, streamTypes.map { it.lowercase() }.distinct(), streamPrefixes.distinct())
+            resources.distinct(), metaPrefixes.distinct(), base, streamTypes.map { it.lowercase() }.distinct(), streamPrefixes.distinct(),
+            logo = m.str("logo")?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
+            types = topTypes.map { it.lowercase() }.distinct(),
+            idPrefixes = (topPrefixes + resourcePrefixes).distinct(),
+            configurable = hints?.bool("configurable") == true || hints?.bool("configurationRequired") == true,
+            p2p = hints?.bool("p2p") == true)
     }
 
     private suspend fun knownInfo(): AppResult<CatalogProviderInfo> = info?.let { AppResult.Ok(it) } ?: describe()
@@ -308,7 +316,7 @@ class StremioCatalogProvider(
 
     companion object {
         private val IMDB = Regex("tt\\d{5,}")
-        const val NUVIO_PLUGINS = "This is a Nuvio plugin repository (scripts that scrape streaming websites). YourStream doesn't run plugins. " +
-            "Add-ons work: paste a Stremio or Nuvio add-on link (it ends in manifest.json)."
+        const val NUVIO_PLUGINS = "This is a Nuvio plugin repository, which YourStream doesn't use. " +
+            "Paste a Stremio or Nuvio add-on link instead (it ends in manifest.json)."
     }
 }

@@ -133,18 +133,18 @@ class AdvancedScreensTest {
 
     @Test
     fun libraryStatusShowsEveryStageAndLeadsToReview() {
-        var reviews = 0; var syncs = 0
+        var syncs = 0
         val s = LibraryStatus(
             sources = listOf(dev.yourstream.ui.screens.library.SourceSync(1, "Tamil Movies", false, 1240, 0, null, null)),
             files = 1240, titles = 240, movies = 180, series = 60, matched = 210, review = 12, unmatched = 18, providers = listOf("TMDB"),
         )
-        set { LibraryStatusScreen(s, { syncs++ }, { reviews++ }, {}, {}, now = 60_000) }
+        set { LibraryStatusScreen(s, { syncs++ }, {}, {}, now = 60_000) }
         compose.onNodeWithText("240 titles from 1240 files in 1 chat").assertExists()
         compose.onNodeWithText("210 of 240").assertExists()
         compose.onNodeWithTag("sync-now").performClick()
-        compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("review"))
-        compose.onNodeWithTag("review").performClick()
-        assertEquals(1 to 1, syncs to reviews)
+        // No "check matches" step since 0.11.5: titles are matched automatically.
+        compose.onNodeWithTag("stage-review").assertDoesNotExist()
+        assertEquals(1, syncs)
         compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("privacy-note"))
         compose.onNodeWithText("only a title and year are sent to TMDB", substring = true).assertExists()
     }
@@ -160,7 +160,7 @@ class AdvancedScreensTest {
             sources = listOf(src(1, IndexState.SCANNING, found = 340), src(2, IndexState.QUEUED), src(3, IndexState.PAUSED, paused = true), src(4, IndexState.RECOVERING)),
             files = 40, policy = dev.yourstream.media.api.model.IndexingPolicy(wifiOnly = true),
         )
-        set { LibraryStatusScreen(s, {}, {}, {}, {}, now = 60_000, onSource = { actions += it }, onPauseAll = { pauseAll = it }) }
+        set { LibraryStatusScreen(s, {}, {}, {}, now = 60_000, onSource = { actions += it }, onPauseAll = { pauseAll = it }) }
         compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("source:4"))
         compose.onNodeWithTag("source-state:1", useUnmergedTree = true).assertTextEquals("10 files · 340 files found so far")
         compose.onNodeWithTag("source-state:2", useUnmergedTree = true).assertTextEquals("10 files · Waiting for Wi-Fi")
@@ -186,7 +186,7 @@ class AdvancedScreensTest {
     @Test
     fun hiddenUntitledFilesAreReachableFromLibraryStatus() {
         var opened = 0
-        set { LibraryStatusScreen(LibraryStatus(titles = 10, untitled = 4), {}, {}, {}, {}, now = 0, onUntitled = { opened++ }) }
+        set { LibraryStatusScreen(LibraryStatus(titles = 10, untitled = 4), {}, {}, {}, now = 0, onUntitled = { opened++ }) }
         compose.onNodeWithTag("library-status").performScrollToNode(hasTestTag("untitled"))
         compose.onNodeWithText("4 files without a title").performClick()
         assertEquals(1, opened)

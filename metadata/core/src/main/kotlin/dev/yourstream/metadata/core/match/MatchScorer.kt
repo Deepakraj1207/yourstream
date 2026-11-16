@@ -39,10 +39,14 @@ data class ScoredCandidate(
 
 /** Thresholds deciding what happens with a best candidate. */
 data class MatchThresholds(
-    /** At or above: accepted automatically. */
-    val accept: Double = 0.80,
-    /** At or above (but below [accept]): kept as a suggestion for the user, never applied. */
-    val review: Double = 0.55,
+    /**
+     * At or above: accepted automatically; below: the title keeps its file name (retried later).
+     * Since 0.11.5 there is no "ask the user" band: matching posters is the app's job, not the
+     * user's (the user's decision, 15 Nov 2026). 0.65 keeps clearly wrong answers out (a title
+     * that only shares a word scores ~0.4) while taking the right one in the cases users were asked
+     * about (~0.7–0.8).
+     */
+    val accept: Double = 0.65,
 )
 
 /**
@@ -94,6 +98,8 @@ class MatchScorer {
         val rivals = sorted.drop(1).filter { other ->
             sameGroup(best, other) &&
                 other.candidate.ref != best.candidate.ref &&
+                // The same film listed twice (same title and year): not a doubt about which film it is.
+                !sameFilm(best.candidate, other.candidate) &&
                 !(best.candidate.ref.imdbId != null && best.candidate.ref.imdbId == other.candidate.ref.imdbId) &&
                 best.confidence - other.confidence < 0.05 &&
                 !(bestPop != null && (other.candidate.popularity ?: 0.0) > 0 && bestPop / other.candidate.popularity!! >= 3)
@@ -104,6 +110,10 @@ class MatchScorer {
             if (s in group) s.copy(confidence = s.confidence - 0.12, breakdown = s.breakdown.copy(ambiguityPenalty = 0.12)) else s
         }.sortedByDescending { it.confidence }
     }
+
+    /** Two entries for one film: the same title (spelling aside) and the same year. */
+    private fun sameFilm(a: MetadataCandidate, b: MetadataCandidate): Boolean =
+        a.year != null && a.year == b.year && a.ref.type == b.ref.type && TitleSimilarity.similarity(a.title, b.title) >= 0.95
 
     private fun rawScore(input: MatchInput, c: MetadataCandidate, index: Int): Pair<Double, ScoreBreakdown> {
         val candidateTitles = listOfNotNull(c.title, c.originalTitle) + c.alternativeTitles

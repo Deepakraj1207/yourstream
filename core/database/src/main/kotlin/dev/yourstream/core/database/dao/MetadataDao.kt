@@ -69,6 +69,13 @@ interface MetadataDao {
     )
     suspend fun matchWork(now: Long, limit: Int): List<MatchWorkRow>
 
+    /**
+     * Titles that waited for the user's check (before 0.11.5): due now, so the matcher decides
+     * them by itself. A no-op once none is left.
+     */
+    @Query("UPDATE metadata_match SET next_attempt_at = 0 WHERE status = 'NEEDS_REVIEW' AND next_attempt_at > 0")
+    suspend fun reviewsDueNow(): Int
+
     // ---- matches ----
 
     @Upsert

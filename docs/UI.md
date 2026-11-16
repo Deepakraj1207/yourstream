@@ -113,11 +113,12 @@ filters open them, and their pages show Home as the selected tab.
 
 Phones show the bar under the content, on the main tabs only; other pages use the whole screen.
 
-* **Manga style** (`MangaNavigationBar`): a printed strip with an ink rule along the top; each
-  tab an icon over its name in bold; the current tab a stamped panel with a hard offset shadow
-  (dark: a cream block on a black shadow; light: a paper panel with an ink border and shadow,
-  like the manga cards). Pressing a tab pushes its panel down onto its shadow; with reduced
-  motion it does not move.
+* **Manga style** (`MangaNavigationBar`), the "Panel Grid" the user picked (14 Nov 2026) from
+  seven mockups: a thick ink rule along the top; each tab a slanted comic panel (about 8°) with
+  an inked border and gutters between panels, nudged slightly off the line like a hand-drawn
+  page. The current tab's panel is filled with ink and its icon and name are printed in the
+  paper colour; pressing a tab tints its panel. Only the outline slants; icon and name stay
+  upright. Colours change instantly with reduced motion. Tested at 320 dp width (≥ 48 dp tabs).
 * **Classic style**: a Material 3 navigation bar (M3 container, elevation, insets and
   `NavigationBarItem`s, without the 8 dp item gaps).
 
@@ -327,3 +328,154 @@ speed labels are pure functions in `PlayerViewModel` (tested).
    `StateContent` for its state.
 4. Register `composable<XxxRoute>` in `AppNavHost`, wiring callbacks to `AppNavigator`.
 5. Test the mapping (pure), the ViewModel (fakes) and the screen (Compose).
+
+## Settings → Layout (Nuvio's structure, since 0.11.4)
+
+The user asked for Nuvio's Layout page with its options working. The hub lists, in Nuvio's order:
+
+| Section | Page | Options (what they change) |
+| --- | --- | --- |
+| Home | Home layout | Show hero; **Hero catalogs** (0.11.5: up to 3 add-on catalogs feeding a Nuvio-style carousel at the top of Home: full-width artwork, title, "Movie • Romance • 2h 11m • 2026", rating and language badges, View Details, dots; swipe or 6 s auto-advance, still with reduced motion; none chosen: the library hero); Show catalog type ("Popular · Movies" on add-on rows); Hide unreleased content (titles from future years left out of add-on rows); rows (For you, Recently added, Series, add-on catalogs); **Catalogs**: every catalog of the enabled add-ons with a switch, move up / down and rename, plus Reset to default (`HomeCatalogPrefs`, applied when Home's rows load). |
+| Home | Continue Watching | Show Continue Watching; card style Wide / Poster; on select Resume playing / Open details. |
+| Home | Poster card style | Live preview; width Compact 104 … Large 140 dp (other layouts scale with it); corner radius look's own / Sharp 0 … Pill 16; Hide labels; Reset. Applied app-wide through `LocalCardLook` and the theme's poster width. Old Small / Medium / Large carry over (104 / 120 / 140). |
+| Streams | Streams | Size badges (file size from `behaviorHints.videoSize`); badge position Top / Bottom; Add-on logo next to each stream group (from the manifest already fetched, no extra request). |
+| Detail page | Detail page | Background Normal / Cinematic (artwork blurred behind add-on title pages and library details); episode cards List / Horizontal; Overview and Cast shown or hidden. |
+| Navigation | Navigation bar | Nuvio's styles (0.11.5): Adaptive (Nuvio's floating bar over the content, shrinking to an icons-only pill while scrolling down and growing back when scrolling up; Panel Grid in the manga look) / Always expanded / Always compact / Panel Grid / Classic (Material bar under the content); Glass glow; Tab names; live preview. |
+
+Not built: Nuvio's Collections (custom folders of catalogs), its card depth effect, custom poster
+sources, badge-URL ("fusion") rules, trailers and ratings sections: they depend on features this app
+does not have.
+
+## Player controls (Nuvio-style, since 0.11.4)
+
+Both players (Telegram files and add-on streams) share `PlayerChrome.kt`:
+
+* **Top bar**: back, title and episode line, quality badge (library player), **lock**, rotate.
+* **Centre**: rewind / play-pause / forward, the jump size under each (−10 / +10, from Settings).
+* **Bottom**: timeline, **time pills** (position; speed · length), then **labelled pills**: previous /
+  next episode, Fit / Fill / Zoom, speed (1×), Subs, Audio, Episodes, **Sources (n)** (other files
+  of the title: switches at the current position), Quality. The stream player has Fit, speed,
+  Subs, Audio.
+* **Lock**: hides every control and ignores touches; back does nothing; a tap shows the unlock
+  button ("Tap to unlock") for a few seconds.
+* **Gestures**: tap (controls), double-tap left/right (seek), swipe up/down left (brightness) and
+  right (volume), **swipe sideways to seek** (a full-width swipe moves 60 s under 30 min, 90 s up to
+  an hour, 120 s beyond, with the target time shown while swiping), hold (faster). Swipes starting
+  within 24 dp of an edge are left to the system's back / home gestures.
+* **Subtitles → Style**: size, colour, position from the bottom, bold, dark background or outline,
+  reset. Kept in the settings, applied right away.
+
+Not built (from Nuvio's player): chapters (Media3 does not expose MKV chapters), audio delay and
+amplification, subtitle delay, the libmpv engine, watch party, intro submission, external player.
+
+## Poster cards keep one height (0.11.5)
+
+A poster's text block has a fixed height (two title lines, subtitle, and a caption line when any
+card of that row or grid has one: `LocalReserveCaption`). Before, a row's height followed its
+tallest visible card, so rows grew and shrank while scrolling sideways and pushed the rows below
+up and down (seen in the user's screen recording). Test: `RowHeightTest`.
+
+## Search like Nuvio (0.12)
+
+Top to bottom, as in Nuvio's search screen:
+- **Field:** a filled field with 16 dp corners, placeholder "Search movies, shows…", and a clear
+  button once something is typed.
+- **Recent Searches:** shown while the field is focused and empty, each with a remove button.
+  A search is saved when you press search on the keyboard or open a result, not on every typed
+  letter, so half-typed words are not kept. At most 10, newest first, no repeats in any case.
+- **Discover** (empty query):
+  - A type / catalog / genre drop-down row over a poster grid of the chosen add-on catalog.
+  - A line names the add-on and type.
+  - More pages load as the grid scrolls. The choice is kept.
+  - A catalog that requires a genre starts on its first genre, and "All genres" is not offered.
+  - Once scrolled, the page heading reads "Discover".
+- **While typing:**
+  - The user's own titles first ("Your titles", tagged FROM TELEGRAM, best match first).
+  - Then one row per add-on and type ("Cinemeta · Movies"), add-ons asked side by side
+    (`CatalogManager.searchSections`).
+  - Media Brain's answer to requests stays above the rows.
+- **Messages:** "No results found", "No searchable catalogs" and "Search failed" with Retry.
+  The verdict waits until the add-ons have answered.
+
+Removed with stated reasons: the results count and the wide "Top result" card (Nuvio shows rows;
+the best match now leads the Telegram row), and the example-request chips on the empty page
+(Discover takes that space, as in Nuvio).
+
+Tests: `ScreensTest` (rows, empty states, recent and Discover), `ViewModelTest` (recent,
+Discover choice and paging, add-on rows), `CatalogManagerTest` (search sections, genre pages).
+
+## Adaptive navigation bar motion (0.12)
+
+Based on Nuvio's floating bar source.
+- One label fraction, eased over 300 ms with CubicBezier(0.2, 0, 0, 1), drives the bar together:
+  - height 58 → 64 dp;
+  - side margins 58 → 28 dp;
+  - the names fading while their line folds away.
+- The selected capsule slides between tabs on a spring. The glow fades in over 420 ms.
+- Adaptive mode reacts after 60 px of scrolling in one direction. The count starts over when the
+  direction turns, so jitters and short flicks do not make the bar pump.
+- Reduced motion: no animation.
+- Deviation: Nuvio's compact bar is 48 dp. Here it is 58 dp so the tabs keep the 48 dp
+  touch-target minimum.
+- Tests: `LayoutSettingsTest` (threshold, in-between sizes, compact touch targets).
+
+## Home (0.12)
+
+- "Recently added" carries a blue FROM TELEGRAM tag.
+- The separate Series row is gone: series appear once, as catalog posters (with the Telegram
+  badge when you have them).
+- The hero carousel's auto-advance waits for the settled page, so it no longer stops halfway
+  between two slides.
+
+## Title page like Nuvio's (0.12.1)
+
+The add-on title page is a Nuvio detail page, filled from TMDB when its key is set
+(`TitleDetailsProvider`, implemented by `TmdbProvider.details`).
+- **Data:** one request with credits, videos, images, recommendations, release dates or content
+  ratings, and external ids. A title known only by its IMDb id is found first. The last 30 pages
+  are kept in memory.
+- **Layout, top to bottom:**
+  - artwork with the logo (in your language, else English, else textless) and the genres;
+  - **Play** (opens the streams) and a "•••" menu (open in your library, refresh streams);
+  - year · length · age rating (your region's, else the US one);
+  - IMDb (titles from Cinemeta) and TMDB scores;
+  - Director, Creator, Writer;
+  - the overview, three lines with Show More;
+  - a series' seasons and episodes (an episode opens its streams);
+  - Production logos, Cast with photos and roles, and Trailers (YouTube, by kind);
+  - Movie or Show Details (status, release, runtime, seasons and episodes, certification,
+    country, language), More Like This, and "Powered by TMDB".
+- **Top bar:** back, plus the logo once the artwork has scrolled away, plus "My library" (+)
+  for titles in your library.
+- **More Like This:** these titles open by TMDB id, and TMDB gives their IMDb id for the stream
+  add-ons.
+- **Without a TMDB key:** the add-on's details fill the same layout.
+- **Not shown:** Nuvio's Rotten Tomatoes, Letterboxd and audience scores. They come from
+  MDBList, which needs its own key, so only IMDb and TMDB are shown.
+- **Streams:** on their own page, as in Nuvio. Play opens it, back returns. Streams start loading
+  when the page opens, so they are ready.
+- **Changed with stated reasons:** the old poster header and inline streams are gone, and the
+  stream tests now open the streams page first.
+- **Tests:** `TitleDetailsPageTest`, `TmdbProviderTest.titleDetailsForTheTitlePage`, and
+  `TitleStreamsCrashTest.titleOpenedByTmdbIdAsksAddonsWithItsImdbId`.
+
+
+## Haptic feedback (0.12.4)
+
+One helper decides how each kind of touch feels: `Haptic` and `rememberHaptics()` in
+`ui/core/Haptics.kt`. It plays through Compose's haptics, so the phone's own touch-feedback
+setting applies. It can be turned off in Settings → Appearance → Accessibility → Haptic feedback
+(on by default).
+
+| Feel | Where |
+|---|---|
+| Select tick | another tab (every navigation style), chips, stream add-on chips, Sort & filter options, Discover drop-downs, player menu choices, a swiped carousel slide (not auto-advance) |
+| Tap | play/pause, seek ±10 s, player pills and buttons |
+| Confirm | Play on a title page, tapping a stream, applying Sort & filter, unlocking the player |
+| Toggle on / off | every settings switch, add-ons, hero catalogs, Home rows, Telegram chats, My library (+) |
+| Long press | a poster's actions menu, hold-for-speed in the player |
+| Threshold | double-tap seek, start of a swipe seek or timeline scrub, locking the player |
+| Steps | each 10 % of brightness, each volume step, every 10 s of a swipe seek, every minute of a scrub |
+
+Tests: `HapticsTest` (tabs, chips and switches are felt; the setting silences them; the switch is
+saved).

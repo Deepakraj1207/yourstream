@@ -71,6 +71,31 @@ class StremioStreamsTest {
     }
 
     @Test
+    fun theAddonsPageGetsLogoVersionTypesIdRulesAndSettings() = runTest {
+        val p = provider(mapOf(
+            "/manifest.json" to """{"id":"r","name":"Regional","version":"1.0.6","description":"Indian regional catalogs",
+                "logo":"https://cdn.example.com/logo.png","types":["movie","series"],"idPrefixes":["tt"],
+                "resources":["catalog",{"name":"meta","idPrefixes":["tmdb:"]},"stream"],"catalogs":[],
+                "behaviorHints":{"configurable":true,"p2p":true}}""",
+        ))
+        val info = (p.describe() as AppResult.Ok).value
+        assertEquals("1.0.6", info.version)
+        assertEquals("https://cdn.example.com/logo.png", info.logo)
+        assertEquals(listOf("movie", "series"), info.types)
+        assertEquals(listOf("catalog", "meta", "stream"), info.resources)
+        assertEquals(listOf("tt", "tmdb:"), info.idPrefixes, "top-level and per-resource rules")
+        assertTrue(info.configurable)
+        assertTrue(info.p2p)
+
+        val plain = provider(mapOf("/manifest.json" to """{"id":"x","name":"X","resources":["stream"],"logo":"javascript:alert(1)",
+            "behaviorHints":{"configurationRequired":true}}"""), "https://x.example.com/manifest.json")
+        val x = (plain.describe() as AppResult.Ok).value
+        assertNull(x.logo, "only web images")
+        assertTrue(x.configurable, "configurationRequired also means it has a settings page")
+        assertFalse(x.p2p)
+    }
+
+    @Test
     fun streamRequestsFollowTheManifest() = runTest {
         val p = provider(mapOf(
             "/manifest.json" to """{"id":"a","name":"Anime","resources":["catalog",{"name":"stream","types":["series"],"idPrefixes":["kitsu:"]}],"types":["movie","series"],"catalogs":[]}""",

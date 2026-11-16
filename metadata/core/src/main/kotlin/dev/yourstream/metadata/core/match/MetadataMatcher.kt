@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 enum class MatchDecision {
     /** Confident enough to apply automatically. */
     ACCEPTED,
-    /** Plausible but not certain: stored as a suggestion, NOT applied. */
+    /** No longer produced (since 0.11.5 the matcher decides by itself); kept for stored rows. */
     NEEDS_REVIEW,
     /** Nothing plausible found. */
     NO_MATCH,
@@ -30,7 +30,8 @@ data class MatchOutcome(
  *  1. queries: title + year, then title alone, then alternative titles;
  *  2. each provider in order (via the manager: cached, rate-limited, health-checked);
  *  3. every candidate scored by [MatchScorer]; stop as soon as one is acceptable;
- *  4. decide with [MatchThresholds]. Low-confidence matches are never accepted.
+ *  4. decide with [MatchThresholds]: accepted, or no match (the title keeps its file name). Low
+ *     confidence is never accepted, and the user is never asked to choose.
  */
 class MetadataMatcher(
     private val manager: MetadataProviderManager,
@@ -73,7 +74,6 @@ class MetadataMatcher(
             !anySucceeded -> MatchDecision.FAILED
             best == null -> MatchDecision.NO_MATCH
             best.confidence >= thresholds.accept -> MatchDecision.ACCEPTED
-            best.confidence >= thresholds.review -> MatchDecision.NEEDS_REVIEW
             else -> MatchDecision.NO_MATCH
         }
         return MatchOutcome(decision, best.takeIf { decision != MatchDecision.FAILED }, ranked.take(5), lastError.takeIf { decision == MatchDecision.FAILED })

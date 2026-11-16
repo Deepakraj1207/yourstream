@@ -41,7 +41,6 @@ import kotlinx.serialization.Serializable
 /** The automatic library: sync and matching progress, stage by stage. */
 @Serializable data object LibraryStatusRoute : Route
 /** Titles the matcher was unsure about. */
-@Serializable data object MatchReviewRoute : Route
 /** Choose the right metadata for one title (from Details). */
 @Serializable data class FixMatchRoute(val itemId: Long) : Route
 @Serializable data object StatsRoute : Route

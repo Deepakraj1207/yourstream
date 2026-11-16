@@ -286,8 +286,9 @@ private fun Telegram(state: FirstRunUiState, onConnect: () -> Unit) {
                 )
             }
             state.unavailable -> Text(stringResource(R.string.first_run_telegram_unavailable), style = MaterialTheme.typography.bodyMedium)
-            state.starting -> Text(stringResource(R.string.first_run_telegram_starting), style = MaterialTheme.typography.bodyMedium)
             else -> {
+                // Still starting: the sign-in screen waits for it, and explains if it does not come.
+                if (state.starting) Text(stringResource(R.string.first_run_telegram_starting), style = MaterialTheme.typography.bodyMedium)
                 Text(stringResource(R.string.first_run_telegram_how), style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = onConnect, modifier = Modifier.focusHighlight().testTag("first-run-connect")) {
                     Text(stringResource(R.string.first_run_telegram_connect))

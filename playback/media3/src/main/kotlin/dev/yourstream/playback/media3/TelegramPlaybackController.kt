@@ -144,7 +144,7 @@ class TelegramPlaybackController(
             scope = scope,
             clock = { System.nanoTime() / 1_000_000 },
             governor = a.streaming.governor,
-            onFocus = { media?.takeIf { !it.isLocal }?.let { streamer.focus(it.fileId).size } ?: 0 },
+            onFocus = { media?.takeIf { !it.isLocal }?.let { streamer.focus(it.activeFileId).size } ?: 0 },
         )
     }
     private var trackSession: TrackSession? = null
@@ -261,7 +261,7 @@ class TelegramPlaybackController(
     fun play(media: PlayableMedia, startPositionMs: Long? = null, playWhenReady: Boolean = true) {
         check(!released) { "released" }
         val previous = this.media
-        if (previous != null && !previous.isLocal && previous.fileId != media.fileId) releaseFile(previous)
+        if (previous != null && !previous.isLocal && previous.fileIds != media.fileIds) releaseFile(previous)
         this.media = media
         trackSession = trackSupport?.let { TrackSession(it.store, trackScopeOf(media), media.trackContext ?: FileContext(fileName = media.fileName)) }
         tracksKey = null; mappedTracks = null; _tracks.value = TrackState()
@@ -535,7 +535,7 @@ class TelegramPlaybackController(
         val runtime = Runtime.getRuntime()
         val java = runtime.totalMemory() - runtime.freeMemory()
         val native = Debug.getNativeHeapAllocatedSize()
-        val stats = media?.takeIf { !it.isLocal }?.let { streamer.stats(it.fileId) }
+        val stats = media?.takeIf { !it.isLocal }?.let { streamer.stats(it.activeFileId) }
         updateMetrics {
             it.copy(
                 peakJavaHeapBytes = maxOf(it.peakJavaHeapBytes, java),
@@ -572,7 +572,7 @@ class TelegramPlaybackController(
         }
         val policy = a.streaming.onSample(
             PlaybackSample(now / 1_000_000, phase, player.currentPosition, player.bufferedPosition, duration, bitrate, dropRate, player.isLoading),
-            m.fileId,
+            m.activeFileId,
         )
         if (!scrubbing && policy.preferFastSeek != fastSeekByPolicy) {
             fastSeekByPolicy = policy.preferFastSeek
@@ -607,7 +607,8 @@ class TelegramPlaybackController(
 
     private fun releaseFile(m: PlayableMedia) {
         if (m.isLocal) return
-        backgroundScope.launch { streamer.release(m.fileId, cancelDownload = true) }
+        if (m.isSplit) SplitReads.forget(m.fileId)
+        backgroundScope.launch { m.fileIds.forEach { streamer.release(it, cancelDownload = true) } }
     }
 
     private inline fun updateMetrics(block: (PlaybackMetrics) -> PlaybackMetrics) { _metrics.value = block(_metrics.value) }

@@ -1,5 +1,12 @@
 package dev.yourstream.ui.screens.player
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.offset
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -7,6 +14,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -136,10 +145,12 @@ fun PlayerRoute(onBack: () -> Unit, onPlay: (OpenTarget.Play) -> Unit, vm: Playe
     var fit by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(settings.defaultFit) }
     if (!tv) Orientation(landscape)
     RestoreBrightnessOnExit()
+    val prefs: dev.yourstream.ui.screens.settings.AppPreferencesViewModel = hiltViewModel()
     PlayerScreen(
         state, vm::onAction, onBack, onPlay, vm.episodeItems.collectAsLazyPagingItems(),
         onRotate = if (tv) null else ({ landscape = !landscape }),
         fit = fit, onFit = { fit = fit.next() },
+        onSettings = { new -> prefs.update { new } },
     ) { PlayerSurface(vm.player, state.isPlaying, fit) }
 }
 
@@ -175,17 +186,19 @@ internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = Vid
         update = {
             it.keepScreenOn = playing
             it.resizeMode = fit.resizeMode
-            // Subtitle look from Settings: size, and outline or dark box.
+            // Subtitle look (player → Subtitles → Style, or Settings): size, colour, bold, outline or
+            // dark box, distance from the bottom.
             it.subtitleView?.apply {
                 setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * settings.subtitleScale)
                 setApplyEmbeddedStyles(!settings.subtitleBox)
+                setBottomPaddingFraction(settings.subtitleOffset)
                 setStyle(
                     androidx.media3.ui.CaptionStyleCompat(
-                        android.graphics.Color.WHITE,
+                        settings.subtitleColor,
                         if (settings.subtitleBox) 0xB3000000.toInt() else android.graphics.Color.TRANSPARENT,
                         android.graphics.Color.TRANSPARENT,
                         if (settings.subtitleBox) androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE else androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE,
-                        android.graphics.Color.BLACK, null,
+                        android.graphics.Color.BLACK, if (settings.subtitleBold) android.graphics.Typeface.DEFAULT_BOLD else null,
                     ),
                 )
             }
@@ -194,7 +207,7 @@ internal fun PlayerSurface(player: Player, playing: Boolean, fit: VideoFit = Vid
     )
 }
 
-enum class PlayerPanel { EPISODES, AUDIO, SUBTITLES, SPEED, INFO }
+enum class PlayerPanel { EPISODES, AUDIO, SUBTITLES, SPEED, INFO, SUBTITLE_STYLE, SOURCES }
 
 private const val UP_NEXT_BEFORE_END_MS = 30_000L
 private const val UP_NEXT_COUNTDOWN_S = 10
@@ -223,6 +236,8 @@ fun PlayerScreen(
     fit: VideoFit = VideoFit.FIT,
     /** Cycles [VideoFit]; null hides the button. */
     onFit: (() -> Unit)? = null,
+    /** Saves a change made in the player (subtitle style); null hides that menu. */
+    onSettings: ((dev.yourstream.ui.screens.settings.AppSettings) -> Unit)? = null,
     surface: @Composable () -> Unit,
 ) {
     val layout = LocalWindowLayout.current
@@ -239,6 +254,11 @@ fun PlayerScreen(
     val inPip by inPictureInPicture()
     var hint by remember { mutableStateOf<PlayerHint?>(null) }
     var speedBeforeHold by remember { mutableStateOf<Float?>(null) }
+    // Locked: no controls and no gestures until unlocked (Nuvio's lock).
+    var locked by rememberSaveable { mutableStateOf(false) }
+    // Swipe-to-seek: where the swipe started and where it would land.
+    var swipeFrom by remember { mutableStateOf<Long?>(null) }
+    var swipeTo by remember { mutableStateOf<Long?>(null) }
     val fitLabel = fit.label()
     val fitChanged = remember { mutableStateOf(false) }
     LaunchedEffect(fit) { if (fitChanged.value) hint = PlayerHint(AppIcons.AspectRatio, fitLabel) else fitChanged.value = true }
@@ -269,6 +289,8 @@ fun PlayerScreen(
 
     BackHandler {
         when {
+            // Locked: back does nothing (the unlock button is the way out).
+            locked -> Unit
             panel != null -> panel = null
             tv && controls && state.isPlaying -> controls = false
             else -> onBack()
@@ -308,24 +330,57 @@ fun PlayerScreen(
         surface()
         // Picture-in-picture: only the video; controls come back with the full screen.
         if (inPip) return@Box
+        if (locked) {
+            val unlockFeel = dev.yourstream.ui.core.rememberHaptics()
+            LockedOverlay { unlockFeel.perform(dev.yourstream.ui.core.Haptic.CONFIRM); locked = false; poke() }
+            return@Box
+        }
         // Gesture layer above the video (the video view itself does not take touches).
         val context = androidx.activity.compose.LocalActivity.current ?: androidx.compose.ui.platform.LocalContext.current
         val brightness = stringResource(R.string.player_brightness)
         val volume = stringResource(R.string.player_volume)
         val holdLabel = stringResource(R.string.player_speed_hold)
+        val haptics = dev.yourstream.ui.core.rememberHaptics()
         Box(
             Modifier.fillMaxSize().testTag("player-gestures").playerGestures(
                 context,
                 onTap = { if (controls) controls = false else poke() },
-                onSeek = { forward -> seek(if (forward) seekStepMs else -seekStepMs) },
+                onSeek = { forward -> haptics.perform(dev.yourstream.ui.core.Haptic.THRESHOLD); seek(if (forward) seekStepMs else -seekStepMs) },
                 onHoldSpeed = { holding ->
-                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
+                    if (holding) { haptics.perform(dev.yourstream.ui.core.Haptic.LONG_PRESS); speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
                     else { onAction(PlayerAction.SetSpeed(speedBeforeHold ?: 1f)); speedBeforeHold = null; hint = null }
                 },
                 onHint = { hint = it },
                 brightnessLabel = brightness, volumeLabel = volume,
+                onSwipeSeek = { phase, fraction ->
+                    val duration = state.durationMs ?: 0
+                    if (duration <= 0) return@playerGestures
+                    when (phase) {
+                        SwipePhase.START -> { haptics.perform(dev.yourstream.ui.core.Haptic.THRESHOLD); swipeFrom = state.positionMs; swipeTo = state.positionMs }
+                        // A tick for every 10 s crossed, so the jump is felt as well as seen.
+                        SwipePhase.MOVE -> swipeFrom?.let { from ->
+                            val to = swipeSeekTarget(from, duration, fraction)
+                            if ((to - from) / 10_000 != ((swipeTo ?: from) - from) / 10_000) haptics.perform(dev.yourstream.ui.core.Haptic.STEP)
+                            swipeTo = to
+                        }
+                        SwipePhase.END -> { swipeTo?.let { onAction(PlayerAction.SeekTo(it)) }; swipeFrom = null; swipeTo = null }
+                        SwipePhase.CANCEL -> { swipeFrom = null; swipeTo = null }
+                    }
+                },
+                onStep = { haptics.perform(dev.yourstream.ui.core.Haptic.STEP) },
             ),
         )
+        // While swiping: where the video will land, and by how much.
+        val from = swipeFrom
+        val to = swipeTo
+        if (from != null && to != null) {
+            val delta = to - from
+            Surface(shape = MaterialTheme.shapes.extraLarge, color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White,
+                modifier = Modifier.align(Alignment.Center).testTag("swipe-seek")) {
+                Text("${timeLabel(to)}  (${if (delta >= 0) "+" else "−"}${timeLabel(kotlin.math.abs(delta))})", style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            }
+        }
 
         val showSpinner = state.loading && state.error == null
         if (showSpinner && !(controls && !tv)) Buffering(Modifier.align(Alignment.Center))
@@ -335,7 +390,8 @@ fun PlayerScreen(
             enter = fadeIn(androidx.compose.animation.core.tween(150)), exit = fadeOut(androidx.compose.animation.core.tween(150)),
             modifier = Modifier.fillMaxSize(),
         ) {
-            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate, onFit)
+            Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate, onFit, fitLabel,
+                onLock = if (tv) null else ({ locked = true; panel = null }))
         }
         PlayerHintBubble(hint, onDone = { if (speedBeforeHold == null) hint = null }, Modifier.align(Alignment.Center))
 
@@ -365,7 +421,8 @@ fun PlayerScreen(
             )
         }
 
-        panel?.let { p -> Panel(p, state, episodes, layout == WindowLayout.COMPACT, onAction, onPlay, onClose = { panel = null; poke() }) }
+        panel?.let { p -> Panel(p, state, episodes, layout == WindowLayout.COMPACT, onAction, onPlay, onClose = { panel = null; poke() },
+            settings = settings, onSettings = onSettings, openPanel = { panel = it }) }
 
         state.error?.let { e ->
             // A Surface, so the message takes the theme's on-surface colour (not black on black).
@@ -425,57 +482,87 @@ private fun Controls(
     seek: (Long) -> Unit,
     onRotate: (() -> Unit)? = null,
     onFit: (() -> Unit)? = null,
+    fitLabel: String = "",
+    onLock: (() -> Unit)? = null,
 ) {
     val seekStepMs = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekMs
-    val gutter = if (tv) 48.dp else if (compact) 12.dp else 24.dp
-    Box(Modifier.fillMaxSize()) {
-        // Top: back, title, quality.
-        Row(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().background(TopScrim).padding(horizontal = gutter, vertical = if (tv) 27.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (!tv) {
-                IconButton(onClick = onBack, modifier = Modifier.focusHighlight().testTag("player-back")) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.player_back), tint = Color.White)
+    val seekSeconds = dev.yourstream.ui.screens.settings.LocalAppSettings.current.seekSeconds
+    // One edge for everything: the title, the resume note, the times, the timeline and the
+    // buttons all start and end on the same gutter. Icon buttons (48 dp, icon 24 dp) sit 12 dp
+    // further out, so their icons line up with that edge too.
+    val gutter = if (tv) 48.dp else if (compact) 20.dp else 28.dp
+    val iconInset = 12.dp
+    Box(
+        Modifier.fillMaxSize()
+            // Landscape phones: keep clear of the camera cutout and the gesture area.
+            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.displayCutout
+                .union(androidx.compose.foundation.layout.WindowInsets.navigationBars)
+                .only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)),
+    ) {
+        // Top: back, title, quality, lock, rotate; the resume note under the title.
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(TopScrim).padding(top = if (tv) 27.dp else 8.dp, bottom = 16.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = if (tv) gutter else gutter - iconInset, end = if (tv) gutter else gutter - iconInset).heightIn(min = 56.dp).testTag("player-top"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (!tv) {
+                    IconButton(onClick = onBack, modifier = Modifier.focusHighlight().testTag("player-back")) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.player_back), tint = Color.White)
+                    }
+                }
+                Column(Modifier.weight(1f).padding(start = if (tv) 0.dp else 4.dp)) {
+                    Text(state.title, color = Color.White, style = if (tv) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                    state.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                state.quality?.badge?.let { b ->
+                    // A pill like the others, as tall as the icons beside it.
+                    Surface(
+                        shape = CircleShape, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp).heightIn(min = 36.dp).focusHighlight(CircleShape).clickable { openPanel(PlayerPanel.INFO) }.testTag("quality-badge"),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(b, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        }
+                    }
+                }
+                onLock?.let { LockButton(it) }
+                onRotate?.let { rotate ->
+                    IconButton(onClick = rotate, modifier = Modifier.focusHighlight().testTag("rotate")) {
+                        Icon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate), tint = Color.White)
+                    }
                 }
             }
-            Column(Modifier.weight(1f)) {
-                Text(state.title, color = Color.White, style = if (tv) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
-                state.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            }
-            state.quality?.badge?.let { b ->
-                Surface(
-                    shape = MaterialTheme.shapes.small, color = Color.White.copy(alpha = 0.15f), contentColor = Color.White,
-                    modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).clickable { openPanel(PlayerPanel.INFO) }.testTag("quality-badge"),
-                ) { Text(b, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) }
-            }
-            onRotate?.let { rotate ->
-                IconButton(onClick = rotate, modifier = Modifier.focusHighlight().testTag("rotate")) {
-                    Icon(AppIcons.ScreenRotation, stringResource(R.string.player_rotate), tint = Color.White)
-                }
+            state.resumedFromMs?.let { r ->
+                ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.padding(start = gutter, top = 8.dp))
             }
         }
 
-        state.resumedFromMs?.let { r -> ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.align(Alignment.TopStart).padding(start = gutter, top = if (tv) 112.dp else 80.dp)) }
-
-        // Centre: large touch transport (phones and tablets).
+        // Centre: rewind, play, forward on one line, play exactly in the middle.
         if (!tv) {
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 32.dp else 56.dp)) {
-                RoundIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), 56.dp, Modifier.testTag("rewind")) { seek(-seekStepMs) }
+            Row(Modifier.align(Alignment.Center).testTag("player-center"), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 40.dp else 64.dp)) {
+                SeekButton(AppIcons.FastRewind, stringResource(R.string.player_rewind), "−$seekSeconds", "rewind") { seek(-seekStepMs) }
                 Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                     if (state.loading) Buffering(Modifier) else PlayPause(state, 80.dp, playFocus, onAction)
                 }
-                RoundIcon(AppIcons.FastForward, stringResource(R.string.player_forward), 56.dp, Modifier.testTag("forward")) { seek(seekStepMs) }
+                SeekButton(AppIcons.FastForward, stringResource(R.string.player_forward), "+$seekSeconds", "forward") { seek(seekStepMs) }
             }
         }
 
-        // Bottom: timeline, times, buttons.
+        // Bottom: the times over the ends of the timeline, then the actions, centred.
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(BottomScrim).padding(horizontal = gutter).padding(top = 32.dp, bottom = if (tv) 27.dp else 8.dp),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(BottomScrim).padding(top = 40.dp, bottom = if (tv) 27.dp else 10.dp),
         ) {
             val duration = state.durationMs ?: 0
             val seekLabel = stringResource(R.string.player_seek_bar)
+            Row(Modifier.fillMaxWidth().padding(horizontal = gutter).testTag("player-times"), verticalAlignment = Alignment.CenterVertically) {
+                TimePill(timeLabel(state.positionMs), "position")
+                Spacer(Modifier.weight(1f))
+                if (duration > 0) TimePill(
+                    if (state.speed != 1f) "${PlayerViewModel.speedLabel(state.speed)} · ${timeLabel(duration)}" else timeLabel(duration), "duration",
+                )
+            }
             if (duration > 0) {
                 Timeline(
                     state.positionMs, duration, state.bufferedMs,
@@ -483,44 +570,82 @@ private fun Controls(
                     onScrubEnd = { onAction(PlayerAction.ScrubEnd(it)) },
                     timeLabel = ::timeLabel,
                     onInteraction = poke,
-                    modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("seek")
+                    modifier = Modifier.padding(horizontal = gutter).focusHighlight(MaterialTheme.shapes.small).testTag("seek")
                         .semantics { contentDescription = seekLabel },
                 )
             }
-            Row(Modifier.fillMaxWidth()) {
-                Text(timeLabel(state.positionMs), color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.testTag("position"))
-                Spacer(Modifier.weight(1f))
-                if (duration > 0) Text(
-                    if (state.speed != 1f) "${PlayerViewModel.speedLabel(state.speed)} · ${timeLabel(duration)}" else timeLabel(duration),
-                    color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelLarge, modifier = Modifier.testTag("duration"),
-                )
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (tv) 12.dp else 4.dp)) {
-                state.previous?.let { p -> BarIcon(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
-                if (tv) {
-                    BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
-                    PlayPause(state, 56.dp, playFocus, onAction)
-                    BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
-                }
-                state.next?.let { n -> BarIcon(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
-                Spacer(Modifier.weight(1f))
-                if (state.episodes != null) BarIcon(AppIcons.Episodes, stringResource(R.string.player_episodes), "episodes") { openPanel(PlayerPanel.EPISODES) }
-                if (state.audio.size > 1) BarIcon(AppIcons.Audio, stringResource(R.string.player_audio), "audio") { openPanel(PlayerPanel.AUDIO) }
-                if (state.subtitles.isNotEmpty()) BarIcon(AppIcons.Subtitles, stringResource(R.string.player_subtitles), "subtitles") { openPanel(PlayerPanel.SUBTITLES) }
-                onFit?.let { f -> BarIcon(AppIcons.AspectRatio, stringResource(R.string.player_fit), "aspect") { f(); poke() } }
-                BarIcon(AppIcons.Speed, stringResource(R.string.player_speed), "speed") { openPanel(PlayerPanel.SPEED) }
-                // On phones the quality badge in the top bar opens the info panel.
-                if (!compact || state.quality?.badge == null) BarIcon(Icons.Filled.Info, stringResource(R.string.player_quality), "info") { openPanel(PlayerPanel.INFO) }
+            // Labelled actions (Nuvio's pills), centred. Phones wrap them onto a second centred
+            // line when they do not fit (portrait); TV keeps one row the remote moves along.
+            ActionsRow(tv, gutter) {
+                    state.previous?.let { p -> IconPill(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
+                    if (tv) {
+                        BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }
+                        PlayPause(state, 56.dp, playFocus, onAction)
+                        BarIcon(AppIcons.FastForward, stringResource(R.string.player_forward), "forward") { seek(seekStepMs) }
+                    }
+                    onFit?.let { f -> ActionPill(fitLabel, "aspect", AppIcons.AspectRatio) { f(); poke() } }
+                    ActionPill(PlayerViewModel.speedLabel(state.speed), "speed", AppIcons.Speed, active = state.speed != 1f) { openPanel(PlayerPanel.SPEED) }
+                    if (state.subtitles.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_subs), "subtitles", AppIcons.Subtitles, active = state.selectedSubtitle != null) { openPanel(PlayerPanel.SUBTITLES) }
+                    if (state.audio.size > 1) ActionPill(stringResource(R.string.player_pill_audio), "audio", AppIcons.Audio) { openPanel(PlayerPanel.AUDIO) }
+                    if (state.episodes != null) ActionPill(stringResource(R.string.player_episodes), "episodes", AppIcons.Episodes) { openPanel(PlayerPanel.EPISODES) }
+                    if (state.sources.isNotEmpty()) ActionPill(stringResource(R.string.player_pill_sources, state.sources.size), "sources") { openPanel(PlayerPanel.SOURCES) }
+                    // On phones the quality badge in the top bar opens the info panel.
+                    if (!compact || state.quality?.badge == null) ActionPill(stringResource(R.string.player_quality), "info", Icons.Filled.Info) { openPanel(PlayerPanel.INFO) }
+                    state.next?.let { n -> IconPill(AppIcons.SkipNext, stringResource(R.string.player_next_episode), "next-episode") { onPlay(n.play) } }
             }
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ActionsRow(tv: Boolean, gutter: androidx.compose.ui.unit.Dp, content: @Composable () -> Unit) {
+    if (tv) {
+        // Composed with the screen (not in a later layout pass): Play must exist when the
+        // player asks for focus on it as it opens.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = gutter).testTag("player-actions"),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) { content() }
+    } else {
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = gutter).testTag("player-actions"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) { content() }
+    }
+}
+
+/**
+ * Rewind / forward in the centre, with how far it jumps under the icon. The amount hangs below
+ * the circle without taking space, so the circles stay level with the play button.
+ */
+@Composable
+private fun SeekButton(icon: ImageVector, label: String, amount: String, tag: String, onClick: () -> Unit) {
+    Box(contentAlignment = Alignment.Center) {
+        RoundIcon(icon, label, 60.dp, Modifier.testTag(tag), onClick)
+        Text(amount, color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y = 22.dp).testTag("$tag-amount"))
+    }
+}
+
+/** An icon-only pill (previous / next episode), the same height and colour as the labelled pills. */
+@Composable
+private fun IconPill(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    Surface(
+        shape = CircleShape, color = Color.Black.copy(alpha = 0.45f), contentColor = Color.White,
+        modifier = Modifier.size(PillTouch).focusHighlight(CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button) { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }
+            .padding((PillTouch - PillHeight) / 2).semantics { contentDescription = label }.testTag(tag),
+    ) { Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) } }
+}
+
 @Composable
 private fun PlayPause(state: PlayerUiState, size: androidx.compose.ui.unit.Dp, focus: FocusRequester, onAction: (PlayerAction) -> Unit) {
     val label = stringResource(if (state.isPlaying) R.string.player_pause else R.string.player_play)
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     FilledIconButton(
-        onClick = { onAction(PlayerAction.TogglePlay) },
+        onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onAction(PlayerAction.TogglePlay) },
         modifier = Modifier.size(size).focusRequester(focus).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("play-pause")
             .semantics { contentDescription = label },
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
@@ -531,15 +656,17 @@ private fun PlayPause(state: PlayerUiState, size: androidx.compose.ui.unit.Dp, f
 
 @Composable
 private fun RoundIcon(icon: ImageVector, label: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     IconButton(
-        onClick = onClick, modifier = modifier.size(size).focusHighlight(MaterialTheme.shapes.extraLarge),
+        onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }, modifier = modifier.size(size).focusHighlight(MaterialTheme.shapes.extraLarge),
         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.35f), contentColor = Color.White),
     ) { Icon(icon, label, Modifier.size(size * 0.55f)) }
 }
 
 @Composable
 private fun BarIcon(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag(tag)) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    IconButton(onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag(tag)) {
         Icon(icon, label, tint = Color.White)
     }
 }
@@ -601,6 +728,9 @@ private fun BoxScope.Panel(
     onAction: (PlayerAction) -> Unit,
     onPlay: (OpenTarget.Play) -> Unit,
     onClose: () -> Unit,
+    settings: dev.yourstream.ui.screens.settings.AppSettings = dev.yourstream.ui.screens.settings.AppSettings(),
+    onSettings: ((dev.yourstream.ui.screens.settings.AppSettings) -> Unit)? = null,
+    openPanel: (PlayerPanel) -> Unit = {},
 ) {
     // Scrim: a tap outside closes the panel.
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose))
@@ -611,6 +741,8 @@ private fun BoxScope.Panel(
             PlayerPanel.SUBTITLES -> R.string.player_subtitles
             PlayerPanel.SPEED -> R.string.player_speed
             PlayerPanel.INFO -> R.string.player_quality
+            PlayerPanel.SUBTITLE_STYLE -> R.string.player_style
+            PlayerPanel.SOURCES -> R.string.player_sources
         },
     )
     val shape = if (compact) MaterialTheme.shapes.extraLarge.copy(bottomStart = androidx.compose.foundation.shape.CornerSize(0.dp), bottomEnd = androidx.compose.foundation.shape.CornerSize(0.dp))
@@ -621,8 +753,15 @@ private fun BoxScope.Panel(
         else Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(400.dp)).testTag("panel:${panel.name.lowercase()}"),
     ) {
         Column(Modifier.padding(vertical = 12.dp)) {
-            Row(Modifier.padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Panel content sits on a 24 dp edge: the title, the options, the close icon.
+            Row(Modifier.padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+                // Subtitles → Style (size, colour, bold, background, position).
+                if (panel == PlayerPanel.SUBTITLES && onSettings != null) {
+                    TextButton(onClick = { openPanel(PlayerPanel.SUBTITLE_STYLE) }, modifier = Modifier.focusHighlight().testTag("subtitle-style-open")) {
+                        Text(stringResource(R.string.player_style))
+                    }
+                }
                 IconButton(onClick = onClose, modifier = Modifier.focusHighlight()) { Icon(Icons.Filled.Close, stringResource(R.string.action_close)) }
             }
             when (panel) {
@@ -637,6 +776,10 @@ private fun BoxScope.Panel(
                     }
                 }
                 PlayerPanel.INFO -> Info(state.quality)
+                PlayerPanel.SUBTITLE_STYLE -> onSettings?.let { SubtitleStyle(settings, it) }
+                PlayerPanel.SOURCES -> Options(state.sources.map { it.mediaId.toString() to "${it.label}\n${it.detail}" }, state.sources.firstOrNull { it.playing }?.mediaId?.toString()) { id ->
+                    id?.toLongOrNull()?.takeIf { m -> state.sources.none { it.playing && it.mediaId == m } }?.let { onAction(PlayerAction.PlaySource(it)) }; onClose()
+                }
                 PlayerPanel.EPISODES -> state.episodes?.let { e -> EpisodeList(e, episodes, onAction, onPlay) }
             }
         }
@@ -646,14 +789,15 @@ private fun BoxScope.Panel(
 @Composable
 private fun Options(options: List<Pair<String?, String>>, selected: String?, onSelect: (String?) -> Unit) {
     val focus = remember { FocusRequester() }
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val initial = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     LazyColumn(state = rememberLazyListState(initial)) {
         items(options.size) { i ->
             val (id, label) = options[i]
             Row(
                 Modifier.fillMaxWidth().then(if (i == initial) Modifier.focusRequester(focus) else Modifier)
-                    .selectable(selected = id == selected, role = Role.RadioButton, onClick = { onSelect(id) })
-                    .focusHighlight().padding(horizontal = 16.dp, vertical = 4.dp).testTag("option:$label"),
+                    .selectable(selected = id == selected, role = Role.RadioButton, onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); onSelect(id) })
+                    .focusHighlight().padding(start = 22.dp, end = 24.dp, top = 4.dp, bottom = 4.dp).testTag("option:$label"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = id == selected, onClick = null)

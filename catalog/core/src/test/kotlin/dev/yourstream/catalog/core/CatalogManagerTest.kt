@@ -61,7 +61,7 @@ class FakeCatalog(
     }
 
     override suspend fun page(catalog: CatalogDescriptor, skip: Int, genre: String?): AppResult<CatalogPage> {
-        calls += "page:${catalog.id}:$skip"
+        calls += "page:${catalog.id}:$skip" + (genre?.let { ":$it" } ?: "")
         errors.removeFirstOrNull()?.let { return AppResult.Err(it) }
         val all = items[catalog.id].orEmpty()
         val slice = all.drop(skip).take(2)
@@ -263,5 +263,33 @@ class CatalogManagerTest {
         val withPresence = m.withLibraryPresence(items)
         assertEquals(7L, withPresence.first { it.first.ref.imdbId == "tt1" }.second?.itemId)
         assertFalse(withPresence.first { it.first.ref.imdbId == "tt2" }.second != null)
+    }
+
+    @Test
+    fun searchSectionsKeepEachAddonAndTypeApart() = runTest {
+        val one = FakeCatalog("one", listOf(Triple("m", CatalogType.MOVIE, emptyList()), Triple("s", CatalogType.SERIES, emptyList())), searchable = true).apply {
+            item("m", "Leo", "tt2"); item("s", "Leo Show", "tt7", type = CatalogType.SERIES)
+        }
+        val two = FakeCatalog("two", listOf(Triple("m", CatalogType.MOVIE, emptyList())), searchable = true).apply { item("m", "Leo Again", "tt8") }
+        val r = manager(one, a, two).searchSections("leo")
+        assertEquals(listOf("one" to CatalogType.MOVIE, "one" to CatalogType.SERIES, "two" to CatalogType.MOVIE), r.sections.map { it.providerName to it.type })
+        assertEquals(listOf("Leo Show"), r.sections[1].items.map { it.title })
+        assertTrue(r.searchable)
+        assertFalse(r.failed)
+        assertTrue("search:leo" !in a.calls, "add-ons without search are not asked")
+
+        // No add-on can search: the external answer as one section, and "no searchable catalogs".
+        val fallback = manager().searchSections("Leo")
+        assertFalse(fallback.searchable)
+        assertEquals(listOf(null), fallback.sections.map { it.provider })
+        assertEquals(emptyList(), manager().searchSections("  ").sections)
+    }
+
+    @Test
+    fun pagesCanBeNarrowedByGenreAndAreCachedApart() = runTest {
+        val m = manager()
+        val ta = m.catalogs().first { it.id == "ta" }
+        m.page(ta, genre = "Drama"); m.page(ta); m.page(ta, genre = "Drama")
+        assertEquals(listOf("page:ta:0:Drama", "page:ta:0"), a.calls.filter { it.startsWith("page:") })
     }
 }

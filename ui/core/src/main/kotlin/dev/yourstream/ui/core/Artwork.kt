@@ -43,12 +43,19 @@ fun Artwork(
     showInitials: Boolean = true,
     /** A poster-shaped (portrait) slot: Telegram thumbnails must be posters too. Wide cards draw their title over the art. */
     portrait: Boolean = showInitials,
+    /**
+     * The grey placeholder behind the image. False for transparent images (title logos, company
+     * logos): the placeholder would show through them as a box.
+     */
+    placeholder: Boolean = true,
 ) {
     Box(modifier) {
         val sources = remember(url, portrait) { artworkSources(url, portrait) }
         var index by remember(sources) { mutableIntStateOf(0) }
         var retried by remember(sources) { mutableStateOf(false) }
-        if (LocalMangaStyle.current) MangaTitleArt(title, Modifier.fillMaxSize(), showInitials) else TitleArt(title, Modifier.fillMaxSize(), showInitials)
+        if (placeholder) {
+            if (LocalMangaStyle.current) MangaTitleArt(title, Modifier.fillMaxSize(), showInitials) else TitleArt(title, Modifier.fillMaxSize(), showInitials)
+        }
         sources.getOrNull(index)?.let { src ->
             AsyncImage(
                 model = if (retried) "$src#retry" else src, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize(),

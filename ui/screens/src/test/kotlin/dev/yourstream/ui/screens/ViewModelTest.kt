@@ -92,12 +92,10 @@ class ViewModelTest {
         ArtworkLookup(media),
         TileActionHandler(media, stub { _, _ -> error("unused") }, stub { _, _ -> error("unused") }),
         assistant,
-        ReviewQueue { review },
         IndexingMonitor(stub<MediaIndexRepository> { name, _ -> if (name == "observeChats") chats else error(name) }),
         HomeCatalogs { flowOf(emptyList()) },
     )
 
-    private val review = MutableStateFlow(0)
     private val brainAsked = mutableListOf<String>()
     private val assistant = object : dev.yourstream.assistant.engine.MediaAssistant {
         override suspend fun ask(text: String): dev.yourstream.assistant.engine.AssistantResponse {
@@ -136,14 +134,10 @@ class ViewModelTest {
         assertEquals("Vikram" to HeroItem.Kind.NEW, hero.title to hero.kind)
         assertEquals(OpenTarget.Play(PlaybackTarget(7)), hero.primary, "a movie plays straight from the hero")
 
-        // Local recommendations with their reason; the review banner only when nothing is more urgent.
+        // Local recommendations with their reason (no "check matches" banner since 0.11.5).
         val forYou = (vm.state.value.forYou as UiState.Content).value
         assertEquals("Tamil, action", forYou.basis)
         assertEquals(TileCaption.Reason("Tamil · action"), forYou.tiles.single().caption)
-        review.value = 2
-        advanceUntilIdle()
-        assertEquals(HomeBanner.REVIEW, vm.state.value.banner)
-        assertEquals(2, vm.state.value.reviewCount)
     }
 
     @Test
@@ -158,7 +152,7 @@ class ViewModelTest {
             }
             override suspend fun suggest(prefix: String, limit: Int) = listOf("vikram")
         }
-        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, AddonSearch { emptyList() })
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, noAddons, dev.yourstream.ui.screens.search.InMemorySearchMemory())
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
         assertNull(vm.state.value.results, "blank query: hint, no search")
@@ -183,6 +177,115 @@ class ViewModelTest {
         assertNull(vm.state.value.results)
     }
 
+    private val noAddons = object : AddonSearch { override suspend fun sections(query: String) = AddonSections(emptyList()) }
+
+    @Test
+    fun searchRemembersMeantSearchesAndDiscoverBrowsesCatalogs() = runTest(dispatcher) {
+        val movie = { k: String -> Tile(dev.yourstream.ui.core.MediaCardModel(k, k), OpenTarget.Details(1)) }
+        val top = DiscoverCatalog("cat:a:MOVIE:top", "Top", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Drama", "Comedy"))
+        val shows = DiscoverCatalog("cat:a:SERIES:top", "Top series", "Alpha", dev.yourstream.catalog.api.CatalogType.SERIES, listOf("Anime"), genreRequired = true)
+        val pages = mutableListOf<String>()
+        val addons = object : AddonSearch {
+            override suspend fun sections(query: String) = AddonSections(listOf(SearchRow("a:MOVIE", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf(movie("hit")))))
+            override suspend fun catalogs() = listOf(top, shows)
+            override suspend fun page(catalog: DiscoverCatalog, genre: String?, skip: Int): DiscoverPage {
+                pages += "${catalog.name}:$genre:$skip"
+                return DiscoverPage(listOf(movie("${catalog.name}-$skip")), if (skip == 0) 1 else null)
+            }
+        }
+        val search = object : LibrarySearch {
+            override suspend fun search(request: SearchRequest) = SearchPage(emptyList(), 0, 0, null, emptyList(), 1)
+            override suspend fun suggest(prefix: String, limit: Int) = emptyList<String>()
+        }
+        val memory = dev.yourstream.ui.screens.search.InMemorySearchMemory(listOf("older"))
+        val vm = SearchViewModel(SavedStateHandle(), search, ArtworkLookup(media), assistant, addons, memory)
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // Discover: the first type and catalog, all genres; more on demand; choices are kept.
+        val d = vm.state.value.discover
+        assertEquals(listOf("Top:null:0"), pages)
+        assertEquals(top, d.catalog)
+        vm.onAction(SearchAction.DiscoverMore); advanceUntilIdle()
+        assertEquals(listOf("Top-0", "Top-1"), vm.state.value.discover.tiles.map { it.card.key })
+        vm.onAction(SearchAction.DiscoverGenre("Comedy")); advanceUntilIdle()
+        assertEquals("Top:Comedy:0", pages.last())
+        // A catalog that requires a genre starts on its first.
+        vm.onAction(SearchAction.DiscoverType(dev.yourstream.catalog.api.CatalogType.SERIES)); advanceUntilIdle()
+        assertEquals("Top series:Anime:0", pages.last())
+        assertEquals(dev.yourstream.ui.screens.search.DiscoverChoice(dev.yourstream.catalog.api.CatalogType.SERIES, shows.key, "Anime"), memory.discover())
+
+        // Typing: the add-ons' rows; typing alone is not remembered, a meant search is.
+        vm.onAction(SearchAction.QueryChanged("leo")); advanceUntilIdle()
+        assertEquals(listOf("hit"), vm.state.value.addons!!.rows.single().tiles.map { it.card.key })
+        assertEquals(listOf("older"), vm.state.value.recent)
+        vm.onAction(SearchAction.Submit)
+        vm.onAction(SearchAction.PickRecent("OLDER")); advanceUntilIdle()
+        assertEquals(listOf("OLDER", "leo"), vm.state.value.recent, "newest first, no repeats in any case")
+        vm.onAction(SearchAction.RemoveRecent("leo"))
+        assertEquals(listOf("OLDER"), memory.recent())
+    }
+
+    private fun fakeTelegram(status: MutableStateFlow<dev.yourstream.telegram.api.model.TelegramStatus>, calls: MutableList<String>) =
+        stub<dev.yourstream.telegram.api.TelegramManager> { name, _ ->
+            when (name) {
+                "getStatus" -> status
+                "start" -> { calls += "start"; AppResult.Ok(Unit) }
+                "restart" -> { calls += "restart"; AppResult.Ok(Unit) }
+                else -> error(name)
+            }
+        }
+
+    /**
+     * Reported from a device: sign-in loaded forever. Telegram had not started (safe mode after
+     * "early exits" that were ordinary closes), and the screen only showed a spinner.
+     */
+    @Test
+    fun signInNeverSpinsForeverWhenTelegramIsNotReady() = runTest(dispatcher) {
+        val starting = MutableStateFlow<AuthState>(AuthState.Unknown)
+        val status = MutableStateFlow<dev.yourstream.telegram.api.model.TelegramStatus>(dev.yourstream.telegram.api.model.TelegramStatus.Stopped)
+        val calls = mutableListOf<String>()
+        val authManager = stub<TelegramAuthManager> { name, _ -> if (name == "getState") starting else error(name) }
+        val noData = object : dev.yourstream.ui.screens.settings.AccountDataStore {
+            override suspend fun hasAccountData() = false
+            override suspend fun wipe() = Unit
+            override var signedOutNotice = false
+        }
+        val vm = AccountViewModel(
+            authManager,
+            stub<TelegramUserRepository> { name, _ -> if (name == "getCurrentUser") MutableStateFlow(null) else error(name) },
+            dev.yourstream.ui.screens.settings.AccountSession(authManager, noData, dev.yourstream.core.common.NoOpLogger),
+            fakeTelegram(status, calls),
+        )
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        // Not running (safe mode or stopped): said at once, with a button that starts it.
+        assertEquals(dev.yourstream.ui.screens.settings.StartProblem.NotRunning, vm.state.value.startProblem)
+        vm.onAction(AccountAction.StartTelegram); advanceUntilIdle()
+        assertEquals(listOf("start"), calls)
+
+        // Running but not getting ready: a normal spinner first, then "taking longer" and a retry.
+        status.value = dev.yourstream.telegram.api.model.TelegramStatus.Running
+        advanceTimeBy(1_000)
+        assertNull(vm.state.value.startProblem, "starting normally: just the spinner")
+        advanceTimeBy(AccountViewModel.SLOW_START_MS)
+        assertEquals(dev.yourstream.ui.screens.settings.StartProblem.Slow, vm.state.value.startProblem)
+        vm.onAction(AccountAction.StartTelegram); advanceUntilIdle()
+        assertEquals(listOf("start", "restart"), calls, "a stuck running instance is restarted")
+
+        // Telegram gets ready: the phone-number step, no problem shown.
+        starting.value = AuthState.WaitPhoneNumber
+        advanceUntilIdle()
+        assertEquals(dev.yourstream.ui.screens.settings.AccountStep.Phone, vm.state.value.step)
+        assertNull(vm.state.value.startProblem)
+
+        // A failure is said in words.
+        assertEquals(
+            dev.yourstream.ui.screens.settings.StartProblem.Failed("no TDLib"),
+            AccountViewModel.startProblem(dev.yourstream.telegram.api.model.TelegramStatus.Failed(AppError.Unknown("no TDLib")), slow = false),
+        )
+    }
+
     @Test
     fun accountSubmitsToTheRightAuthCallAndShowsErrors() = runTest(dispatcher) {
         val calls = mutableListOf<String>()
@@ -203,6 +306,7 @@ class ViewModelTest {
             authManager,
             stub<TelegramUserRepository> { name, _ -> if (name == "getCurrentUser") MutableStateFlow(null) else error(name) },
             dev.yourstream.ui.screens.settings.AccountSession(authManager, noData, dev.yourstream.core.common.NoOpLogger),
+            fakeTelegram(MutableStateFlow(dev.yourstream.telegram.api.model.TelegramStatus.Running), mutableListOf()),
         )
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()

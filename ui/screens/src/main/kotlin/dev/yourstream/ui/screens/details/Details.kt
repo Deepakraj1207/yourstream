@@ -152,8 +152,15 @@ class DetailsViewModel @Inject constructor(
                 available = s.isAvailable,
                 matched = if (s.kind == LibraryKind.VIDEO) null else s.metadataTitle != null,
                 versions = d.versions.filter { !it.isDeleted && !it.isExcluded }.map { v ->
-                    VersionRow(v.mediaId, v.fileName,
-                        listOfNotNull(Presentation.resolution(v.resolution), v.quality, "%.1f GB".format(v.sizeBytes / 1e9), v.languages.joinToString("/").ifEmpty { null }).joinToString(" · "),
+                    // A movie in raw pieces is one version: named without ".001", with its piece count (and any missing piece).
+                    val missing = dev.yourstream.library.api.SplitFiles.missing(v.parts)
+                    val pieces = when {
+                        !v.isSplit -> null
+                        missing.isNotEmpty() -> "${v.parts.size} pieces, ${missing.joinToString(", ") { "%03d".format(it) }} missing"
+                        else -> "${v.parts.size} pieces"
+                    }
+                    VersionRow(v.mediaId, if (v.isSplit) v.fileName.removeSuffix(".001") else v.fileName,
+                        listOfNotNull(Presentation.resolution(v.resolution), v.quality, "%.1f GB".format(v.sizeBytes / 1e9), pieces, v.languages.joinToString("/").ifEmpty { null }).joinToString(" · "),
                         OpenTarget.Play(PlaybackTarget(s.id), v.mediaId),
                         onDevice = v.downloadState == dev.yourstream.media.api.model.DownloadState.COMPLETE.name,
                         isLocal = v.isLocal)

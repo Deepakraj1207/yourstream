@@ -164,4 +164,55 @@ class TmdbProviderTest {
         assertEquals("27205", (p.findByImdbId("tt1375666", MetadataType.MOVIE) as AppResult.Ok).value.id)
         assertIs<AppError.NotFound>((p.findByImdbId("tt1375666", MetadataType.SERIES) as AppResult.Err).error)
     }
+
+    /** The title page's details: found by IMDb id, then one request with everything appended. */
+    @Test
+    fun titleDetailsForTheTitlePage() = runTest {
+        val p = provider { req ->
+            when (req.url.encodedPath) {
+                "/3/find/tt9000001" -> HttpStatusCode.OK to """{"movie_results":[{"id":555}],"tv_results":[]}"""
+                "/3/movie/555" -> HttpStatusCode.OK to """{"id":555,"title":"Baththa","overview":"In 1986 Madras…","genres":[{"name":"Drama"},{"name":"Comedy"}],
+                  "runtime":159,"release_date":"2026-01-10","status":"Released","vote_average":7.9,"vote_count":120,"backdrop_path":"/b.jpg","poster_path":"/p.jpg",
+                  "imdb_id":"tt9000001","original_language":"ta","origin_country":["IN"],
+                  "production_companies":[{"name":"Star Studios","logo_path":"/star.png"},{"name":"Small Films"}],
+                  "credits":{"cast":[{"name":"Vijay Sethupathi","character":"Bathvachalam","profile_path":"/v.jpg","order":1},{"name":"Sai Prithviraj","character":"Sabari","order":0}],
+                    "crew":[{"name":"Balaji T","job":"Director","department":"Directing"},{"name":"Balaji T","job":"Screenplay","department":"Writing"},{"name":"Someone","job":"Editor","department":"Editing"}]},
+                  "videos":{"results":[{"name":"Teaser","key":"t1","site":"YouTube","type":"Teaser"},{"name":"Official Trailer","key":"tr1","site":"YouTube","type":"Trailer","official":true,"published_at":"2026-01-01T00:00:00Z"},{"name":"Vimeo","key":"v","site":"Vimeo","type":"Trailer"}]},
+                  "images":{"logos":[{"file_path":"/de.png","iso_639_1":"de","vote_average":9},{"file_path":"/en.png","iso_639_1":"en","vote_average":5},{"file_path":"/ta.png","iso_639_1":"ta","vote_average":1}],
+                    "posters":[{"file_path":"/titled.jpg","iso_639_1":"en","vote_average":9},{"file_path":"/clean.jpg","iso_639_1":null,"vote_average":4}]},
+                  "recommendations":{"results":[{"id":7,"title":"Airborne","release_date":"1993-09-17","poster_path":"/a.jpg"}]},
+                  "release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"certification":"R"}]},{"iso_3166_1":"IN","release_dates":[{"certification":""},{"certification":"U/A 13+"}]}]}}"""
+                else -> HttpStatusCode.NotFound to "{}"
+            }
+        }
+        val d = (p.details(MetadataType.MOVIE, "tt9000001", null, "ta-IN", "IN") as AppResult.Ok).value
+        assertEquals("555", d.tmdbId)
+        assertEquals("U/A 13+", d.certification, "the user's region first")
+        assertEquals("https://image.tmdb.org/t/p/w500/ta.png", d.logoUrl, "the logo in the user's language first")
+        assertEquals("https://image.tmdb.org/t/p/w780/clean.jpg", d.textlessPosterUrl, "a poster without printed title")
+        assertEquals(listOf("Balaji T"), d.directors)
+        assertEquals(listOf("Balaji T"), d.writers)
+        assertEquals(listOf("Sai Prithviraj", "Vijay Sethupathi"), d.cast.map { it.name }, "billing order")
+        assertEquals(listOf("tr1", "t1"), d.videos.map { it.youtubeKey }, "YouTube only, trailers first")
+        assertEquals(listOf("Star Studios", "Small Films"), d.companies.map { it.name })
+        assertEquals(null, d.companies[1].logoUrl)
+        assertEquals(listOf("IN"), d.originCountries)
+        assertEquals(159, d.runtimeMinutes)
+        assertEquals(listOf("Airborne" to 1993), d.recommendations.map { it.title to it.year })
+        val asked = requests.last().url.parameters
+        assertTrue(asked["append_to_response"]!!.contains("release_dates"))
+        assertEquals("ta,en,null", asked["include_image_language"])
+        // A second visit is not asked again.
+        val before = requests.size
+        p.details(MetadataType.MOVIE, null, "555", "ta-IN", "IN")
+        assertEquals(before, requests.size)
+        // By IMDb id for another region: the page is fetched again, but the IMDb → TMDB id is
+        // remembered, so there is no second /find.
+        val before2 = requests.size
+        p.details(MetadataType.MOVIE, "tt9000001", null, "ta-IN", "GB")
+        assertEquals(listOf("/3/movie/555"), requests.drop(before2).map { it.url.encodedPath })
+        assertEquals("https://image.tmdb.org/t/p/w780/b.jpg", d.backdropUrl)
+        // Elsewhere: the US rating.
+        assertEquals("R", (p.details(MetadataType.MOVIE, null, "555", "ta-IN", "DE") as AppResult.Ok).value.certification)
+    }
 }

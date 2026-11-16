@@ -273,6 +273,13 @@ interface LibraryDao {
     )
     suspend fun episodeRow(episodeId: Long): EpisodeRow?
 
+    /** A series' episode by its numbers (a double episode "E05-E06" answers for 5 and 6). */
+    @Query(
+        """SELECT id FROM episode WHERE series_id = :seriesId AND season_number = :season
+          AND (number = :number OR (number < :number AND number_end >= :number)) ORDER BY number DESC LIMIT 1""",
+    )
+    suspend fun episodeIdByNumber(seriesId: Long, season: Int, number: Int): Long?
+
     // ================================================================ links
 
     @Upsert
@@ -303,6 +310,19 @@ interface LibraryDao {
         ORDER BY m.is_deleted, COALESCE(p.resolution, 0) DESC, m.size_bytes DESC""",
     )
     suspend fun versions(itemId: Long, episodeId: Long?, includeUnavailable: Boolean): List<MediaVersionRow>
+
+    /**
+     * The pieces of a split file in one chat: files named [base] plus a three-digit suffix
+     * (".001", ".002", …), whatever library item they were linked to. Exact prefix match (no LIKE
+     * wildcards: names often contain "_" and "%"); Telegram files only.
+     */
+    @Query(
+        """SELECT m.id AS media_id, m.message_id, m.file_name, m.size_bytes, m.is_deleted, m.download_state FROM media m
+        WHERE m.chat_id = :chatId AND m.locator IS NULL AND length(m.file_name) = length(:base) + 4
+          AND substr(m.file_name, 1, length(:base)) = :base
+        ORDER BY m.file_name, m.message_id""",
+    )
+    suspend fun splitParts(chatId: Long, base: String): List<SplitPartRow>
 
     // ================================================================ lists
 

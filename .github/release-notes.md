@@ -1,3 +1,110 @@
+## What's new in 0.12.3
+
+- **The hero carousel no longer reloads** when you come back to Home from another tab, and it
+  shows at once when the app starts (the last carousel is kept and refreshed in the background).
+  The catalog rows are kept too.
+- **Manga style for the hero carousel:** inked comic panels with speed lines, a red FEATURED
+  caption, manga lettering, ink boxes for the rating and language, and square dots.
+- **Player alignment:** the title, times, timeline and buttons share one edge. Rewind, play and
+  forward sit on one line. The times sit over the ends of the timeline. The buttons are centred,
+  all the same height, and wrap onto a second line in portrait instead of running off the
+  screen. The quality badge matches the icons, and the Audio, Subtitles and Speed menus line up.
+
+## What's new in 0.12.2
+
+- Fixed: the old home showed for a moment at start before the hero carousel replaced it.
+- **Carousel like Nuvio's** (with your TMDB key): the title's logo over artwork without the title
+  printed on it, instead of the title twice.
+- Fixed: title logos and production company logos had a grey box behind them.
+- The TMDB score shows out of 10 ("6.7"), like IMDb.
+
+## What's new in 0.12.1
+
+- **Fixed: the app closed while streams loaded** (0.12.0). Streams with and without a file size
+  could not be sorted together.
+- **Title page like Nuvio's, from TMDB** (with your TMDB key in Settings → TMDB): the title's
+  logo over the artwork, genres, **Play**, year · length · age rating, IMDb and TMDB scores,
+  director and writer, the overview with Show More, production companies, cast with photos,
+  trailers (open in YouTube), movie details, and **More Like This**. Without a TMDB key, your
+  add-ons' details fill the same page.
+- **Play opens the streams** on their own page, like Nuvio. They start loading when you open the
+  title, so they are ready. For series, tap an episode to see its streams.
+- **+ in the top bar** adds a title you have on Telegram to My library.
+
+## What's new in 0.12.0
+
+- **One poster per title.** A movie or series you have on Telegram shows once, with a blue
+  "Telegram" badge, instead of a second poster. Its page lists **your Telegram files first, as a
+  stream source**, above the add-on streams, with quality, size and audio languages. Tapping one
+  plays it in your player (resume, tracks and split files work as before).
+- **Sort & filter streams:** sort by best quality, largest, smallest or source order. Filter by
+  quality (4K / 1080p / 720p / SD), source (Telegram / add-ons), direct or torrent, and audio
+  language. Your choice is remembered for every title.
+- **Search like Nuvio:** recent searches, and **Discover** (type, catalog and genre over a poster
+  grid) before you type. While typing, your Telegram titles come first, then one row per add-on.
+- **Smoother navigation bar:** in Adaptive mode the labels fade and fold away together as the bar
+  shrinks, and the highlight slides between tabs. It reacts only after a real scroll.
+- Home: "Recently added" is tagged **From Telegram**, and the separate Series row is gone.
+- Fixed: the hero carousel stopped halfway between two slides.
+
+## What's new in 0.11.5
+
+- **Navigation like Nuvio's** in the classic theme: a floating bar over the content, the current
+  tab in a lighter capsule. **Adaptive** (default) shrinks it to icons while you scroll down and
+  brings it back when you scroll up; also Always expanded, Always compact, Classic, and Panel Grid
+  for the manga look (Settings → Layout → Navigation bar, with a preview and Glass glow).
+- **Hero carousel**: pick up to 3 catalogs in Settings → Layout → Home layout → Hero catalogs, and
+  Home opens on a full-width carousel of their titles (title, genre, length, year, rating,
+  View Details). Without hero catalogs, the hero shows what to continue or your newest title.
+- **Posters are matched automatically.** "Check matches" is gone: the best match is applied when it
+  is clearly right, otherwise the title keeps its file name. Titles that were waiting are matched
+  now. "Fix match" on a title still corrects a wrong one.
+- Fixed: rows below jumped up and down while you scrolled posters sideways.
+
+## What's new in 0.11.4
+
+- **Player like Nuvio's:** lock button (hides the controls and ignores touches until you unlock),
+  labelled buttons (Fit, speed, Subs, Audio, Episodes), time pills, **Sources** to switch to
+  another file of the same title without losing your place, **swipe sideways to seek**, and
+  **Subtitles → Style** (size, colour, position, bold, background).
+- **Settings → Layout like Nuvio's:** Home layout (hero, "Popular · Movies" labels, hide
+  unreleased titles, and every add-on catalog: hide, reorder, rename), Continue Watching (wide or
+  poster cards, resume or open details), Poster card style (width, corners, labels, live preview),
+  Streams (size badges, add-on logos), Detail page (Cinematic background, episodes as a row,
+  overview and cast), Navigation bar (Adaptive, Panel Grid, Floating with glow, Classic).
+- **Add-ons page like Nuvio's:** overview, logo and version on each card, move up / down (also
+  orders Home's rows and the stream groups), refresh, settings page for configurable add-ons,
+  delete with a confirmation.
+- **Only Cinemeta is built in.** Every other add-on is added by you (the built-in Indian catalogs
+  are gone after this update; add them again with their links if you used them).
+- **Opening logo** when the app starts (a tap skips it).
+- Fixed: a full-screen "Connect Telegram" flashed at launch before switching to the normal Home.
+
+## What's new in 0.11.3
+
+- **4K movies split into pieces play as one movie.** Files like "Movie.2160p.mkv.001", ".002",
+  ".003" (cut to fit Telegram's upload limit) now show as one version ("9 pieces") and stream as
+  one file: full length, seeking anywhere, audio and subtitle tracks, resume. The next piece
+  starts downloading before the current one ends. A missing piece is named instead of failing
+  midway. "Download" saves every piece. Split archives (.7z.001, .part1.rar) are not supported.
+- **Add-ons: refresh button** (or pull down): asks every add-on again, picks up new names and
+  catalogs, and says how many answered.
+- **Streams grouped by add-on:** each add-on's streams appear as soon as it answers, under its
+  name, with chips to show all or one add-on and a refresh button. Add-ons that found nothing or
+  did not answer are named.
+- **New manga navigation bar** ("Panel Grid"): slanted comic panels, the current one inked.
+- Fixed: switching episodes while a slow add-on answered could show the previous episode's
+  streams.
+
+## What's new in 0.11.2
+
+- **Fixed: Telegram sign-in could keep loading forever.** Closing the app quickly a few times
+  (or installing an update) could start it in a safe mode where Telegram never started. Now
+  only real crashes count, and the sign-in screen always explains a slow or stopped start, with
+  a button to start Telegram.
+- Library status: buttons no longer squeeze the text on phones.
+- Add-ons: the Nuvio plugins tab is gone (plugin links get a short note).
+
 ## What's new in 0.11.1
 
 - **Titles fixed for names joined with underscores** ("@Channel_LinkZ_Movie_2023_…"): such files

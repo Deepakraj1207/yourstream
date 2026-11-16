@@ -70,8 +70,6 @@ data class SettingsUiState(
     val signedIn: Boolean = false,
     val enabledSources: Int = 0,
     val languages: String = "",
-    /** Titles waiting for a match check. */
-    val reviewCount: Int = 0,
     /** Multi-device progress sync: on/off (it is optional and off until the user turns it on). */
     val syncOn: Boolean = false,
 )
@@ -82,22 +80,18 @@ class SettingsViewModel @Inject constructor(
     users: TelegramUserRepository,
     index: MediaIndexRepository,
     private val tracks: TrackPreferenceStore,
-    reviewQueue: dev.yourstream.ui.screens.ReviewQueue,
     sync: dev.yourstream.sync.ProgressSync,
 ) : ViewModel() {
     private val languages = MutableStateFlow("")
 
-    private val review = reviewQueue.count()
-
-    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages, combine(review, sync.status) { r, s -> r to s.enabled }) { a, user, chats, langs, (r, syncOn) ->
+    val state: StateFlow<SettingsUiState> = combine(auth.state, users.currentUser, index.observeChats(), languages, sync.status) { a, user, chats, langs, syncStatus ->
         SettingsUiState(
             signedInAs = user?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ").ifEmpty { it.username } },
             signedIn = a == AuthState.Ready,
             // Telegram chats only: folders on the device have their own row.
             enabledSources = chats.count { it.enabled && !dev.yourstream.media.api.LocalSourceIds.isLocal(it.chatId) },
             languages = langs,
-            reviewCount = r,
-            syncOn = syncOn,
+            syncOn = syncStatus.enabled,
         )
     }.catch { emit(SettingsUiState()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -152,6 +146,7 @@ fun SettingsRoute(
         securedHosts = secured,
         indexing = indexing,
         onIndexing = { indexingVm.set(it) },
+        onPage = onPage,
     )
     if (page == null) SettingsScreen(host, onPage) else SettingsPageScreen(page, host, onBack)
 }
@@ -161,7 +156,6 @@ private const val SOURCE_URL = "https://github.com/Deepakraj1207/yourstream"
 /** The advanced screens reachable from Settings. */
 data class SettingsLinks(
     val libraryStatus: (() -> Unit)? = null,
-    val review: (() -> Unit)? = null,
     val stats: (() -> Unit)? = null,
     val sync: (() -> Unit)? = null,
     val addons: (() -> Unit)? = null,
@@ -197,6 +191,8 @@ data class SettingsHost(
     /** When background indexing may run (Content & discovery → Indexing). */
     val indexing: dev.yourstream.media.api.model.IndexingPolicy = dev.yourstream.media.api.model.IndexingPolicy(),
     val onIndexing: (dev.yourstream.media.api.model.IndexingPolicy) -> Unit = {},
+    /** Opens another Settings page (Layout's own pages). */
+    val onPage: (SettingsPage) -> Unit = {},
 )
 
 /** The indexing policy for Settings (it lives with the indexer: background workers read it). */
@@ -226,7 +222,7 @@ fun SettingsScreen(host: SettingsHost, onPage: (SettingsPage) -> Unit = {}) {
             if (query.isBlank()) {
                 item(key = "profile") { Profile(host.state, host.onAccount) }
                 SettingsSection.entries.forEach { section ->
-                    val pages = SettingsPage.entries.filter { it.section == section }
+                    val pages = SettingsPage.entries.filter { it.section == section && it.parent == null }
                     val direct = SETTINGS.filter { it.page == null && it.section == section && it.shown(host) }
                     if (pages.isEmpty() && direct.isEmpty()) return@forEach
                     item(key = "section:${section.name}") { SettingsGroup(stringResource(section.title)) }
@@ -333,8 +329,6 @@ private fun SettingsDialogs(dialog: SettingsDialog, host: SettingsHost, onClose:
             { onPrefs(prefs.copy(style = it)) }, onClose)
         SettingsDialog.THEME -> Choose(stringResource(R.string.settings_theme), ThemeMode.entries.map { it to themeLabel(it) }, prefs.theme,
             { onPrefs(prefs.copy(theme = it)) }, onClose)
-        SettingsDialog.POSTER -> Choose(stringResource(R.string.settings_poster_size), PosterSize.entries.map { it to posterSizeLabel(it) }, prefs.posterSize,
-            { onPrefs(prefs.copy(posterSize = it)) }, onClose)
         SettingsDialog.BUFFER -> Choose(stringResource(R.string.settings_buffer), AppSettings.BUFFER_OPTIONS.map { it to bufferLabel(it) }, prefs.streamBufferSeconds,
             { onPrefs(prefs.copy(streamBufferSeconds = it)) }, onClose)
         SettingsDialog.TORRENT_CONSENT -> TorrentConsentDialog(onEnable = { onPrefs(prefs.copy(torrentStreaming = true)) }, onClose = onClose)
@@ -397,7 +391,10 @@ internal fun SettingRow(title: String, supporting: String?, icon: androidx.compo
 
 @Composable
 internal fun SettingToggle(title: String, supporting: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = { onChange(!checked) },
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = {
+        haptics.perform(if (checked) dev.yourstream.ui.core.Haptic.TOGGLE_OFF else dev.yourstream.ui.core.Haptic.TOGGLE_ON); onChange(!checked)
+    },
         trailing = { androidx.compose.material3.Switch(checked = checked, onCheckedChange = null) }, modifier = Modifier.testTag(tag))
 }
 

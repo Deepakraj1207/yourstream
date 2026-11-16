@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The ink of the manga style (and the launch screen's background). -->
+    <color name="launch_ink">#FF0E0E0E</color>
+</resources>

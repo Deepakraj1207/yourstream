@@ -1,7 +1,14 @@
 package dev.yourstream.ui.screens
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -145,6 +152,29 @@ class ScreensTest {
     }
 
     @Test
+    fun signInPanelDoesNotJumpFromFullScreenWhileAddonRowsLoad() {
+        // Launch while signed out with an empty library: the add-on rows are still loading. The
+        // layout is already the final one (sign-in panel above rows), not a full-screen
+        // "Connect Telegram" that turns into the panel a moment later.
+        var state by androidx.compose.runtime.mutableStateOf(HomeUiState(HomeBanner.NOT_SIGNED_IN, UiState.Empty(EmptyKind.LIBRARY_EMPTY),
+            UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), libraryCount = 0, catalogsLoading = true))
+        val tile = Tile(MediaCardModel("item:9", "Leo", "2023"), OpenTarget.Details(9), itemId = 9, isFavorite = false, watched = false)
+        set { HomeScreen(state, rows(), {}, {}, {}, {}, {}) }
+        compose.onNodeWithTag("home-setup").assertExists()
+        compose.onAllNodes(hasTestTag("home-catalogs-loading")).fetchSemanticsNodes().let { assertTrue(it.isNotEmpty(), "placeholders for the rows") }
+        compose.onNodeWithTag("state-action").assertDoesNotExist()
+
+        state = state.copy(catalogsLoading = false, catalogs = listOf(dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Popular", listOf(tile))))
+        compose.onNodeWithTag("home-setup").assertExists()
+        compose.onNodeWithText("Popular").assertExists()
+        assertTrue(compose.onAllNodes(hasTestTag("home-catalogs-loading")).fetchSemanticsNodes().isEmpty())
+
+        // No add-on rows at all (none enabled, or none answered): the full-screen step is right.
+        state = state.copy(catalogs = emptyList())
+        compose.onNodeWithTag("state-action").assertExists()
+    }
+
+    @Test
     fun browseShowsCountAndSkeletonWhileLoading() {
         set {
             val loading = androidx.compose.runtime.remember {
@@ -170,17 +200,78 @@ class ScreensTest {
         compose.onNodeWithTag("sort").assertDoesNotExist()
     }
 
+    /** Nuvio's layout: rows, the user's Telegram titles first (top hit leading), then each add-on's. */
     @Test
-    fun searchShowsTopResultAndCount() {
+    fun searchShowsTelegramTitlesFirstThenAddonRows() {
         val top = Tile(MediaCardModel("hit:1:0", "Doraemon"), OpenTarget.Details(1))
         val rest = listOf(Tile(MediaCardModel("hit:2:0", "Doraemon: Nobita"), OpenTarget.Details(2)))
+        val addon = Tile(MediaCardModel("cat:cinemeta:tt1", "Doraemon the Movie"), OpenTarget.Details(3))
         val opened = mutableListOf<OpenTarget>()
-        set { SearchScreen(SearchUiState("doremon", UiState.Content(SearchResults(top, rest, 2)), interpretation = listOf("doremon → doraemon")), {}, { opened += it }) }
-        compose.onNodeWithTag("results-count").assertTextEquals("2 results")
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set {
+            SearchScreen(SearchUiState("doremon", UiState.Content(SearchResults(top, rest, 2)), interpretation = listOf("doremon → doraemon"),
+                addons = AddonSections(listOf(SearchRow("cinemeta:MOVIE", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf(addon))))),
+                { actions += it }, { opened += it })
+        }
         compose.onNodeWithText("doremon → doraemon").assertExists()
-        compose.onNodeWithTag("top-result").performClick()
+        compose.onNodeWithText("FROM TELEGRAM", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("search").performScrollToNode(hasTestTag("addon-results:cinemeta:MOVIE"))
+        compose.onNodeWithTag("addon-results:cinemeta:MOVIE").assertExists()
+        compose.onNodeWithText("Cinemeta · Movies", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("search").performScrollToIndex(0)
+        compose.onNodeWithText("Doraemon").performClick()
         assertEquals(listOf<OpenTarget>(OpenTarget.Details(1)), opened)
+        assertEquals(listOf<dev.yourstream.ui.screens.search.SearchAction>(dev.yourstream.ui.screens.search.SearchAction.Submit), actions, "an opened result is a meant search")
+        compose.onNodeWithTag("search-clear").assertExists()
         assertTouchTargets()
+    }
+
+    @Test
+    fun searchSaysWhyThereIsNothing() {
+        var state by mutableStateOf(SearchUiState("zzz", UiState.Empty(dev.yourstream.ui.core.EmptyKind.NO_RESULTS), addons = AddonSections(emptyList())))
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set { SearchScreen(state, { actions += it }, {}) }
+        compose.onNodeWithText("No results found").assertExists()
+        state = state.copy(addons = AddonSections(emptyList(), searchable = false))
+        compose.onNodeWithText("No searchable catalogs").assertExists()
+        state = state.copy(addons = AddonSections(emptyList(), failed = true))
+        compose.onNodeWithText("Search failed").assertExists()
+        compose.onNodeWithTag("search-failed-retry").performClick()
+        assertEquals(listOf<dev.yourstream.ui.screens.search.SearchAction>(dev.yourstream.ui.screens.search.SearchAction.Retry), actions)
+        // Still asking the add-ons: no verdict yet.
+        state = state.copy(addons = null, addonsLoading = true)
+        compose.onNodeWithTag("addons-loading").assertExists()
+        compose.onNodeWithTag("search-empty").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptySearchShowsRecentSearchesAndDiscover() {
+        val movie = { k: String -> Tile(MediaCardModel(k, k), OpenTarget.Details(1)) }
+        val top = DiscoverCatalog("cat:a:MOVIE:top", "Top", "Alpha", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Drama"))
+        val actions = mutableListOf<dev.yourstream.ui.screens.search.SearchAction>()
+        set {
+            SearchScreen(SearchUiState(recent = listOf("vikram"),
+                discover = dev.yourstream.ui.screens.search.DiscoverUiState(listOf(top), loadingCatalogs = false, type = top.type, catalog = top,
+                    tiles = (1..5).map { movie("t$it") })), { actions += it }, {})
+        }
+        compose.onNodeWithTag("discover").assertTextEquals("Discover")
+        compose.onNodeWithTag("discover-context").assertTextEquals("Alpha · Movies")
+        compose.onNodeWithTag("discover-catalog").assertTextContains("Top")
+        // A poster grid, row by row (two columns on this width), paged as it scrolls.
+        compose.onAllNodesWithTag("discover-tile").assertCountEquals(2)
+        compose.onNodeWithTag("search").performScrollToNode(hasText("t5"))
+        compose.onNodeWithTag("search").performScrollToIndex(0)
+        // Recent searches show while the field is focused.
+        compose.onNodeWithText("Recent Searches").assertDoesNotExist()
+        compose.onNodeWithTag("search-field").performClick()
+        compose.onNodeWithTag("recent:vikram").performClick()
+        compose.onNodeWithTag("recent-remove:vikram").performClick()
+        compose.onNodeWithTag("discover-genre").performClick()
+        compose.onNodeWithTag("discover-genre:Drama").performClick()
+        assertEquals(listOf(
+            dev.yourstream.ui.screens.search.SearchAction.PickRecent("vikram"), dev.yourstream.ui.screens.search.SearchAction.RemoveRecent("vikram"),
+            dev.yourstream.ui.screens.search.SearchAction.DiscoverGenre("Drama"),
+        ), actions)
     }
 
     @Test
@@ -245,20 +336,19 @@ class ScreensTest {
         compose.onNodeWithTag("pref-theme").performClick()
         compose.onNodeWithTag("choice:Dark").performClick()
         assertEquals(dev.yourstream.ui.screens.settings.ThemeMode.DARK, prefs.theme)
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
-        compose.onNodeWithTag("pref-dock-labels").performClick()
-        assertEquals(false, prefs.dockLabels)
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reduce-motion"))
         compose.onNodeWithTag("pref-reduce-motion").performClick()
         assertEquals(true, prefs.reduceMotion)
-        page = SettingsPage.LAYOUT
+        // Home rows, poster size and tab names moved to Layout's own pages (Nuvio's structure,
+        // the user's request of 15 Nov 2026): see LayoutSettingsTest.
+        page = SettingsPage.LAYOUT_HOME
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-home-hero"))
         compose.onNodeWithTag("pref-home-hero").performClick()
         assertEquals(false, prefs.homeRows.hero)
-        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-poster-size"))
-        compose.onNodeWithTag("pref-poster-size").performClick()
-        compose.onNodeWithTag("choice:Large").performClick()
-        assertEquals(dev.yourstream.ui.screens.settings.PosterSize.LARGE, prefs.posterSize)
+        page = SettingsPage.LAYOUT_NAVIGATION
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-dock-labels"))
+        compose.onNodeWithTag("pref-dock-labels").performClick()
+        assertEquals(false, prefs.dockLabels)
         page = SettingsPage.ADVANCED
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("pref-reset"))
         compose.onNodeWithTag("pref-reset").performClick()
@@ -519,6 +609,24 @@ class ScreensTest {
     }
 
     @Test
+    fun theMangaPanelGridKeepsTouchTargetsOnTheNarrowestPhones() {
+        // The panel grid adds side margins and gutters between panels; on a 320 dp wide screen
+        // every panel must still be a 48 dp touch target, in the light theme too.
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT, darkTheme = false, manga = true) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.core.LocalMangaStyle provides true) {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.width(320.dp)) {
+                        MainNavigationBar(TopLevel.HOME, {})
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("nav:HOME").assertIsSelected()
+        for (t in MAIN_TABS) compose.onNodeWithTag("nav:${t.name}").assertExists()
+        assertTouchTargets()
+    }
+
+    @Test
     fun tabNamesStayReadableWithoutLabels() {
         // Settings → Appearance → Tab names off: only the selected tab shows its name, but screen
         // readers still get every tab's name.
@@ -527,8 +635,10 @@ class ScreensTest {
                 YourStreamTheme(WindowLayout.COMPACT) { MainNavigationBar(TopLevel.HOME, {}) }
             }
         }
-        compose.onNodeWithTag("nav:SEARCH").assert(androidx.compose.ui.test.hasText("Search"))
-        compose.onNodeWithTag("nav:SETTINGS").assert(androidx.compose.ui.test.hasText("Settings"))
+        // The name as text, or as the icon's description when the bar hides it (floating / manga bars).
+        for ((tag, name) in listOf("nav:SEARCH" to "Search", "nav:SETTINGS" to "Settings")) {
+            compose.onNodeWithTag(tag).assert(androidx.compose.ui.test.hasText(name) or androidx.compose.ui.test.hasContentDescription(name))
+        }
     }
 
     @Test

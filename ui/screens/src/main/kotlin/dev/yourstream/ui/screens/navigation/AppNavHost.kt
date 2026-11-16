@@ -38,7 +38,6 @@ import dev.yourstream.ui.screens.home.HomeSection
 import dev.yourstream.ui.screens.player.PlayerRoute as PlayerScreenRoute
 import dev.yourstream.ui.screens.library.FixMatchDestination
 import dev.yourstream.ui.screens.library.LibraryStatusDestination
-import dev.yourstream.ui.screens.library.MatchReviewDestination
 import dev.yourstream.ui.screens.settings.SettingsLinks
 import dev.yourstream.ui.screens.stats.StatsDestination
 import dev.yourstream.ui.screens.sync.ProgressSyncDestination
@@ -124,7 +123,6 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
                 },
                 onSignIn = navigator::account,
                 onChooseSources = navigator::sources,
-                onReview = navigator::review,
             )
         }
         page<LocalFilesRoute> { dev.yourstream.ui.screens.settings.LocalFilesRoute(onBack = back) }
@@ -140,14 +138,15 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<SearchRoute> { SearchScreenRoute(navigator::open) }
         page<ContinueWatchingRoute> { ContinueWatchingScreenRoute(navigator::open) }
         page<RecentlyAddedRoute> { RecentlyAddedScreenRoute(navigator::open) }
-        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::review, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb, navigator::firstRun, navigator::storage, navigator::localFiles)
+        val settingsLinks = SettingsLinks(navigator::libraryStatus, navigator::stats, navigator::progressSync, navigator::addons, navigator::tmdb, navigator::firstRun, navigator::storage, navigator::localFiles)
         page<SettingsRoute> {
             SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, onPage = navigator::settingsPage)
         }
         page<SettingsPageRoute> { entry ->
             val name = entry.toRoute<SettingsPageRoute>().page
             val settingsPage = dev.yourstream.ui.screens.settings.SettingsPage.entries.firstOrNull { it.name == name } ?: dev.yourstream.ui.screens.settings.SettingsPage.APPEARANCE
-            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage, onBack = back)
+            SettingsScreenRoute(appVersion, navigator::account, navigator::sources, navigator::languages, settingsLinks, page = settingsPage,
+                onPage = navigator::settingsPage, onBack = back)
         }
         page<DetailsRoute> { DetailsScreenRoute(navigator::open, back, navigator::fixMatch) }
         page<EpisodesRoute> { EpisodesScreenRoute(navigator::open, back) }
@@ -155,9 +154,8 @@ fun AppNavHost(nav: NavHostController, navigator: AppNavigator, appVersion: Stri
         page<AccountRoute> { AccountScreenRoute(back) }
         page<SourcesRoute> { SourcesScreenRoute(back) }
         page<LanguagesRoute> { LanguagesScreenRoute(back) }
-        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::review, navigator::sources, back, onUntitled = navigator::untitledFiles) }
+        page<LibraryStatusRoute> { LibraryStatusDestination(navigator::sources, back, onUntitled = navigator::untitledFiles) }
         page<UntitledFilesRoute> { dev.yourstream.ui.screens.browse.UntitledRoute(navigator::open, back) }
-        page<MatchReviewRoute> { MatchReviewDestination(back) }
         page<FixMatchRoute> { FixMatchDestination(back) }
         page<StatsRoute> { StatsDestination(back) }
         page<CatalogTitleRoute> { dev.yourstream.ui.screens.addon.CatalogTitleDestination(navigator::open, back) }

@@ -1,5 +1,8 @@
 package dev.yourstream.ui.core
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -85,6 +88,37 @@ data class MediaCardModel(
 enum class CardStyle { POSTER, WIDE }
 
 /**
+ * How cards look app-wide (Settings → Layout → Poster card style): the corner radius (null: the
+ * look's own shape) and whether posters show their title underneath.
+ */
+@Immutable
+data class CardLook(val cornerRadius: Dp? = null, val hideLabels: Boolean = false)
+
+val LocalCardLook = staticCompositionLocalOf { CardLook() }
+
+/**
+ * A row or grid where some card has a caption line ("Next episode", "★ 7.6"): every card keeps
+ * room for one, so all cards are the same height. Rows of uneven cards change height as they
+ * scroll sideways (the tallest visible card sets it) and push the rows below up and down.
+ */
+val LocalReserveCaption = staticCompositionLocalOf { false }
+
+/** The height of a poster's text block: a two-line title, a subtitle, and a caption when reserved. */
+@Composable
+private fun posterTextHeight(caption: Boolean): Dp {
+    val t = MaterialTheme.typography
+    fun lh(style: androidx.compose.ui.text.TextStyle) =
+        if (style.lineHeight != androidx.compose.ui.unit.TextUnit.Unspecified) style.lineHeight else style.fontSize * 1.35f
+    return with(androidx.compose.ui.platform.LocalDensity.current) {
+        8.dp + lh(t.titleSmall).toDp() * 2 + lh(t.bodySmall).toDp() + (if (caption) lh(t.labelSmall).toDp() else 0.dp) + 2.dp
+    }
+}
+
+@Composable
+private fun cardShape(): androidx.compose.ui.graphics.Shape =
+    LocalCardLook.current.cornerRadius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it) } ?: MaterialTheme.shapes.medium
+
+/**
  * The shared frame of every card: focus lift + border, click, long press / Menu key / "more"
  * button → [actions] menu, one merged accessibility node with the actions as custom actions.
  */
@@ -98,6 +132,7 @@ private fun CardFrame(
     content: @Composable (openMenu: () -> Unit) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val progressText = model.progress?.let { stringResource(R.string.cd_progress, (it * 100).toInt()) }
     val watchedText = if (model.watched) stringResource(R.string.cd_watched) else null
     val description = listOfNotNull(model.title, model.subtitle, model.caption, model.badge, progressText, watchedText).joinToString(", ")
@@ -108,7 +143,7 @@ private fun CardFrame(
             .onPreviewKeyEvent { e ->
                 if (actions.isNotEmpty() && e.type == KeyEventType.KeyDown && e.key == Key.Menu) { menu = true; true } else false
             }
-            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = if (actions.isEmpty()) null else ({ haptics.perform(Haptic.LONG_PRESS); menu = true }))
             .semantics(mergeDescendants = true) {
                 contentDescription = description
                 if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.onClick(); true } }
@@ -122,11 +157,15 @@ private fun CardFrame(
 fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
         Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
+            val shape = cardShape()
+            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).inkPanel(shape).clip(shape)) {
                 Artwork(model.posterUrl, model.title, Modifier.fillMaxSize())
                 Overlays(model)
             }
-            Column(Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
+            // Hidden labels: the title stays in the card's accessibility description. The text
+            // block has one fixed height (see LocalReserveCaption): rows do not jump while scrolling.
+            val reserve = LocalReserveCaption.current
+            if (!LocalCardLook.current.hideLabels) Column(Modifier.height(posterTextHeight(reserve || (model.caption != null && model.caption != model.badge))).padding(top = 8.dp, start = 2.dp, end = 2.dp)) {
                 Text(model.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 model.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 // Why it is here ("Tamil · action · ★ 7.6", "Next episode"), when the screen gives a reason.
@@ -140,7 +179,8 @@ fun PosterCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 fun WideCard(model: MediaCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, actions: List<CardAction> = emptyList()) {
     CardFrame(model, onClick, actions, modifier) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(MaterialTheme.shapes.medium).clip(MaterialTheme.shapes.medium)) {
+        val shape = cardShape()
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(shape).clip(shape)) {
             Artwork(model.posterUrl, model.title, Modifier.fillMaxSize(), showInitials = false)
             Box(Modifier.fillMaxSize().background(BottomScrim))
             Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
@@ -201,12 +241,17 @@ fun <T> MediaRow(
     style: CardStyle = CardStyle.POSTER,
     actions: (T) -> List<CardAction> = { emptyList() },
     onSeeAll: (() -> Unit)? = null,
+    /** Where the row's titles come from, shown by the title ("From Telegram"). */
+    tag: String? = null,
 ) {
     val d = LocalDimens.current
+    val reserve = items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
-        SectionHeader(title, onSeeAll)
-        LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
-            items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+        SectionHeader(title, onSeeAll, tag = tag)
+        CompositionLocalProvider(LocalReserveCaption provides reserve) {
+            LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
+                items(items, key = { card(it).key }) { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+            }
         }
     }
 }
@@ -223,6 +268,7 @@ fun <T : Any> PagedMediaRow(
     style: CardStyle = CardStyle.POSTER,
     actions: (T) -> List<CardAction> = { emptyList() },
     onSeeAll: (() -> Unit)? = null,
+    tag: String? = null,
 ) {
     val refresh = items.loadState.refresh
     if (items.itemCount == 0) {
@@ -230,11 +276,14 @@ fun <T : Any> PagedMediaRow(
         return // empty or failed: the row is simply absent (the screen shows its own state)
     }
     val d = LocalDimens.current
+    val reserve = items.itemSnapshotList.items.any { card(it).let { m -> m.caption != null && m.caption != m.badge } }
     Column(modifier.fillMaxWidth().testTag("row:$title")) {
-        SectionHeader(title, onSeeAll)
-        LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
-            items(items.itemCount, key = items.itemKey { card(it).key }) { i ->
-                items[i]?.let { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+        SectionHeader(title, onSeeAll, tag = tag)
+        CompositionLocalProvider(LocalReserveCaption provides reserve) {
+            LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = d.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(d.cardGap)) {
+                items(items.itemCount, key = items.itemKey { card(it).key }) { i ->
+                    items[i]?.let { item -> MediaCard(card(item), { onClick(item) }, Modifier.width(cardWidth(style)), style, actions(item)) }
+                }
             }
         }
     }
@@ -324,19 +373,27 @@ private fun Modifier.combinedClickableCompat(onClick: () -> Unit) = this.combine
 
 /** Section title with an optional count and "See all". */
 @Composable
-fun SectionHeader(title: String, onSeeAll: (() -> Unit)? = null, count: String? = null) {
+fun SectionHeader(title: String, onSeeAll: (() -> Unit)? = null, count: String? = null, tag: String? = null) {
     Row(
         Modifier.fillMaxWidth().padding(start = LocalDimens.current.gutter, end = LocalDimens.current.gutter - 8.dp, top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f)) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() }
                 .then(if (LocalMangaStyle.current) Modifier.padding(bottom = 4.dp).inkUnderline(MaterialTheme.colorScheme.onSurface) else Modifier))
+            // Where the row's titles come from ("From Telegram").
+            tag?.let {
+                Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color.White,
+                    modifier = Modifier.background(TelegramBlue, MaterialTheme.shapes.extraSmall).padding(horizontal = 6.dp, vertical = 2.dp).testTag("row-tag"))
+            }
         }
         count?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp)) }
         onSeeAll?.let { TextButton(onClick = it, modifier = Modifier.focusHighlight()) { Text(stringResource(R.string.ui_see_all)) } }
     }
 }
+
+/** Telegram's blue, for "From Telegram" tags and badges. */
+val TelegramBlue = Color(0xFF2AABEE)
 
 /** A small overflow button that opens a card's menu (keyboard/touch alternative to long press). */
 @Composable

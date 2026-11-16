@@ -93,6 +93,7 @@ import dev.yourstream.telegram.api.model.CodeDeliveryType
 import dev.yourstream.ui.core.ErrorKind
 import dev.yourstream.ui.core.ErrorState
 import dev.yourstream.ui.core.LoadingState
+import dev.yourstream.ui.core.focusHighlight
 import dev.yourstream.ui.core.ScreenScaffold
 import dev.yourstream.ui.core.UiError
 import dev.yourstream.ui.core.toUiError
@@ -133,7 +134,18 @@ data class AccountUiState(
     val signedOutNotice: Boolean = false,
     /** Account data is being removed from the device after signing out. */
     val removingData: Boolean = false,
+    /** Why Telegram is not ready while [step] is [AccountStep.Starting] (null: still starting normally). */
+    val startProblem: StartProblem? = null,
 )
+
+/** Telegram not reaching the sign-in screen: said plainly, with a way to start it, never an endless spinner. */
+sealed interface StartProblem {
+    /** Not running (the app started in safe mode after crashes, or Telegram was stopped). */
+    data object NotRunning : StartProblem
+    data class Failed(val message: String) : StartProblem
+    /** Still starting after [AccountViewModel.SLOW_START_MS]. */
+    data object Slow : StartProblem
+}
 
 sealed interface AccountAction {
     data class Submit(val text: String) : AccountAction
@@ -143,6 +155,8 @@ sealed interface AccountAction {
     data object ChangeNumber : AccountAction
     data object LogOut : AccountAction
     data object DismissNotice : AccountAction
+    /** Start (or restart) Telegram from the sign-in screen when it is not ready. */
+    data object StartTelegram : AccountAction
 }
 
 @HiltViewModel
@@ -150,17 +164,38 @@ class AccountViewModel @Inject constructor(
     private val auth: TelegramAuthManager,
     users: TelegramUserRepository,
     private val account: AccountSession,
+    private val telegram: dev.yourstream.telegram.api.TelegramManager,
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
     private val error = MutableStateFlow<dev.yourstream.core.common.AppError?>(null)
     private val editingPhone = MutableStateFlow(false)
 
-    private val session = combine(account.notice, account.wiping) { n, w -> n to w }
+    /** True once this screen has waited [SLOW_START_MS] without Telegram getting ready. */
+    private val slow = MutableStateFlow(false)
+    private var slowTimer: kotlinx.coroutines.Job? = null
 
-    val state: StateFlow<AccountUiState> = combine(auth.state, users.currentUser, combine(busy, error, ::Pair), editingPhone, session) { a, u, (b, e), edit, (notice, wiping) ->
+    private val session = combine(account.notice, account.wiping) { n, w -> n to w }
+    private val running = combine(telegram.status, slow) { s, sl -> s to sl }
+
+    val state: StateFlow<AccountUiState> = combine(auth.state, users.currentUser, combine(busy, error, ::Pair), combine(editingPhone, session, ::Pair), running) { a, u, (b, e), (edit, sess), (status, isSlow) ->
+        val (notice, wiping) = sess
         val step = step(a, u?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ") })
-        AccountUiState(if (edit && step.acceptsNewNumber()) AccountStep.Phone else step, b, e, notice, wiping)
+        val shown = if (edit && step.acceptsNewNumber()) AccountStep.Phone else step
+        AccountUiState(shown, b, e, notice, wiping, if (shown == AccountStep.Starting && !wiping) startProblem(status, isSlow) else null)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccountUiState())
+
+    init {
+        // The spinner may show for a while (TDLib starting, a slow network), never forever.
+        viewModelScope.launch {
+            state.collect { s ->
+                if (s.step == AccountStep.Starting) {
+                    if (slowTimer == null) slowTimer = launch { kotlinx.coroutines.delay(SLOW_START_MS); slow.value = true }
+                } else {
+                    slowTimer?.cancel(); slowTimer = null; slow.value = false
+                }
+            }
+        }
+    }
 
     fun onAction(action: AccountAction) {
         if (action == AccountAction.ChangeNumber) { error.value = null; editingPhone.value = true; return }
@@ -179,6 +214,14 @@ class AccountViewModel @Inject constructor(
                 AccountAction.Resend -> auth.resendCode()
                 AccountAction.UseQr -> auth.requestQrCodeLogin()
                 AccountAction.LogOut -> account.signOut()
+                AccountAction.StartTelegram -> {
+                    slow.value = false; slowTimer?.cancel(); slowTimer = null
+                    // Not running (safe mode, stopped, failed): start it. Running but stuck: restart it.
+                    when (telegram.status.value) {
+                        is dev.yourstream.telegram.api.model.TelegramStatus.Stopped, is dev.yourstream.telegram.api.model.TelegramStatus.Failed -> telegram.start()
+                        else -> telegram.restart()
+                    }
+                }
                 AccountAction.ChangeNumber, AccountAction.DismissNotice -> AppResult.Ok(Unit)
             }
             if (result is AppResult.Err) error.value = result.error
@@ -188,6 +231,15 @@ class AccountViewModel @Inject constructor(
     }
 
     companion object {
+        const val SLOW_START_MS = 20_000L
+
+        /** What to tell the user while Telegram is not ready (pure; tested). */
+        fun startProblem(status: dev.yourstream.telegram.api.model.TelegramStatus, slow: Boolean): StartProblem? = when (status) {
+            is dev.yourstream.telegram.api.model.TelegramStatus.Stopped -> StartProblem.NotRunning
+            is dev.yourstream.telegram.api.model.TelegramStatus.Failed -> StartProblem.Failed(status.error.message)
+            else -> if (slow) StartProblem.Slow else null
+        }
+
         fun step(a: AuthState, name: String?): AccountStep = when (a) {
             AuthState.Unknown, AuthState.WaitParameters, AuthState.Closing, AuthState.Closed, AuthState.LoggingOut -> AccountStep.Starting
             is AuthState.NotConfigured -> AccountStep.NotConfigured(a.reason)
@@ -220,12 +272,29 @@ fun AccountRoute(onBack: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
 fun AccountScreen(state: AccountUiState, onAction: (AccountAction) -> Unit, onBack: () -> Unit) {
     when (val step = state.step) {
         AccountStep.Starting -> ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) {
-            if (state.removingData) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            val problem = state.startProblem
+            when {
+                state.removingData -> Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
                     Text(stringResource(R.string.account_removing_data), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("account-removing"))
                 }
-            } else LoadingState()
+                problem != null -> Column(Modifier.padding(24.dp).testTag("account-start-problem"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.account_start_title), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        when (problem) {
+                            StartProblem.NotRunning -> stringResource(R.string.account_start_not_running)
+                            StartProblem.Slow -> stringResource(R.string.account_start_slow)
+                            is StartProblem.Failed -> stringResource(R.string.account_start_failed, problem.message)
+                        },
+                        style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    androidx.compose.material3.Button(
+                        onClick = { onAction(AccountAction.StartTelegram) }, enabled = !state.busy,
+                        modifier = Modifier.focusHighlight().testTag("account-start-telegram"),
+                    ) { Text(stringResource(if (problem == StartProblem.Slow) R.string.account_start_retry else R.string.account_start_button)) }
+                }
+                else -> LoadingState()
+            }
         }
         is AccountStep.NotConfigured -> ScreenScaffold(stringResource(R.string.settings_account), onBack = onBack) {
             ErrorState(UiError(ErrorKind.TELEGRAM, stringResource(R.string.account_not_configured), retryable = false))

@@ -136,6 +136,16 @@ data class CatalogProviderInfo(
     val streamTypes: List<String> = emptyList(),
     /** Id prefixes the stream resource answers for ("tt", "kitsu"); empty = any. */
     val streamIdPrefixes: List<String> = emptyList(),
+    /** The add-on's logo (manifest `logo`), for the Add-ons page. */
+    val logo: String? = null,
+    /** Content types it serves ("movie", "series", …), as the manifest lists them. */
+    val types: List<String> = emptyList(),
+    /** Every id prefix the manifest names, across resources ("id rules"). */
+    val idPrefixes: List<String> = emptyList(),
+    /** `behaviorHints.configurable` / `configurationRequired`: it has a settings page at `…/configure`. */
+    val configurable: Boolean = false,
+    /** `behaviorHints.p2p`: its streams are peer-to-peer (torrents). */
+    val p2p: Boolean = false,
 ) {
     val supportsMeta: Boolean get() = "meta" in resources
     val supportsStreams: Boolean get() = "stream" in resources

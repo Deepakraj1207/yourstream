@@ -159,23 +159,6 @@ abstract class MatchViewModelBase(
     }
 }
 
-/** Every title the matcher was unsure about, with its suggestions. */
-@HiltViewModel
-class MatchReviewViewModel @Inject constructor(
-    metadata: MetadataRepository,
-    confirm: ConfirmMetadataMatch,
-    reject: RejectMetadataMatch,
-    search: SearchMetadataCandidates,
-) : MatchViewModelBase(confirm, reject, search) {
-    private val queue: Flow<UiState<List<MatchEntry>>> = metadata.reviewQueue()
-        .map<_, UiState<List<MatchEntry>>> { list -> list.map { MatchEntry(it.itemId, it.title, it.year, it.candidates.map { c -> c.toCandidate() }) }.toUiState(EmptyKind.NOTHING_TO_REVIEW) }
-        .catch { emit(UiState.Error(it.toUiError())) }
-
-    override val state: StateFlow<MatchUiState> = combine(queue, searched, busy, error) { q, s, b, e ->
-        MatchUiState(q.mapState { list -> list.map { entry -> s[entry.itemId]?.let { entry.copy(candidates = it, searched = true) } ?: entry } }, b, e)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MatchUiState())
-}
-
 /** "Fix match" for one title: fresh candidates for its title and year, or the user's own search. */
 @HiltViewModel
 class FixMatchViewModel @Inject constructor(
@@ -199,12 +182,6 @@ class FixMatchViewModel @Inject constructor(
     override val state: StateFlow<MatchUiState> = combine(entry, searched, busy, error, done) { q, s, b, e, d ->
         MatchUiState(q.mapState { list -> list.map { en -> s[en.itemId]?.let { en.copy(candidates = it, searched = true) } ?: en } }, b, e, d)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MatchUiState())
-}
-
-@Composable
-fun MatchReviewDestination(onBack: () -> Unit, vm: MatchReviewViewModel = hiltViewModel()) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    MatchScreen(stringResource(R.string.review_title), state, vm::onAction, onBack)
 }
 
 @Composable

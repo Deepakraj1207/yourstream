@@ -76,7 +76,15 @@ fun Timeline(
     val end by rememberUpdatedState(onScrubEnd)
     val shown = (scrub ?: positionMs).coerceIn(0, duration)
 
-    fun begin(at: Long) { if (scrub == null) start(); scrub = at.coerceIn(0, duration); onInteraction() }
+    val haptics = rememberHaptics()
+    // A tick when scrubbing starts, then one per minute crossed, so the thumb is felt moving.
+    fun begin(at: Long) {
+        val next = at.coerceIn(0, duration)
+        val prev = scrub
+        if (prev == null) { start(); haptics.perform(Haptic.THRESHOLD) }
+        else if (next / 60_000 != prev / 60_000) haptics.perform(Haptic.STEP)
+        scrub = next; onInteraction()
+    }
     fun commit() { scrub?.let { end(it) }; scrub = null; byKeys = false; presses = 0 }
 
     // Key scrubbing commits after a pause, so a run of presses is one seek.

@@ -38,9 +38,10 @@ val tmdbApiKey = secret("tmdb.apiKey", "TMDB_API_KEY")
 val tmdbReadToken = secret("tmdb.readToken", "TMDB_READ_TOKEN")
 val metadataProviders = secret("metadata.providers", "METADATA_PROVIDERS").ifEmpty { "tmdb,cinemeta" }
 val metadataLanguage = secret("metadata.language", "METADATA_LANGUAGE").ifEmpty { "en" }
-// Catalog providers (docs/CATALOGS.md): optional title lists, never a media source. Empty
-// ("none") leaves the local library only. Custom add-ons: comma-separated manifest URLs.
-val catalogProviders = secret("catalog.providers", "CATALOG_PROVIDERS").ifEmpty { "indiastreams,indian_regional" }
+// Catalog providers (docs/CATALOGS.md): optional title lists, never a media source. Default
+// "none": the app ships with Cinemeta only, every other add-on is added by the user (their
+// choice, 15 Nov 2026). A build can still name known ones. Custom add-ons: manifest URLs.
+val catalogProviders = secret("catalog.providers", "CATALOG_PROVIDERS").ifEmpty { "none" }
 val catalogCustomManifests = secret("catalog.customManifests", "CATALOG_CUSTOM_MANIFESTS")
 // Playback (docs/ADAPTIVE_STREAMING.md): adaptive streaming on/off, download concurrency, prefetch on mobile data.
 val playbackAdaptive = secret("playback.adaptive", "PLAYBACK_ADAPTIVE").ifEmpty { "true" }
@@ -163,6 +164,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.core.ktx)
+    // Android 12+ launch screen (also back-ported): the logo on ink instead of a blank window.
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

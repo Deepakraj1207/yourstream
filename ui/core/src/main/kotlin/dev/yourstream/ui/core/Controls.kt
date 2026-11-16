@@ -46,13 +46,14 @@ data class ChipOption<T>(val value: T, val label: String)
 /** A single-choice row of filter chips. Scrolls when it does not fit. */
 @Composable
 fun <T> ChipRow(options: List<ChipOption<T>>, selected: T?, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
     Row(
         modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LocalDimens.current.gutter),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { o ->
             FilterChip(
-                selected = o.value == selected, onClick = { onSelect(o.value) }, label = { Text(o.label) },
+                selected = o.value == selected, onClick = { if (o.value != selected) haptics.perform(Haptic.SELECT); onSelect(o.value) }, label = { Text(o.label) },
                 leadingIcon = if (o.value == selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
                 modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("chip:${o.label}"),
             )

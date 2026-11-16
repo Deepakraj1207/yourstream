@@ -60,6 +60,8 @@ data class LibraryItemRow(
     @ColumnInfo(name = "metadata_title") val metadataTitle: String?,
     /** "chatId:messageId" of the title's newest file: its Telegram thumbnail is the fallback artwork. */
     @ColumnInfo(name = "thumb_ref") val thumbRef: String? = null,
+    /** The matched title's IMDb id: its catalog page, where the Telegram files are a stream source. */
+    @ColumnInfo(name = "imdb_id") val imdbId: String? = null,
 )
 
 data class EpisodeRow(
@@ -99,6 +101,16 @@ data class MediaVersionRow(
     @ColumnInfo(name = "download_state") val downloadState: String,
     /** v14: `content://` address of a file on this device; null for Telegram files. */
     val locator: String? = null,
+)
+
+/** A media file that may be a raw piece of a split file ("Film.mkv.002"), for joining the pieces. */
+data class SplitPartRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "message_id") val messageId: Long,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    @ColumnInfo(name = "size_bytes") val sizeBytes: Long,
+    @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
+    @ColumnInfo(name = "download_state") val downloadState: String,
 )
 
 /** Continue-watching / recently-watched entry. */

@@ -77,6 +77,8 @@ data class LibraryItemSummary(
     val posterUrl: String? = null,
     /** Official title from external metadata, when matched (title stays the library's own). */
     val metadataTitle: String? = null,
+    /** The matched title's IMDb id (null: not matched, or no IMDb id). */
+    val imdbId: String? = null,
     /** The user added it to "My library". */
     val inLibrary: Boolean = false,
     /** "chatId:messageId" of a file of this title, for its Telegram thumbnail (when there is no poster). */
@@ -155,9 +157,27 @@ data class MediaVersion(
     val downloadState: String,
     /** A file on this device (`content://` address); null for Telegram files. */
     val locator: String? = null,
+    /**
+     * A movie cut into raw pieces ("Film.mkv.001", ".002", …), played as one file: every piece in
+     * order, the first being this version's own file. Empty for a normal file. See [SplitFiles].
+     */
+    val parts: List<SplitPart> = emptyList(),
 ) {
     val isLocal: Boolean get() = locator != null
+    val isSplit: Boolean get() = parts.size > 1
 }
+
+/** One raw piece of a split file: its Telegram message and its exact size. */
+data class SplitPart(
+    val number: Int,
+    val mediaId: Long,
+    val messageId: Long,
+    val fileName: String,
+    val sizeBytes: Long,
+    val isDeleted: Boolean,
+    /** [dev.yourstream.media.api.model.DownloadState] name of this piece. */
+    val downloadState: String = "NOT_DOWNLOADED",
+)
 
 data class LibraryItemDetails(
     val summary: LibraryItemSummary,

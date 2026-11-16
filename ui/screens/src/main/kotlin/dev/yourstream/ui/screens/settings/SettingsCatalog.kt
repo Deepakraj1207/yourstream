@@ -33,14 +33,22 @@ enum class SettingsSection(@StringRes val title: Int) {
 }
 
 /** A category of Settings: a row on the hub that opens its own page. */
-enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int, @StringRes val detail: Int) {
+enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int, @StringRes val detail: Int, val parent: SettingsPage? = null) {
     APPEARANCE(SettingsSection.LOOK, R.string.settings_group_appearance, R.string.settings_page_appearance_detail),
     LAYOUT(SettingsSection.LOOK, R.string.settings_page_layout, R.string.settings_page_layout_detail),
     CONTENT(SettingsSection.WATCH, R.string.settings_page_content, R.string.settings_page_content_detail),
     PLAYBACK(SettingsSection.WATCH, R.string.settings_group_playback, R.string.settings_page_playback_detail),
     INTEGRATIONS(SettingsSection.SERVICES, R.string.settings_page_integrations, R.string.settings_page_integrations_detail),
     ADVANCED(SettingsSection.SYSTEM, R.string.settings_page_advanced, R.string.settings_page_advanced_detail),
-    ABOUT(SettingsSection.SYSTEM, R.string.settings_group_about, R.string.settings_page_about_detail);
+    ABOUT(SettingsSection.SYSTEM, R.string.settings_group_about, R.string.settings_page_about_detail),
+
+    // Settings → Layout's own pages (not on the hub).
+    LAYOUT_HOME(SettingsSection.LOOK, R.string.layout_home, R.string.layout_home_detail, LAYOUT),
+    LAYOUT_CONTINUE(SettingsSection.LOOK, R.string.home_continue, R.string.layout_continue_detail, LAYOUT),
+    LAYOUT_POSTERS(SettingsSection.LOOK, R.string.layout_posters, R.string.layout_posters_detail, LAYOUT),
+    LAYOUT_STREAMS(SettingsSection.LOOK, R.string.layout_streams, R.string.layout_streams_detail, LAYOUT),
+    LAYOUT_DETAIL(SettingsSection.LOOK, R.string.layout_detail, R.string.layout_detail_detail, LAYOUT),
+    LAYOUT_NAVIGATION(SettingsSection.LOOK, R.string.layout_navigation, R.string.layout_navigation_detail, LAYOUT);
 
     val icon: ImageVector get() = when (this) {
         APPEARANCE -> AppIcons.Palette
@@ -50,11 +58,17 @@ enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int,
         INTEGRATIONS -> AppIcons.Link
         ADVANCED -> Icons.Filled.Build
         ABOUT -> Icons.Filled.Info
+        LAYOUT_HOME -> Icons.Filled.Home
+        LAYOUT_CONTINUE -> Icons.Filled.PlayArrow
+        LAYOUT_POSTERS -> AppIcons.Grid
+        LAYOUT_STREAMS -> AppIcons.Explore
+        LAYOUT_DETAIL -> Icons.Filled.Info
+        LAYOUT_NAVIGATION -> AppIcons.Tv
     }
 }
 
 /** Choices that open a dialog. */
-enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, POSTER, BUFFER, RESET, TORRENT_CONSENT }
+enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, BUFFER, RESET, TORRENT_CONSENT }
 
 /** What a setting's row works with: the settings bundle, and the dialogs it may open. */
 class SettingsRows internal constructor(val host: SettingsHost, internal val open: (SettingsDialog) -> Unit) {
@@ -78,7 +92,7 @@ internal class SettingEntry(
     val row: @Composable SettingsRows.() -> Unit,
 )
 
-private fun entry(
+internal fun entry(
     key: String, page: SettingsPage, @StringRes group: Int, @StringRes title: Int, keywords: String = "",
     shown: (SettingsHost) -> Boolean = { true }, row: @Composable SettingsRows.() -> Unit,
 ) = SettingEntry(key, page.section, page, group, title, keywords, shown, row)
@@ -124,34 +138,19 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(amoledBlack = it))
         }
     })
-    add(entry("dock-labels", ap, R.string.settings_group_navigation, R.string.settings_dock_labels, "navigation bar tabs labels names") {
-        SettingToggle(stringResource(R.string.settings_dock_labels), stringResource(R.string.settings_dock_labels_detail), AppIcons.Dock, prefs.dockLabels, "pref-dock-labels") {
-            change(prefs.copy(dockLabels = it))
-        }
-    })
     add(entry("reduce-motion", ap, R.string.settings_group_accessibility, R.string.settings_reduce_motion, "animation motion accessibility still fade") {
         SettingToggle(stringResource(R.string.settings_reduce_motion), stringResource(R.string.settings_reduce_motion_detail), AppIcons.Brightness, prefs.reduceMotion, "pref-reduce-motion") {
             change(prefs.copy(reduceMotion = it))
         }
     })
-
-    // ---- Layout
-    val la = SettingsPage.LAYOUT
-    fun homeRow(key: String, @StringRes title: Int, @StringRes detail: Int, icon: () -> ImageVector, on: (HomeRowsShown) -> Boolean, set: (HomeRowsShown, Boolean) -> HomeRowsShown) =
-        entry("home-$key", la, R.string.settings_group_home, title, "home rows") {
-            SettingToggle(stringResource(title), stringResource(detail), icon(), on(prefs.homeRows), "pref-home-$key") {
-                change(prefs.copy(homeRows = set(prefs.homeRows, it)))
-            }
+    add(entry("haptics", ap, R.string.settings_group_accessibility, R.string.settings_haptics, "haptic vibration feedback touch buzz") {
+        SettingToggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), AppIcons.Volume, prefs.haptics, "pref-haptics") {
+            change(prefs.copy(haptics = it))
         }
-    add(homeRow("hero", R.string.settings_home_hero, R.string.settings_home_hero_detail, { Icons.Filled.Home }, { it.hero }) { r, v -> r.copy(hero = v) })
-    add(homeRow("continue", R.string.home_continue, R.string.settings_home_row_detail, { Icons.Filled.PlayArrow }, { it.continueWatching }) { r, v -> r.copy(continueWatching = v) })
-    add(homeRow("for-you", R.string.home_for_you, R.string.settings_home_row_detail, { Icons.Filled.Star }, { it.forYou }) { r, v -> r.copy(forYou = v) })
-    add(homeRow("recent", R.string.home_recently_added, R.string.settings_home_row_detail, { Icons.Filled.DateRange }, { it.recentlyAdded }) { r, v -> r.copy(recentlyAdded = v) })
-    add(homeRow("series", R.string.home_series, R.string.settings_home_row_detail, { AppIcons.Tv }, { it.series }) { r, v -> r.copy(series = v) })
-    add(homeRow("catalogs", R.string.settings_home_catalogs, R.string.settings_home_catalogs_detail, { AppIcons.Explore }, { it.catalogs }) { r, v -> r.copy(catalogs = v) })
-    add(entry("poster-size", la, R.string.settings_group_posters, R.string.settings_poster_size, "cards grid big small") {
-        SettingRow(stringResource(R.string.settings_poster_size), posterSizeLabel(prefs.posterSize), AppIcons.Grid, tag = "pref-poster-size") { open(SettingsDialog.POSTER) }
     })
+
+    // ---- Layout (and its own pages)
+    addAll(layoutEntries())
 
     // ---- Content & discovery
     val co = SettingsPage.CONTENT
@@ -177,10 +176,6 @@ internal val SETTINGS: List<SettingEntry> = buildList {
     })
     add(entry("library-status", co, R.string.settings_group_library, R.string.settings_status, "indexing sync matching progress", shown = { it.links.libraryStatus != null }) {
         SettingRow(stringResource(R.string.settings_status), stringResource(R.string.settings_status_detail), AppIcons.Episodes, onClick = host.links.libraryStatus)
-    })
-    add(entry("review", co, R.string.settings_group_library, R.string.settings_review, "matches titles wrong", shown = { it.links.review != null && it.state.reviewCount > 0 }) {
-        SettingRow(stringResource(R.string.settings_review), pluralStringResource(R.plurals.settings_review_count, state.reviewCount, state.reviewCount),
-            Icons.Filled.Warning, onClick = host.links.review)
     })
 
     // ---- Playback
@@ -310,7 +305,7 @@ internal fun pageSummary(page: SettingsPage, host: SettingsHost): String = when 
     SettingsPage.CONTENT -> listOf(pluralStringResource(R.plurals.settings_sources_count, host.state.enabledSources, host.state.enabledSources), stringResource(R.string.settings_addons))
         .joinToString(" · ")
     SettingsPage.ABOUT -> host.updateLine ?: host.appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(page.detail)
-    else -> stringResource(page.detail)
+    else -> layoutSummary(page, host) ?: stringResource(page.detail)
 }
 
 internal fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
@@ -319,14 +314,6 @@ internal fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else
 internal fun bufferLabel(seconds: Int): String =
     if (seconds < 60) stringResource(R.string.settings_seconds, seconds) else pluralStringResource(R.plurals.settings_minutes, seconds / 60, seconds / 60)
 
-@Composable
-internal fun posterSizeLabel(s: PosterSize) = stringResource(
-    when (s) {
-        PosterSize.SMALL -> R.string.settings_poster_small
-        PosterSize.MEDIUM -> R.string.settings_poster_medium
-        PosterSize.LARGE -> R.string.settings_poster_large
-    },
-)
 
 @Composable
 internal fun subtitleSizeLabel(scale: Float) = stringResource(

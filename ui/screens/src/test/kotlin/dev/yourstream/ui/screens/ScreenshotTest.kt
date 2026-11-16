@@ -41,6 +41,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import dev.yourstream.metadata.api.TitleDetails
 import java.io.File
 
 /**
@@ -67,8 +68,13 @@ class ScreenshotTest {
         Tile(MediaCardModel("cw:21:9", "Doraemon", "S02E01"), OpenTarget.Play(PlaybackTarget(21, 9)), 21, dismissible = true, caption = TileCaption.NewEpisode),
     )
 
-    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(), content: @Composable () -> Unit) {
-        compose.setContent { YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } } }
+    private fun shot(name: String, layout: WindowLayout, top: TopLevel?, dark: Boolean = true, manga: Boolean = false, indexing: IndexingStatus = IndexingStatus(),
+                     settings: dev.yourstream.ui.screens.settings.AppSettings = dev.yourstream.ui.screens.settings.AppSettings(), content: @Composable () -> Unit) {
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
+                YourStreamTheme(layout, darkTheme = dark, manga = manga) { androidx.compose.material3.Surface { AdaptiveShell(layout, top, {}, indexing) { content() } } }
+            }
+        }
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -87,7 +93,7 @@ class ScreenshotTest {
             Tile(MediaCardModel("fy:32", "Super Deluxe", "2019"), OpenTarget.Details(32), 32, caption = TileCaption.Reason("Tamil · ★ 8.3")),
             Tile(MediaCardModel("fy:33", "Soorarai Pottru", "2020"), OpenTarget.Details(33), 33, caption = TileCaption.Reason("Tamil · drama · ★ 8.7")),
         ))
-        HomeScreen(HomeUiState(HomeBanner.REVIEW, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou), 12), HomeRows(r, s), {}, {}, {}, {}, {})
+        HomeScreen(HomeUiState(null, UiState.Content(hero), UiState.Content(continueTiles), 240, UiState.Content(forYou)), HomeRows(r, s), {}, {}, {}, {}, {})
     }
 
     private fun firstRun(name: String, step: dev.yourstream.ui.screens.firstrun.FirstRunStep, state: dev.yourstream.ui.screens.firstrun.FirstRunUiState, dark: Boolean = true) =
@@ -142,7 +148,7 @@ class ScreenshotTest {
         val none = flowOf(PagingData.from(emptyList<Tile>(), done)).collectAsLazyPagingItems()
         val catalog = dev.yourstream.ui.screens.home.CatalogRow("cat:1", "Tamil Movies", series.map { it.copy(caption = TileCaption.InLibrary) })
         HomeScreen(
-            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC), 0,
+            HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Empty(EmptyKind.NOTHING_IN_PROGRESS), 240, UiState.Empty(EmptyKind.GENERIC),
                 IndexingStatus(chats = 2, found = 134, scanned = 900, total = 2400), catalogs = listOf(catalog)),
             HomeRows(r, none), {}, {}, {}, {}, {},
         )
@@ -153,18 +159,18 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {})
     }
 
-    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun phoneAddonsPlugins() = shot("phone-addons-plugins", WindowLayout.COMPACT, TopLevel.SETTINGS, manga = true, dark = false) {
-        dev.yourstream.ui.screens.settings.AddonsScreen(addonsState(), {}, {}, initialTab = dev.yourstream.ui.screens.settings.AddonsTab.PLUGINS)
+    private fun addonsState(): dev.yourstream.ui.screens.settings.AddonsUiState {
+        fun d(version: String, description: String, types: List<String>, resources: List<String>, rules: Int, configurable: Boolean = false) =
+            dev.yourstream.ui.screens.settings.AddonDetails(version, null, description, types, resources, rules, configurable)
+        return dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true,
+                info = d("3.0.13", "The official add-on for movie and series catalogs", listOf("movie", "series"), listOf("catalog", "meta"), 1)),
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true,
+                info = d("1.2.0", "Streams for movies and series from example sources.", listOf("movie", "series"), listOf("stream"), 2, configurable = true)),
+            dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:catalog.example.com", "Example Catalogs", "https://catalog.example.com/manifest.json", false, false), 3, true,
+                info = d("1.0.6", "Regional movie and series catalogs.", listOf("movie", "series"), listOf("catalog", "meta"), 1)),
+        ))
     }
-
-    private fun addonsState() = dev.yourstream.ui.screens.settings.AddonsUiState(listOf(
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("cinemeta", "Cinemeta", null, true, true), 6, true, details = true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("indian_regional", "Indian Regional Catalog", null, true, false), 12, true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:streams.example.com", "Example Streams", "https://streams.example.com/manifest.json", false, true), 0, true, streams = true),
-        dev.yourstream.ui.screens.settings.AddonRow(dev.yourstream.catalog.sync.CatalogAddon("custom:nuvio.example.com", "Example Nuvio Add-on", "https://nuvio.example.com/manifest.json", false, true,
-            dev.yourstream.catalog.sync.AddonSource.NUVIO), 0, true, streams = true),
-    ), added = "Example Streams")
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phoneDetails() = shot("phone-details", WindowLayout.COMPACT, TopLevel.LIBRARY) {
@@ -192,11 +198,21 @@ class ScreenshotTest {
                 meta = dev.yourstream.catalog.api.CatalogMetadata(ref, "Breaking Bad", 2008, "A chemistry teacher diagnosed with cancer turns to making methamphetamine.",
                     genres = listOf("Crime", "Drama"), rating = 9.5, runtimeMinutes = 49, videos = videos),
                 loadingMeta = false, seasons = listOf(1, 2, 3), season = 1, episode = ep,
-                streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
+                streams = listOf(dev.yourstream.ui.screens.addon.StreamGroup("Telegram", listOf(
+                    dev.yourstream.catalog.api.AddonStream("Telegram", "1080p", "Breaking.Bad.S01E02.1080p.mkv", null, null, null, sizeBytes = 1_300_000_000,
+                        library = dev.yourstream.catalog.api.LibraryFile(20, 6, 1, 1080), languages = listOf("en", "ta")),
+                ), id = dev.yourstream.ui.screens.addon.StreamGroup.TELEGRAM),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Example Streams", listOf(
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "1080p", "Breaking.Bad.S01E02.1080p.mkv · 1.2 GB", "https://example.com/a.mkv", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "720p", "HLS", "https://example.com/a.m3u8", null, null),
                     dev.yourstream.catalog.api.AddonStream("Example Streams", "4K", "Breaking.Bad.S01E02.2160p.mkv · 6.1 GB · 👤 120", null, null, "aabbccddeeff00112233445566778899aabbccdd"),
-                ))),
+                ), id = "example"),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Other Add-on", listOf(
+                        dev.yourstream.catalog.api.AddonStream("Other Add-on", "1080p", "WEB-DL · 1.4 GB", "https://example.org/b.mkv", null, null),
+                    ), id = "other"),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Slow Add-on", emptyList(), id = "slow", loading = true),
+                    dev.yourstream.ui.screens.addon.StreamGroup("Quiet Add-on", emptyList(), id = "quiet"),
+                ), loadingStreams = true, streamsOpen = true,
             ),
             {}, {}, {}, onStream = {},
         )
@@ -217,9 +233,36 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT, settingsHost("0.10.0"), {})
     }
 
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSettingsLayoutPosters() = shot("phone-settings-layout-posters", WindowLayout.COMPACT, null, dark = true, manga = false) {
+        dev.yourstream.ui.screens.settings.SettingsPageScreen(dev.yourstream.ui.screens.settings.SettingsPage.LAYOUT_POSTERS, settingsHost("0.10.0"), {})
+    }
+
+    /** Home with the floating navigation bar and its glow (Settings → Layout → Navigation bar). */
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeFloatingNav() = shot("phone-home-floating-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
+        settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
+            navStyle = dev.yourstream.ui.screens.settings.NavStyle.EXPANDED, navGlow = true))) { home() }
+
+    /** The hero carousel from hero catalogs, with the floating bar (classic dark). */
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeHeroCarousel() = shot("phone-home-hero-carousel", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false) {
+        val r = flowOf(PagingData.from(movies, done)).collectAsLazyPagingItems()
+        val s = flowOf(PagingData.from(series, done)).collectAsLazyPagingItems()
+        val slides = listOf("Immortal", "Jailer 2", "Lenin Pandiyan", "Thedal").mapIndexed { i, t ->
+            dev.yourstream.ui.screens.home.HeroSlide("hero:$i", t, null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Romance", 131, 2026, 7.0, listOf("ta"), OpenTarget.Details(i.toLong()))
+        }
+        HomeScreen(HomeUiState(null, UiState.Empty(EmptyKind.LIBRARY_EMPTY), UiState.Content(continueTiles), 240, heroSlides = slides), HomeRows(r, s), {}, {}, {}, {}, {})
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneHomeCompactNav() = shot("phone-home-compact-nav", WindowLayout.COMPACT, TopLevel.HOME, dark = true, manga = false,
+        settings = dev.yourstream.ui.screens.settings.AppSettings(layout = dev.yourstream.ui.screens.settings.LayoutSettings(
+            navStyle = dev.yourstream.ui.screens.settings.NavStyle.COMPACT))) { home() }
+
     private fun settingsHost(version: String) = dev.yourstream.ui.screens.settings.SettingsHost(
-        SettingsUiState("Asha Kumar", true, 3, "Tamil, English", reviewCount = 4), version,
-        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, {}, storage = {}),
+        SettingsUiState("Asha Kumar", true, 3, "Tamil, English"), version,
+        links = dev.yourstream.ui.screens.settings.SettingsLinks({}, {}, {}, {}, {}, storage = {}),
         updateLine = "Version $version · up to date", onUpdate = {}, onSourceCode = {}, onReset = {},
         securedHosts = listOf("api.themoviedb.org"),
     )
@@ -321,6 +364,9 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayer() = playerShot("phone-player", WindowLayout.COMPACT, playerState)
 
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phonePlayerPortrait() = playerShot("phone-player-portrait", WindowLayout.COMPACT, playerState)
+
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayerAudio() = playerShot("phone-player-audio", WindowLayout.COMPACT, playerState.copy(resumedFromMs = null), open = "audio")
 
@@ -348,7 +394,7 @@ class ScreenshotTest {
                     dev.yourstream.ui.screens.library.SourceSync(2, "Kids Cartoons", true, 260, 0, null, 42),
                 ),
                 files = 1240, titles = 240, movies = 180, series = 60, matched = 204, review = 12, unmatched = 18, providers = listOf("TMDB", "Cinemeta"),
-            ), {}, {}, {}, {}, now = 5 * 60_000,
+            ), {}, {}, {}, now = 5 * 60_000,
         )
     }
 
@@ -395,8 +441,68 @@ class ScreenshotTest {
         dev.yourstream.ui.screens.search.SearchScreen(
             dev.yourstream.ui.screens.search.SearchUiState(
                 "unwatched tamil movies", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(null, emptyList(), 0)),
-                brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched Tamil movies.", listOf("language Tamil", "unwatched", "movies"), tiles, 4),
+                brain = dev.yourstream.ui.screens.search.BrainAnswer("4 unwatched action movies.", listOf("genre action", "unwatched", "movies"), tiles, 4),
             ), {}, {},
         )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSearchDiscover() = shot("phone-search-discover", WindowLayout.COMPACT, TopLevel.SEARCH) {
+        val top = DiscoverCatalog("cat:cinemeta:MOVIE:top", "Popular", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, listOf("Action", "Drama"))
+        dev.yourstream.ui.screens.search.SearchScreen(
+            dev.yourstream.ui.screens.search.SearchUiState(discover = dev.yourstream.ui.screens.search.DiscoverUiState(listOf(top), loadingCatalogs = false,
+                type = top.type, catalog = top, tiles = movies + series, nextSkip = 12)), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneSearchResults() = shot("phone-search-results", WindowLayout.COMPACT, TopLevel.SEARCH) {
+        dev.yourstream.ui.screens.search.SearchScreen(
+            dev.yourstream.ui.screens.search.SearchUiState("leo", UiState.Content(dev.yourstream.ui.screens.search.SearchResults(movies[2], movies.take(2), 3)),
+                addons = AddonSections(listOf(
+                    SearchRow("cinemeta:MOVIE", "Cinemeta", dev.yourstream.catalog.api.CatalogType.MOVIE, movies.drop(3)),
+                    SearchRow("cinemeta:SERIES", "Cinemeta", dev.yourstream.catalog.api.CatalogType.SERIES, series),
+                ))), {}, {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneStreamFilter() = shot("phone-stream-filter", WindowLayout.COMPACT, null) {
+        val s = { name: String, size: Long, hash: String? -> dev.yourstream.catalog.api.AddonStream("A", name, "$name Tamil", if (hash == null) "https://example.com/$name.mkv" else null, null, hash, sizeBytes = size) }
+        dev.yourstream.ui.screens.addon.StreamFilterContent(
+            dev.yourstream.ui.screens.addon.StreamFilter(qualities = setOf(dev.yourstream.ui.screens.addon.StreamQuality.FHD)),
+            listOf(dev.yourstream.ui.screens.addon.StreamGroup("A", listOf(s("1080p", 2_000, null), s("2160p", 6_000, null), s("1080p WEB", 1_500, "aabbccddeeff00112233445566778899aabbccdd")), id = "a")),
+        ) {}
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneTitleDetails() = shot("phone-title-details", WindowLayout.COMPACT, null) {
+        val ref = dev.yourstream.catalog.api.CatalogItemRef(dev.yourstream.catalog.api.CatalogProviderId("cinemeta"), dev.yourstream.catalog.api.CatalogType.MOVIE, "tt9000001", "tt9000001")
+        dev.yourstream.ui.screens.addon.CatalogTitleScreen(
+            dev.yourstream.ui.screens.addon.CatalogTitleUiState("Baththa", 2026, null, loadingMeta = false, ratingIsImdb = true, libraryItemId = 7, inLibrary = false,
+                meta = dev.yourstream.catalog.api.CatalogMetadata(ref, "Baththa", 2026, rating = 8.5),
+                details = TitleDetails("555", dev.yourstream.metadata.api.MetadataType.MOVIE, "tt9000001", "Baththa",
+                    "In 1986 Madras, a timid eight-year-old boy accidentally traps a feared gangster inside a deserted school toilet. As the gangster is forced to confront his past, the boy finds his courage.",
+                    listOf("Drama", "Comedy", "Action"), 2026, "2026-01-10", 159, "U/A 13+", "Released", 7.9, null, null, null,
+                    listOf("Balaji Tharaneetharan"), listOf("Balaji Tharaneetharan"), emptyList(),
+                    listOf(TitleDetails.Company("Passion Studios", null), TitleDetails.Company("Star Studios", null)),
+                    listOf(TitleDetails.Person("Balaji Tharaneetharan", "Director", null), TitleDetails.Person("Vijay Sethupathi", "Bathvachalam", null), TitleDetails.Person("Sai Prithviraj", "Sabari", null)),
+                    listOf(TitleDetails.Video("Official Trailer [Subtitled]", "abc", "Trailer", 2026, true)), listOf("IN"), "ta",
+                    recommendations = listOf(TitleDetails.Recommendation("7", dev.yourstream.metadata.api.MetadataType.MOVIE, "Airborne", 1993, null))),
+            ),
+            {}, {}, {}, onStream = {},
+        )
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun phoneMangaHeroCarousel() = shot("phone-manga-hero", WindowLayout.COMPACT, TopLevel.HOME, manga = true) {
+        androidx.compose.foundation.layout.Column {
+            dev.yourstream.ui.screens.home.HeroCarousel(listOf(
+                dev.yourstream.ui.screens.home.HeroSlide("hero:1", "Thedal", null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Drama", 142, 2026, 7.4,
+                    listOf("ta"), OpenTarget.Details(1)),
+                dev.yourstream.ui.screens.home.HeroSlide("hero:2", "Jailer 2", null, null, dev.yourstream.catalog.api.CatalogType.MOVIE, "Action", 160, 2026, null,
+                    emptyList(), OpenTarget.Details(2)),
+            ), {})
+        }
     }
 }

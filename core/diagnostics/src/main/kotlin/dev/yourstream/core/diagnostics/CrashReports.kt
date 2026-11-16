@@ -50,11 +50,17 @@ class CrashStore(private val dir: File, private val clock: Clock, private val ke
 }
 
 /**
- * Detects crash loops, including native crashes and kills the JVM handler never sees: a marker
- * is written when the app starts and removed once it has run [stableAfterMs]. Finding the marker
- * at the next start means the previous run died early. After [threshold] early deaths in a
- * row (or that many crash reports within [windowMs]), the app starts in **safe mode**: no
- * automatic Telegram start or background work, only the local library and diagnostics.
+ * Detects crash loops. A marker is written when the app starts and removed once it has run
+ * [stableAfterMs]; finding it at the next start means the previous run ended early. An early end
+ * counts only when it was a crash: the caller passes what Android recorded about the previous
+ * run (`previousExitCrashed`, Android 11+). Swiping the app away, installing an update or Android
+ * reclaiming memory are not crashes; counting them (as before 0.11.2) put ordinary users in safe
+ * mode, where Telegram never started and sign-in loaded forever. Where Android cannot say (older
+ * versions), only the crash reports the app wrote itself count.
+ *
+ * After [threshold] crashing starts in a row (or that many crash reports within [windowMs]), the
+ * app starts in **safe mode**: no automatic Telegram start or background work, only the local
+ * library and diagnostics; the sign-in screen offers to start Telegram anyway.
  */
 class StartupGuard(
     private val dir: File,
@@ -67,13 +73,20 @@ class StartupGuard(
     private val marker get() = File(dir, "startup.marker")
     private val forced get() = File(dir, "safe-mode.forced")
 
-    fun begin(crashes: List<CrashReport>): Startup {
+    /** [previousExitCrashed]: true / false as Android recorded the previous run's end; null when unknown. */
+    fun begin(crashes: List<CrashReport>, previousExitCrashed: Boolean? = null): Startup {
         val previousDeaths = runCatching { marker.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull() }.getOrNull()
-        // The marker holds the count of consecutive early deaths, incremented now.
-        val earlyDeaths = previousDeaths?.let { it + 1 } ?: 0
-        runCatching { dir.mkdirs(); marker.writeText("$earlyDeaths") }
         val now = clock.nowMillis()
         val recent = crashes.count { now - it.time in 0..windowMs }
+        // The marker holds the count of consecutive crashing starts.
+        val earlyDeaths = when {
+            previousDeaths == null -> 0
+            previousExitCrashed == true -> previousDeaths + 1
+            previousExitCrashed == false -> 0
+            // Unknown: an early end counts only when it left a crash report.
+            else -> if (recent > 0) previousDeaths + 1 else 0
+        }
+        runCatching { dir.mkdirs(); marker.writeText("$earlyDeaths") }
         val isForced = forced.exists()
         return Startup(earlyDeaths, recent, isForced || earlyDeaths >= threshold || recent >= threshold, isForced)
     }

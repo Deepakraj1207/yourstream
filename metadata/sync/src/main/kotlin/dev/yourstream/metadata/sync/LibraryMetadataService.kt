@@ -44,8 +44,9 @@ data class MetadataSettings(
  *     alternative titles);
  *  2. [MetadataMatcher] (providers in order, cached, scored);
  *  3. ACCEPTED → fetch details (+ seasons/episodes the library has) and store them;
- *     NEEDS_REVIEW → keep the candidates, apply nothing; NO_MATCH / FAILED → retry later with
- *     backoff. User decisions (MANUAL / REJECTED) are never overwritten.
+ *     NO_MATCH / FAILED → keep the file name's title, retry later with backoff. Titles left
+ *     "for the user to check" by older versions are decided again. User decisions (MANUAL via
+ *     "Fix match", REJECTED) are never overwritten.
  */
 @Singleton
 class LibraryMetadataService @Inject constructor(
@@ -66,6 +67,7 @@ class LibraryMetadataService @Inject constructor(
     /** Matches up to [limit] items that need it. Call repeatedly until processed == 0. */
     suspend fun processPending(limit: Int = 40): MetadataRunResult = mutex.withLock {
         if (!settings.enabled || manager.searchProviders(null).isEmpty()) return MetadataRunResult(0, 0, 0, 0, 0)
+        dao.reviewsDueNow()
         val work = dao.matchWork(clock.nowMillis(), limit)
         // Several titles at once: a big library is matched in minutes, not hours. Providers keep
         // their own rate limits; this only overlaps the waiting.

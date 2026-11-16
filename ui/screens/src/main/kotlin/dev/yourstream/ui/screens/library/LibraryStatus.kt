@@ -199,15 +199,15 @@ class LibraryStatusViewModel @Inject constructor(
 }
 
 @Composable
-fun LibraryStatusDestination(onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, onUntitled: () -> Unit = {}, vm: LibraryStatusViewModel = hiltViewModel()) {
+fun LibraryStatusDestination(onSources: () -> Unit, onBack: () -> Unit, onUntitled: () -> Unit = {}, vm: LibraryStatusViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    LibraryStatusScreen(state, onSyncNow = { vm.syncNow() }, onReview, onSources, onBack, now = System.currentTimeMillis(),
+    LibraryStatusScreen(state, onSyncNow = { vm.syncNow() }, onSources, onBack, now = System.currentTimeMillis(),
         onSource = { vm.onSource(it) }, onPauseAll = { vm.pauseAll(it) }, onUntitled = onUntitled)
 }
 
 @Composable
 fun LibraryStatusScreen(
-    state: LibraryStatus, onSyncNow: () -> Unit, onReview: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, now: Long,
+    state: LibraryStatus, onSyncNow: () -> Unit, onSources: () -> Unit, onBack: () -> Unit, now: Long,
     onSource: (SourceAction) -> Unit = {}, onPauseAll: (Boolean) -> Unit = {}, onUntitled: () -> Unit = {},
 ) {
     ScreenScaffold(stringResource(R.string.status_title), onBack = onBack) {
@@ -272,17 +272,6 @@ fun LibraryStatusScreen(
                     },
                     progress = state.matchedFraction, busy = state.pending > 0 && state.providers.isNotEmpty(), tag = "stage-matched",
                 )
-            }
-            // 4. The user's check
-            item {
-                Stage(
-                    Icons.Filled.Warning, stringResource(R.string.status_stage_review),
-                    if (state.review == 0) stringResource(R.string.status_review_none) else pluralStringResource(R.plurals.status_review_count, state.review, state.review),
-                    if (state.unmatched > 0) pluralStringResource(R.plurals.status_unmatched, state.unmatched, state.unmatched) else null,
-                    tag = "stage-review",
-                ) {
-                    if (state.review > 0) Button(onClick = onReview, modifier = Modifier.focusHighlight().testTag("review")) { Text(stringResource(R.string.status_review_action)) }
-                }
             }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {

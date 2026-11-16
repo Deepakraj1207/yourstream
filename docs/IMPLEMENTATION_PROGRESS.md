@@ -669,7 +669,7 @@ First real-device report (screenshots from the owner's phone).
 | "Scam 2003 …" shown as "Link to this message" | Same: nothing left of the name, so the post above the file was used, whose text was "Link to this message" | Same fix; link phrases ("Link to this message", "Click here", "Join us") are never a title; `S02_EP_01_05` reads as episodes 1–5 |
 | "Toonworld4all Naruto" | Site brand in the name | Words like `Toonworld4all`, `Movies4u`, `Filmy4wap` are brands, not titles |
 | Movies / Series in the navigation | User's choice | Removed from `MAIN_TABS` (Home, Search, Library, Settings); still opened from Home and the Library |
-| Navigation look | User's reference (manga store app) | `MangaNavigationBar`: printed strip, stamped-panel selected tab with hard shadow and press-down, paper panel in light mode; classic style keeps Material 3 |
+| Navigation look | User's reference (manga store app); on 14 Nov 2026 the user picked option 5 "Panel Grid" from seven mockups | `MangaNavigationBar`: slanted inked comic panels with gutters, the current one filled with ink; classic style keeps Material 3 |
 
 Parser version 5 → 6: libraries already indexed are re-parsed after the update and regrouped
 (existing `ReparseWorker` + library sync by signature). Tests: `UnderscoreHandleNamesTest` (6,
@@ -682,3 +682,349 @@ pre-release (release run 16 on `c148c7a`): versionCode 16, same release certific
 (`35249306…07b2`), arm64 APK matches `SHA256SUMS.txt`; GitHub's "latest" is still v0.10.0.
 **Promoted:** v0.11.1 marked latest on 13 Nov 2026 (release workflow, promote mode; nothing
 rebuilt). The in-app updater now offers it.
+
+
+## Device report 2 (14 Nov 2026): sign-in loading forever
+
+**Cause (found in code):** the crash-loop guard counted every run that ended within 30 s as an
+"early death" (swiping the app away, installing an update, Android reclaiming memory). Three in a
+row started the app in safe mode, where Telegram is never started, and the sign-in screen showed
+only a spinner, which made users close the app again, feeding the loop.
+
+**Fixes:** early ends count only when Android reports a crash or ANR for the previous run
+(`ApplicationExitInfo`, Android 11+; older versions: only the app's own crash reports); the
+sign-in screen never spins forever: Telegram not running, failed, or still starting after 20 s
+is said plainly with Start Telegram / Try again (`StartProblem`); the first run keeps its
+Connect button while Telegram starts. Tests: `DiagnosticsTest` (rule changed, with the reason),
+`ViewModelTest.signInNeverSpinsForeverWhenTelegramIsNotReady`, `FirstRunTest`. Needs a device
+check: open the app after updating; sign-in opens (or explains why not).
+
+Also: the Nuvio plugins tab was removed (a pasted plugin link still gets a one-line message);
+example texts no longer say "Tamil" ("unwatched action movies", "comedy movies").
+
+## v0.11.2 release and Panel Grid navigation (14 Nov 2026)
+
+* **v0.11.2 published as the latest release** (the user said "Publish"). Checked on the published
+  files: `releases/latest` is v0.11.2 and not a pre-release; the arm64 APK's SHA-256 matches
+  `SHA256SUMS.txt`; `aapt2` shows versionCode 19, versionName 0.11.2; `apksigner` shows the pinned
+  release certificate (`35249306…07b2`). Status: NEEDS REAL-DEVICE TESTING (the sign-in fix in
+  particular).
+* **Manga navigation: Panel Grid.** Reason: the user picked option 5 from a page of seven mockups.
+  `MangaNavigationBar` now draws each tab as a slanted, inked comic panel with gutters; the current
+  panel is filled with ink (same rule in dark and light, from the theme's `onSurface`/`surface`).
+  The tab semantics (role, selected state, names for screen readers with tab names off) are
+  unchanged. New test: `theMangaPanelGridKeepsTouchTargetsOnTheNarrowestPhones` (320 dp, light).
+  Status: NEEDS REAL-DEVICE TESTING (look on real screens, press feedback, TalkBack).
+
+## Add-on refresh and streams grouped by add-on (14 Nov 2026)
+
+User request: "Add refresh button on addon like nuvio" and "Display streams as addon by group".
+Nuvio's source could not be read from this session (GitHub access is limited to this repository),
+so both follow Nuvio's behaviour as it is commonly known, not its code.
+
+* **Add-ons page refresh.** Reason: add-ons change their manifests (new catalogs, names, stream
+  support) and the page only checked add-ons that had not answered yet. A top-bar refresh button
+  (and pull-to-refresh) fetches every manifest again (`CatalogAddons.refresh`), keeps a renamed
+  add-on's new name across restarts, rebuilds the catalog manager, and reports how many answered.
+  Tests: `CatalogAddonsRefreshTest` (fake add-ons, no network: proves the bookkeeping, not real
+  add-ons) and `AddonsAndStreamsTest.refreshButtonAsksAgainAndSaysHowManyAnswered`.
+* **Streams grouped by add-on.** Reason: the list waited for the slowest add-on and mixed groups
+  with no way to look at one add-on. Now each add-on's streams appear as it answers, under its
+  name and count, with All / per-add-on chips, a refresh button, a stable order, and the add-ons
+  that found nothing or did not answer named. Also fixes a race: selecting another episode while a
+  slow add-on was still answering could show the previous episode's streams (the older request is
+  now cancelled). Tests: `AddonsAndStreamsTest` (grouping, chips, progressive answers, order).
+* Status: NEEDS REAL-DEVICE TESTING (real add-ons, slow networks, TV remote focus on the chips).
+
+## Movies in raw pieces streamed as one file (15 Nov 2026)
+
+User report: 4K movies in their channel are split into raw pieces (".mkv.001", ".002", …).
+Before, each piece was a separate version; only the first had the container header, so at best
+the start played with a wrong duration, and later pieces failed.
+
+* Reason: Telegram's upload limit makes this the usual way 4K movies are posted. The pieces are
+  joined at the byte level while streaming (no download or copy first), so everything that works
+  for a normal file (duration, seeking, tracks, resume, offline download) works for these.
+* Changes: `SplitFiles` + `LibraryDao.splitParts` (one version with every piece), resolver
+  (`resolveSplit`, missing pieces named), `TelegramMediaUri` split form, `TelegramMediaDataSource`
+  (reads across pieces, prefetches the next piece), controller (focus/stats/release per piece),
+  `VideoDownloads` (all pieces), title page ("N pieces"). Details in `docs/STREAMS.md`.
+* Tested: `SplitFilesTest`, `SplitPlaybackTest` (real ExoPlayer on the simulated Telegram with
+  committed clips cut into pieces), resolver and download tests. The simulated Telegram is not
+  TDLib, and the clips are small: real multi-GB 4K pieces have not been played.
+* Status: NEEDS REAL-DEVICE TESTING (a real channel's 4K pieces: start time, seeking far into a
+  late piece, the boundary between pieces, 4K decoding on the device).
+
+## v0.11.3 release (15 Nov 2026)
+
+Published as the latest release (not a pre-release), on the user's instruction ("release as
+latest"), with the Panel Grid navigation, add-on refresh, streams grouped by add-on, and movies
+in raw pieces. Checked on the published files: `releases/latest` is v0.11.3; the arm64 APK's
+SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 20, versionName 0.11.3; `apksigner`
+shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
+Status: NEEDS REAL-DEVICE TESTING (above all, real 4K movies in pieces from a channel).
+
+## Device report 3 (15 Nov 2026): Layout, add-ons, startup, opening logo
+
+Requests: Layout page like Nuvio's with its options working; add-ons page like Nuvio's; Cinemeta
+as the only default add-on; the full-screen sign-in shown briefly at launch; an opening logo; a
+player like Nuvio's (separate entry). Nuvio's current source (NuvioMedia/NuvioMobile, read through
+public pages) was used as the reference for labels and options; no code was copied.
+
+* **Only Cinemeta built in.** Reason: the user adds add-ons themselves. `catalog.providers` now
+  defaults to `none`. Users who relied on the Indian catalogs add them by link.
+* **Startup flash fixed.** Reason: Home showed a full-screen "Connect Telegram" while the add-on
+  rows loaded, then the sign-in panel above them. Now the panel and placeholder rows show while
+  loading. Test: `signInPanelDoesNotJumpFromFullScreenWhileAddonRowsLoad`.
+* **Opening logo.** Android's launch screen (core-splashscreen) with the app's bubble on ink, then
+  `LaunchIntro` (about 1 s; tap skips; still with animations off). Tests: `LaunchIntroTest`. The
+  test renderer cannot draw the logo vector mid-animation: the look is checked on a device only.
+* **Add-ons page like Nuvio's.** Overview, install box, cards with logo, version, switch, move
+  up / down (the order drives Home's rows and stream groups), refresh, settings page, delete with
+  confirmation, chips, description and summary line. Tests: `AddonsAndStreamsTest`,
+  `CatalogAddonsRefreshTest.movingAnAddonChangesTheOrderEverywhereAndIsKept`, manifest test.
+* **Layout like Nuvio's** (docs/UI.md). Tests: `LayoutSettingsTest` (7), screenshots.
+* Status: NEEDS REAL-DEVICE TESTING (all of the above; the opening logo's look and timing in
+  particular).
+
+* **Player like Nuvio's** (docs/UI.md "Player controls"). Reason: the user asked for Nuvio's
+  functionality, control panel and options. Lock, labelled pills, time pills, Sources (other files
+  of the title, switched at the current position), sideways swipe-to-seek, subtitle style menu
+  (size, colour, position, bold, background), edge zones for system gestures; both players.
+  Tests: `PlayerScreenTest.nuvioControlsLockPillsSourcesAndSubtitleStyle`,
+  `swipeToSeekCoversMoreOfLongerVideos`; existing player tests unchanged and passing. Not built:
+  chapters, audio/subtitle delay, amplification, libmpv, watch party (listed in docs/UI.md).
+  Status: NEEDS REAL-DEVICE TESTING (gestures, lock, Sources switching on a real title).
+
+## v0.11.4 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction, with the Nuvio-style player, Layout
+and Add-ons pages, Cinemeta as the only built-in add-on, the opening logo and the startup fix.
+Checked on the published files: `releases/latest` is v0.11.4 and not a pre-release; the arm64
+APK's SHA-256 matches `SHA256SUMS.txt`; `aapt2` shows versionCode 21, versionName 0.11.4;
+`apksigner` shows the pinned release certificate (`35249306…07b2`). The in-app updater offers it.
+Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 4 (15 Nov 2026)
+
+* **Rows jumping while scrolling** (the user's recording): fixed with one poster text height.
+  Test: `RowHeightTest`.
+* **Posters matched automatically; Check matches removed.** Reason: the user wants matching to be
+  the app's job. One 65% threshold (else the file name's title stays), duplicates of the same film
+  are not doubt, titles left waiting are decided again; the queue screen, Home banner, Settings row
+  and library status step are gone; "Fix match" stays. Tests: `MatchingTest`, `LibraryMetadataServiceTest`.
+* **Nuvio's navigation bar in the classic theme**, with Nuvio's Adaptive / Always expanded /
+  Always compact / Classic options (plus Panel Grid for the manga look) and Glass glow. Tests:
+  `LayoutSettingsTest.adaptiveBarShrinksWhileScrollingDownAndGrowsBack`, floating bar test.
+  Not copied: Nuvio's profile picture on the last tab (this app's last tab is Settings).
+* **Hero carousel from hero catalogs** (Nuvio's). Tests: `HeroCarouselTest`,
+  `homeShowsTheHeroCarouselWhenHeroCatalogsAreChosen`. The hero starts below the status bar (the
+  shell keeps that inset for every tab); the rating badge shows "★" (the add-on's rating may not be
+  IMDb's).
+* Status: NEEDS REAL-DEVICE TESTING.
+
+## v0.11.5 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction (Nuvio navigation bar, hero carousel,
+automatic poster matching without Check matches, row-height fix). Checked on the published files:
+`releases/latest` is v0.11.5 and not a pre-release; the arm64 APK's SHA-256 matches
+`SHA256SUMS.txt`; `aapt2` shows versionCode 22, versionName 0.11.5; `apksigner` shows the pinned
+release certificate (`35249306…07b2`). Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 5 (15 Nov 2026)
+
+Implemented after the user approved the mockups:
+* **Hero stopped halfway:** the auto-advance was keyed on `currentPage`, which changes in the
+  middle of a move and restarted the effect, cancelling the animation. It is now keyed on
+  `settledPage`.
+* **One poster per title; Telegram files as a stream source:** see STREAMS.md. Tests:
+  `StreamSourcesTest`, `LibraryMetadataServiceTest.catalogEpisodeFindsTheLibraryEpisodeIncludingDoubleEpisodes`.
+* **"From Telegram" tag on Recently added; Series row removed.** Test: `StreamSourcesTest.recentlyAddedIsTaggedFromTelegram`.
+* **Sort & filter for streams** (this app's design; Nuvio has none). Tests: `StreamSourcesTest`.
+* **Search like Nuvio** (field, recent searches, Discover, rows per add-on, Nuvio's messages): see
+  UI.md. Tests: `ScreensTest`, `ViewModelTest`, `CatalogManagerTest`.
+* **Adaptive bar animated like Nuvio:** see UI.md. Tests: `LayoutSettingsTest`.
+* **Gate:** 680 tests, 0 failures. Lint has 0 errors and 15 warnings. The 4 warnings above the
+  previous 11 are "newer version available" notices (AGP 9.5.1, kotlinx-serialization 1.13.0)
+  that appeared because those versions were published upstream, not from these changes.
+  Dependencies were left as they are in this change.
+* Status: NEEDS REAL-DEVICE TESTING.
+
+## v0.12.0 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction:
+- one poster per title, with Telegram files as a stream source;
+- stream Sort & filter;
+- Search like Nuvio;
+- the adaptive bar animated like Nuvio;
+- Home: "From Telegram" tag and no Series row;
+- the hero carousel fix.
+
+A first run was cancelled before it published, because the release notes still described 0.11.5.
+The notes were updated and run 24 published the release.
+
+Checked on the published files:
+- `releases/latest` is v0.12.0 and is not a pre-release.
+- The arm64 APK's SHA-256 (`24a95782…7481`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 24 and versionName 0.12.0.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 6 (15 Nov 2026): app closed while streams loaded (0.12.0)
+
+* **Cause:** the new stream sort (`StreamFilter.apply`). The "best quality" tie-break used
+  `sizeBytes ?: 0` and "Largest" used `?: -1`. For streams without a size, those are `Int` values,
+  compared with other streams' `Long` sizes, which threw `ClassCastException` while composing
+  the list. Add-ons usually send a mix of streams with and without sizes. The 0.12.0 tests gave
+  every stream a size, or none, so they never compared the two.
+* **Fix:** `0L` / `-1L`. `qualityOf` now returns null instead of throwing for an unknown height.
+* **Tests:**
+  - `StreamSourcesTest.streamsWithAndWithoutSizesSortTogether`, checked to fail with the old
+    code (same exception);
+  - `TitleStreamsCrashTest`, which runs the real title-page view model with a Torrentio-like
+    add-on (40 results, some without a size) and a Telegram file, and renders the page. It
+    reproduced the device crash before the fix.
+* Gate: 682 tests, 0 failures; lint 0 errors, 15 warnings (unchanged).
+* Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 7 (15 Nov 2026): title page like Nuvio's, from TMDB
+
+The user had added a TMDB key, but the title page did not use it. It is now a Nuvio-style detail
+page from TMDB (see UI.md), with Play opening the streams page. Only IMDb and TMDB scores are
+shown: the other scores in the user's screenshot come from MDBList, which needs its own key.
+Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+TESTING.
+
+
+## v0.12.1 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction. It contains:
+- the fix for the crash while streams loaded (device report 6);
+- the title page like Nuvio's, from TMDB, with Play opening the streams (device report 7).
+
+Checked on the published files (run 25):
+- `releases/latest` is v0.12.1 and is not a pre-release.
+- The arm64 APK's SHA-256 (`db372d27…e5aa`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 25 and versionName 0.12.1.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 8 (15 Nov 2026): startup hero swap, logo boxes, TMDB score
+
+From the user's screen recording and screenshots of 0.12.1:
+* **The old home showed first, then the new one.** Until the hero catalogs answered, Home showed
+  the library hero (Continue watching), then swapped it for the carousel. Home now keeps the
+  carousel's space empty while it loads (`HomeUiState.heroLoading`, `HeroCarouselPlaceholder`).
+  Test: `LayoutSettingsTest.homeShowsTheHeroCarouselWhenHeroCatalogsAreChosen`.
+* **The title logo had a box behind it, and production logos looked wrong.** `Artwork` always
+  drew its grey placeholder under the image. Transparent PNGs (logos) showed it as a box, and
+  dark company logos disappeared into it. `Artwork(placeholder = false)` is now used for title
+  and company logos.
+* **The carousel showed the title twice** (printed on the poster, and as text). With a TMDB key,
+  slides use TMDB's logo over a poster without printed title (or the backdrop). The wait for
+  TMDB is at most 3 s; slides it does not answer for keep the add-on's artwork. The logo carries
+  the title for screen readers.
+* **The TMDB score showed "67".** It is now "6.7", out of 10 like IMDb.
+* Gate: 687 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.
+
+## v0.12.2 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction (device report 8: no startup hero
+swap, TMDB logos in the carousel, no box behind logos, TMDB score out of 10).
+
+Checked on the published files (run 26):
+- `releases/latest` is v0.12.2 and is not a pre-release.
+- The arm64 APK's SHA-256 (`1f4f7c88…c27a`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 26 and versionName 0.12.2.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
+
+## Device report 9 (15 Nov 2026): slow hero carousel, reload on return, manga carousel
+
+* **The carousel reloaded every time the user came back from another tab.** Home's state stopped
+  listening 5 s after Home left the screen (`WhileSubscribed`). The cold hero and catalog-row
+  flows then started over: catalog pages, library check, TMDB art, with the placeholder in
+  between. They now live in `HomeSources`, an app-wide singleton that computes once and follows
+  add-on, hero-choice and layout changes. Coming back to Home shows them at once.
+* **Slow at every start.** The last carousel is saved (`home_hero_cache`, used only for the same
+  hero choice and add-ons) and shown at once. It is refreshed quietly; when nothing changed,
+  nothing on screen changes. Test: `HeroCarouselTest.savedSlidesComeBackTheSame`.
+* **Manga style for the carousel.** Each slide is an inked comic panel with speed lines, a red
+  FEATURED caption, the title (or logo) in the manga lettering, ink boxes for the rating and
+  language, a square VIEW DETAILS button, and ink-square dots. This is the same look as Home's
+  manga hero. Test: `HeroCarouselTest.mangaLookDrawsInkedPanels`; screenshot `phone-manga-hero`.
+* Gate: 690 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.
+
+## Player alignment (15 Nov 2026)
+
+The user asked for a better player with better alignment. Checked on rendered phone (landscape
+and portrait) and TV screenshots:
+* **One edge for everything.** Before, the back arrow, title, resume note, seek bar, times and
+  buttons each started at a different inset. Now the title, resume note, times, timeline and
+  buttons share one gutter (20 dp phones, 28 dp tablets, 48 dp TV). Icon buttons sit 12 dp
+  further out, so their icons line up with it. Landscape keeps clear of the camera cutout.
+* **Centre transport level:** the −10/+10 labels hang below their circles without taking space,
+  so rewind, play and forward share one centre line.
+* **Times over the ends of the timeline**, not a row below it with a gap.
+* **Bottom row:** previous and next are round pills like the labelled ones. All pills are drawn
+  44 dp tall (48 dp touch area) and centred. On phones they wrap onto a second centred line when
+  they do not fit (portrait); on TV they stay one scrolling row.
+* **Quality badge:** now a pill as tall as the icons beside it.
+* **Panels:** the title, options, close icon and subtitle-style controls share one 24 dp edge.
+* **Regression caught by `PlayerScreenTest.tvTransportPanelsAndBack` and fixed:** the TV row
+  first used `BoxWithConstraints`, which composes later, so Play was not focused when the player
+  opened.
+* New screenshot `phone-player-portrait`. Gate: 691 tests, 0 failures; lint 0 errors, 15
+  warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING.
+
+## v0.12.3 release (15 Nov 2026)
+
+Published as the latest release on the user's instruction. It contains:
+- device report 9: the carousel and rows are kept across tabs and restarts, and the carousel has
+  a manga style;
+- the player alignment pass.
+
+Checked on the published files (run 27):
+- `releases/latest` is v0.12.3 and is not a pre-release.
+- The arm64 APK's SHA-256 (`2700c4b2…2395`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 27 and versionName 0.12.3.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
+
+## Haptic feedback (16 Nov 2026)
+
+The user asked for haptic feedback in the app. It is one shared helper (`Haptic`, `rememberHaptics`)
+used for tabs, chips, switches, the title page, Sort & filter, the carousel, Search and the
+player (taps, double-tap and swipe seek, scrubbing, brightness and volume steps, hold-for-speed,
+lock). See UI.md for the full map. It follows the phone's touch-feedback setting, and Settings →
+Haptic feedback turns it off. Tests: `HapticsTest`. Gate: 693 tests, 0 failures; lint 0 errors,
+15 warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING (vibration cannot be felt in tests).
+
+## Device report 10 (16 Nov 2026): slow, glitchy title page; cut-off add-on chips
+
+From the user's two screen recordings:
+* **The title page glitched.** It drew the add-on's details first (plain title, genres,
+  "Movie Details", cast initials), then TMDB's answer replaced them: the picture blanked to grey
+  before the backdrop came in, and new rows pushed the page down.
+  * While TMDB answers (`detailsLoading`, at most `DETAILS_WAIT_MS` = 4 s), the page keeps
+    fixed space: an empty logo and genres area and placeholder bars. Then it fills in once.
+  * The list's poster shows at once, and TMDB's backdrop is drawn over it only when it has
+    loaded (`Artwork(placeholder = false)`), so the picture never blanks.
+  * Without a TMDB key the page never waits. A TMDB answer after 4 s still fills the page.
+* **The poster loaded slowly.**
+  * TMDB remembers each IMDb → TMDB id, so a title seen before (in the carousel, or on a
+    revisit) needs one request instead of two.
+  * The page's backdrop is w780 instead of w1280.
+* **The add-on chips were cut off** ("8" for "All · 8"): they scrolled in a strip between
+  Sort & filter and refresh. Now Sort & filter and refresh sit on their own row at the page's
+  edges, and the chips scroll edge to edge below with the first on the page's edge.
+* Tests: `TitleDetailsPageTest.whileTmdbAnswersThePageKeepsItsSpace`, `TitleStreamsCrashTest`
+  (loading cleared; never set without a key), `TmdbProviderTest` (id remembered, w780). Gate:
+  694 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.

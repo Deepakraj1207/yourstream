@@ -55,10 +55,10 @@ class HomeRows(
 )
 
 @Composable
-fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit = {}, vm: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onSignIn: () -> Unit, onChooseSources: () -> Unit, vm: HomeViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val rows = HomeRows(vm.recentlyAdded.collectAsLazyPagingItems(), vm.series.collectAsLazyPagingItems())
-    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
+    HomeScreen(state, rows, vm::onAction, onOpen, onSeeAll, onSignIn, onChooseSources)
 }
 
 /** Stateless: renders [HomeUiState] + [HomeRows]; every user intent goes out through the callbacks. */
@@ -71,12 +71,11 @@ fun HomeScreen(
     onSeeAll: (HomeSection) -> Unit,
     onSignIn: () -> Unit,
     onChooseSources: () -> Unit,
-    onReview: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
         // Pinned above the rows: what indexing is doing (the rows below update live).
         // Indexing progress floats above the navigation on every tab (IndexingPill).
-        HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources, onReview)
+        HomeContent(state, rows, onAction, onOpen, onSeeAll, onSignIn, onChooseSources)
     }
 }
 
@@ -89,19 +88,29 @@ private fun HomeContent(
     onSeeAll: (HomeSection) -> Unit,
     onSignIn: () -> Unit,
     onChooseSources: () -> Unit,
-    onReview: () -> Unit,
 ) {
     val blocking = state.blocking
     // Settings → Layout → Home rows.
     val shown = dev.yourstream.ui.screens.settings.LocalAppSettings.current.homeRows
-    val catalogs = if (shown.catalogs) state.catalogs else emptyList()
+    val layout = dev.yourstream.ui.screens.settings.LocalAppSettings.current.layout
+    val movies = stringResource(R.string.nav_movies)
+    val seriesLabel = stringResource(R.string.nav_series)
+    // Settings → Layout → Home layout: "Popular · Movies", and titles not out yet left out.
+    val catalogs = (if (shown.catalogs) state.catalogs else emptyList()).map { c ->
+        val type = when (c.type) { dev.yourstream.catalog.api.CatalogType.MOVIE -> movies; dev.yourstream.catalog.api.CatalogType.SERIES -> seriesLabel; null -> null }
+        c.copy(
+            title = if (layout.showCatalogType && type != null) "${c.title} · $type" else c.title,
+            tiles = if (layout.hideUnreleased) c.tiles.filter { it.card.key !in c.unreleased } else c.tiles,
+        )
+    }.filter { it.tiles.isNotEmpty() }
     if (blocking != null) {
         val setupAction = when (blocking) {
             EmptyKind.NOT_SIGNED_IN -> onSignIn
             EmptyKind.NO_SOURCES -> onChooseSources
             else -> null
         }
-        if (catalogs.isEmpty()) {
+        val waiting = shown.catalogs && state.catalogsLoading
+        if (catalogs.isEmpty() && !waiting) {
             EmptyState(blocking, Modifier.testTag("home"), onAction = setupAction)
             return
         }
@@ -118,6 +127,8 @@ private fun HomeContent(
             catalogs.forEach { c ->
                 item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
             }
+            // The add-on rows are on their way: placeholders where they will appear.
+            if (catalogs.isEmpty() && waiting) items(2, key = { "catalog-loading-$it" }) { SkeletonRow(modifier = Modifier.testTag("home-catalogs-loading")) }
         }
         return
     }
@@ -127,18 +138,26 @@ private fun HomeContent(
     val d = LocalDimens.current
     LazyColumn(
         Modifier.fillMaxSize().testTag("home"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = if (LocalWindowLayout.current.isTv) 32.dp else 16.dp, bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current),
+        // The hero carousel starts at the very top (full width, like Nuvio's).
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            top = if (shown.hero && (state.heroSlides.isNotEmpty() || state.heroLoading)) 0.dp else if (LocalWindowLayout.current.isTv) 32.dp else 16.dp,
+            bottom = 32.dp + dev.yourstream.ui.core.LocalBottomClearance.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(d.rowGap),
     ) {
-        state.banner?.let { b -> item(key = "banner") { Banner(b, state.reviewCount, onSignIn, onChooseSources, onReview) } }
-        if (shown.hero) item(key = "hero") {
+        state.banner?.let { b -> item(key = "banner") { Banner(b, onSignIn, onChooseSources) } }
+        // Settings → Layout → Home layout → Hero catalogs: a carousel from them, else the library hero.
+        if (shown.hero && state.heroSlides.isNotEmpty()) item(key = "hero-carousel") { HeroCarousel(state.heroSlides, onOpen) }
+        // Still asking the hero catalogs: keep their space empty rather than flash the library hero.
+        else if (shown.hero && state.heroLoading) item(key = "hero-carousel") { HeroCarouselPlaceholder() }
+        else if (shown.hero) item(key = "hero") {
             when (val h = state.hero) {
                 UiState.Loading -> SkeletonHero()
                 is UiState.Content -> HeroBanner(heroModel(h.value), { onOpen(h.value.primary) }, { onOpen(h.value.secondary) }, primaryFocus = heroFocus)
                 else -> Unit
             }
         }
-        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction)
+        if (shown.continueWatching) continueWatching(state.continueWatching, card, actions, onOpen, onSeeAll, onAction, layout)
         (state.forYou as? UiState.Content)?.value?.takeIf { shown.forYou }?.let { f ->
             item(key = "for-you") {
                 Column(Modifier.testTag("for-you")) {
@@ -146,8 +165,10 @@ private fun HomeContent(
                 }
             }
         }
-        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll)
-        if (shown.series) paged("series", R.string.home_series, rows.series, HomeSection.SERIES, card, actions, onOpen, onSeeAll)
+        // Your newest Telegram files (the add-on rows below are catalogs; a title you also have on
+        // Telegram carries a badge there). The Series row is gone (the user's decision, 0.12).
+        if (shown.recentlyAdded) paged("recent", R.string.home_recently_added, rows.recentlyAdded, HomeSection.RECENTLY_ADDED, card, actions, onOpen, onSeeAll,
+            tag = R.string.home_from_telegram)
         // Catalog add-ons (Settings → Add-ons): information only; titles in the library open their details.
         catalogs.forEach { c ->
             item(key = c.key) { MediaRow(c.title, c.tiles, card, { onOpen(it.open) }, actions = actions) }
@@ -175,12 +196,18 @@ private fun heroModel(h: HeroItem) = HeroModel(
 private fun LazyListScope.continueWatching(
     state: UiState<List<Tile>>, card: (Tile) -> dev.yourstream.ui.core.MediaCardModel, actions: (Tile) -> List<dev.yourstream.ui.core.CardAction>,
     onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, onAction: (HomeAction) -> Unit,
+    layout: dev.yourstream.ui.screens.settings.LayoutSettings,
 ) {
+    // Settings → Layout → Continue Watching: card style, and what a tap does.
+    val style = if (layout.continueStyle == dev.yourstream.ui.screens.settings.ContinueStyle.POSTER) CardStyle.POSTER else CardStyle.WIDE
+    val open: (Tile) -> OpenTarget = { t ->
+        if (layout.continueOpens == dev.yourstream.ui.screens.settings.ContinueOpens.DETAILS && t.itemId != null) OpenTarget.Details(t.itemId) else t.open
+    }
     item(key = "continue") {
         when (state) {
-            UiState.Loading -> SkeletonRow(stringResource(R.string.home_continue), CardStyle.WIDE)
-            is UiState.Content -> MediaRow(stringResource(R.string.home_continue), state.value, card, { onOpen(it.open) },
-                style = CardStyle.WIDE, actions = actions, onSeeAll = { onSeeAll(HomeSection.CONTINUE_WATCHING) })
+            UiState.Loading -> SkeletonRow(stringResource(R.string.home_continue), style)
+            is UiState.Content -> MediaRow(stringResource(R.string.home_continue), state.value, card, { onOpen(open(it)) },
+                style = style, actions = actions, onSeeAll = { onSeeAll(HomeSection.CONTINUE_WATCHING) })
             is UiState.Error -> ErrorState(state.error, Modifier.fillMaxWidth().padding(16.dp)) { onAction(HomeAction.Retry) }
             is UiState.Empty -> Unit
         }
@@ -190,18 +217,17 @@ private fun LazyListScope.continueWatching(
 private fun LazyListScope.paged(
     key: String, title: Int, items: LazyPagingItems<Tile>, section: HomeSection,
     card: (Tile) -> dev.yourstream.ui.core.MediaCardModel, actions: (Tile) -> List<dev.yourstream.ui.core.CardAction>,
-    onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit,
+    onOpen: (OpenTarget) -> Unit, onSeeAll: (HomeSection) -> Unit, tag: Int? = null,
 ) {
-    item(key = key) { PagedMediaRow(stringResource(title), items, card, { onOpen(it.open) }, actions = actions, onSeeAll = { onSeeAll(section) }) }
+    item(key = key) { PagedMediaRow(stringResource(title), items, card, { onOpen(it.open) }, actions = actions, onSeeAll = { onSeeAll(section) }, tag = tag?.let { stringResource(it) }) }
 }
 
 @Composable
-private fun Banner(banner: HomeBanner, reviewCount: Int, onSignIn: () -> Unit, onChooseSources: () -> Unit, onReview: () -> Unit) {
+private fun Banner(banner: HomeBanner, onSignIn: () -> Unit, onChooseSources: () -> Unit) {
     val (text, action) = when (banner) {
         HomeBanner.NOT_SIGNED_IN -> stringResource(R.string.home_banner_signed_out) to onSignIn
         HomeBanner.NO_SOURCES -> stringResource(R.string.home_banner_no_sources) to onChooseSources
         HomeBanner.OFFLINE -> stringResource(R.string.home_banner_offline) to null
-        HomeBanner.REVIEW -> androidx.compose.ui.res.pluralStringResource(R.plurals.home_banner_review, reviewCount, reviewCount) to onReview
     }
     val m = Modifier.padding(horizontal = LocalDimens.current.gutter).testTag("banner")
     if (action != null) {

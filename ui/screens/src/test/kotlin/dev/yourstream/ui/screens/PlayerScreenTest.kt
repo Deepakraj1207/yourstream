@@ -18,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.percentOffset
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
@@ -90,6 +92,70 @@ class PlayerScreenTest {
             val items = flowOf(PagingData.from(episodes, done)).collectAsLazyPagingItems()
             PlayerScreen(state, { actions += it }, { backs++ }, { played += it }, items) { Box(Modifier.fillMaxSize().testTag("surface")) }
         }
+    }
+
+    @Test
+    fun nuvioControlsLockPillsSourcesAndSubtitleStyle() {
+        var settings by mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        state = base.copy(sources = listOf(
+            dev.yourstream.ui.screens.player.SourceOption(1, "1080p · Tamil", "2.1 GB · Ben.10.1080p.mkv", playing = true),
+            dev.yourstream.ui.screens.player.SourceOption(2, "720p · Hindi", "0.9 GB · Ben.10.720p.mkv", playing = false),
+        ))
+        compose.setContent {
+            YourStreamTheme(WindowLayout.COMPACT) {
+                androidx.compose.runtime.CompositionLocalProvider(dev.yourstream.ui.screens.settings.LocalAppSettings provides settings) {
+                    val items = flowOf(PagingData.from(episodes, done)).collectAsLazyPagingItems()
+                    PlayerScreen(state, { actions += it }, { backs++ }, { played += it }, items, onFit = {}, onSettings = { settings = it }) {
+                        Box(Modifier.fillMaxSize().testTag("surface"))
+                    }
+                }
+            }
+        }
+        // Labelled pills and time pills, like Nuvio's.
+        compose.onNodeWithTag("speed").assertTextContains("1×", substring = true)
+        compose.onNodeWithTag("subtitles").assertTextContains("Subs", substring = true)
+        compose.onNodeWithTag("audio").assertTextContains("Audio", substring = true)
+        compose.onNodeWithTag("position").assertTextContains("1:00")
+        compose.onNodeWithTag("sources").assertTextContains("Sources (2)")
+
+        // Sources: switching to the other file.
+        compose.onNodeWithTag("sources").performClick()
+        compose.onNodeWithTag("panel:sources").assertExists()
+        compose.onNodeWithText("720p · Hindi", substring = true).performClick()
+        assertEquals(PlayerAction.PlaySource(2), actions.last())
+
+        // Subtitles → Style: changes are kept in the settings.
+        compose.onNodeWithTag("subtitles").performClick()
+        compose.onNodeWithTag("subtitle-style-open").performClick()
+        compose.onNodeWithTag("style-color:Yellow").performClick()
+        compose.onNodeWithTag("style-bold").performClick()
+        assertEquals(dev.yourstream.ui.screens.settings.AppSettings.SUBTITLE_COLORS[1], settings.subtitleColor)
+        assertEquals(true, settings.subtitleBold)
+        compose.onNodeWithTag("style-reset").performScrollTo().performClick()
+        assertEquals(false, settings.subtitleBold)
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        // Lock: controls and gestures gone, back does nothing; the unlock button brings them back.
+        compose.onNodeWithTag("player-lock").performClick()
+        compose.onNodeWithTag("player-locked").assertExists()
+        compose.onNodeWithTag("play-pause").assertDoesNotExist()
+        compose.onNodeWithTag("player-gestures").assertDoesNotExist()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        assertEquals(0, backs, "back does not leave a locked player")
+        compose.onNodeWithTag("player-unlock").performClick()
+        compose.onNodeWithTag("player-locked").assertDoesNotExist()
+        compose.onNodeWithTag("play-pause").assertExists()
+    }
+
+    @Test
+    fun swipeToSeekCoversMoreOfLongerVideos() {
+        assertEquals(60_000L, dev.yourstream.ui.screens.player.swipeSeekSpanMs(22 * 60_000L))
+        assertEquals(90_000L, dev.yourstream.ui.screens.player.swipeSeekSpanMs(45 * 60_000L))
+        assertEquals(120_000L, dev.yourstream.ui.screens.player.swipeSeekSpanMs(150 * 60_000L))
+        // Half the width forward in a 2½-hour film: +60 s; never before 0 or past the end.
+        assertEquals(660_000L, dev.yourstream.ui.screens.player.swipeSeekTarget(600_000L, 150 * 60_000L, 0.5f))
+        assertEquals(0L, dev.yourstream.ui.screens.player.swipeSeekTarget(10_000L, 22 * 60_000L, -1f))
+        assertEquals(22 * 60_000L, dev.yourstream.ui.screens.player.swipeSeekTarget(22 * 60_000L - 5_000, 22 * 60_000L, 1f))
     }
 
     @Test
