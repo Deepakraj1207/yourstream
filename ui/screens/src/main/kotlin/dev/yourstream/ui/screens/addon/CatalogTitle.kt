@@ -3,6 +3,9 @@ package dev.yourstream.ui.screens.addon
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.blur
 import androidx.compose.foundation.border
@@ -149,6 +152,11 @@ data class CatalogTitleUiState(
     val inLibrary: Boolean? = null,
     /** Opened from Cinemeta: its rating is IMDb's. */
     val ratingIsImdb: Boolean = false,
+    /**
+     * TMDB is still answering (at most [DETAILS_WAIT_MS]): the page keeps its space rather than
+     * drawing the add-on's details and replacing them a moment later.
+     */
+    val detailsLoading: Boolean = false,
 ) {
     val episodes: List<CatalogVideo> get() = meta?.videos.orEmpty().filter { it.season == season }
 
@@ -178,6 +186,9 @@ sealed interface CatalogTitleAction {
 
 private const val TELEGRAM_LABEL = "Telegram"
 
+/** How long a title page waits for TMDB before showing the add-on's details instead. */
+internal const val DETAILS_WAIT_MS = 4_000L
+
 /**
  * Like a Stremio/Nuvio title page: details from the add-ons (or Cinemeta), seasons and episodes
  * for series, and the streams for the movie or chosen episode: the user's Telegram files first
@@ -200,7 +211,7 @@ class CatalogTitleViewModel @Inject constructor(
         route.title, route.year, route.poster,
     )
     private val _state = MutableStateFlow(CatalogTitleUiState(route.title, route.year, route.poster, series = type == CatalogType.SERIES,
-        ratingIsImdb = route.provider == "cinemeta"))
+        ratingIsImdb = route.provider == "cinemeta", detailsLoading = titleDetails.isConfigured))
     val state: StateFlow<CatalogTitleUiState> = _state.asStateFlow()
 
     /** The IMDb id once known (from the route, or from the details): what most stream add-ons key on. */
@@ -257,9 +268,14 @@ class CatalogTitleViewModel @Inject constructor(
         imdb = imdb ?: meta?.ref?.imdbId
         val presence = runCatching { addons.manager().withLibraryPresence(listOf(if (imdb != null) known.copy(ref = known.ref.copy(imdbId = imdb)) else known)).firstOrNull()?.second }.getOrNull()
         val inLibrary = presence?.let { p -> runCatching { media.getItem(p.itemId)?.summary?.inLibrary }.getOrNull() }
-        _state.update { it.copy(details = details, inLibrary = inLibrary) }
-        // Never wait for TMDB to show the add-on's details or ask for streams.
-        if (details == null) launch { tmdb.await()?.let { d -> _state.update { it.copy(details = d) } } }
+        _state.update { it.copy(details = details, inLibrary = inLibrary, detailsLoading = details == null && it.detailsLoading) }
+        // Never wait for TMDB to ask for streams. The page waits for it at most DETAILS_WAIT_MS,
+        // then shows the add-on's details; a late answer still fills the page.
+        if (details == null) launch {
+            val d = kotlinx.coroutines.withTimeoutOrNull(DETAILS_WAIT_MS) { tmdb.await() }
+            _state.update { it.copy(details = d ?: it.details, detailsLoading = false) }
+            if (d == null) tmdb.await()?.let { late -> _state.update { it.copy(details = late) } }
+        }
         val seasons = meta?.videos.orEmpty().mapNotNull { it.season }.distinct().sortedWith(compareBy { if (it == 0) Int.MAX_VALUE else it })
         _state.update {
             it.copy(
@@ -549,27 +565,49 @@ private fun FilteredOut(hidden: Int, onClear: () -> Unit) {
 private fun StreamTabs(state: CatalogTitleUiState, onAction: (CatalogTitleAction) -> Unit, filter: StreamFilter = StreamFilter(), onSortFilter: () -> Unit = {}) {
     val tabs = state.streamTabs
     val chosen = state.streamAddon?.takeIf { id -> tabs.any { it.id == id } }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        SortFilterButton(filter, onSortFilter)
-        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (tabs.isNotEmpty()) {
-                StreamChip(stringResource(R.string.addon_streams_all, tabs.sumOf { it.streams.size }), chosen == null, loading = false, tag = "stream-addon:all") {
-                    onAction(CatalogTitleAction.SelectStreamAddon(null))
+    // Reported from a device: the add-on chips scrolled in a strip squeezed between Sort & filter
+    // and refresh, so they were cut off ("8" for "All · 8"). Now Sort & filter and refresh sit on
+    // their own line on the page's edges, and the chips get the whole width below.
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SortFilterButton(filter, onSortFilter)
+            Spacer(Modifier.weight(1f))
+            // The icon (not its 48 dp button) ends on the page's edge.
+            IconButton(
+                onClick = { onAction(CatalogTitleAction.RefreshStreams) }, enabled = !state.loadingStreams,
+                modifier = Modifier.offset(x = 12.dp).focusHighlight().testTag("streams-refresh"),
+            ) {
+                if (state.loadingStreams) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.addon_streams_refresh))
+            }
+        }
+        if (tabs.isNotEmpty()) {
+            // Edge to edge: the chips scroll under the screen's edges, not under a button; the
+            // first starts on the page's edge like everything else.
+            val g = LocalDimens.current.gutter
+            androidx.compose.foundation.lazy.LazyRow(
+                Modifier.bleed(g).testTag("stream-addons"),
+                contentPadding = PaddingValues(horizontal = g), horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = "all") {
+                    StreamChip(stringResource(R.string.addon_streams_all, tabs.sumOf { it.streams.size }), chosen == null, loading = false, tag = "stream-addon:all") {
+                        onAction(CatalogTitleAction.SelectStreamAddon(null))
+                    }
+                }
+                items(tabs, key = { it.id }) { g2 ->
+                    val label = if (g2.loading) g2.addon else stringResource(R.string.addon_streams_chip, g2.addon, g2.streams.size)
+                    StreamChip(label, chosen == g2.id, g2.loading, "stream-addon:${g2.id}") { onAction(CatalogTitleAction.SelectStreamAddon(g2.id)) }
                 }
             }
-            tabs.forEach { g ->
-                val label = if (g.loading) g.addon else stringResource(R.string.addon_streams_chip, g.addon, g.streams.size)
-                StreamChip(label, chosen == g.id, g.loading, "stream-addon:${g.id}") { onAction(CatalogTitleAction.SelectStreamAddon(g.id)) }
-            }
-        }
-        IconButton(
-            onClick = { onAction(CatalogTitleAction.RefreshStreams) }, enabled = !state.loadingStreams,
-            modifier = Modifier.focusHighlight().testTag("streams-refresh"),
-        ) {
-            if (state.loadingStreams) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            else Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.addon_streams_refresh))
         }
     }
+}
+
+/** Widens the content by [by] on both sides (into the parent's padding), for rows that scroll to the screen's edges. */
+private fun Modifier.bleed(by: androidx.compose.ui.unit.Dp) = layout { measurable, constraints ->
+    val extra = (by * 2).roundToPx()
+    val p = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + extra, minWidth = constraints.minWidth + extra))
+    layout(constraints.maxWidth, p.height) { p.place(-by.roundToPx(), 0) }
 }
 
 @Composable

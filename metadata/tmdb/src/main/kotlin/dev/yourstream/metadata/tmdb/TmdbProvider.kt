@@ -205,9 +205,13 @@ class TmdbProvider(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, dev.yourstream.metadata.api.TitleDetails>?) = size > DETAILS_CACHE
     }
 
+    /** IMDb id → TMDB id, so a title seen before (the hero carousel, a revisit) needs no lookup. */
+    private val tmdbIds = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     override suspend fun details(type: MetadataType, imdbId: String?, tmdbId: String?, language: String?, region: String?): AppResult<dev.yourstream.metadata.api.TitleDetails> {
         val id = tmdbId?.removePrefix("tmdb:")?.takeIf { it.isNotBlank() }
-            ?: imdbId?.let { imdb -> when (val r = findByImdbId(imdb, type)) { is AppResult.Ok -> r.value.id; is AppResult.Err -> return r } }
+            ?: imdbId?.let { imdb -> tmdbIds["$type:$imdb"] }
+            ?: imdbId?.let { imdb -> when (val r = findByImdbId(imdb, type)) { is AppResult.Ok -> r.value.id.also { tmdbIds["$type:$imdb"] = it }; is AppResult.Err -> return r } }
             ?: return AppResult.Err(AppError.NotFound("no id"))
         val key = "$type:$id:$language:$region"
         synchronized(detailsCache) { detailsCache[key] }?.let { return AppResult.Ok(it) }
@@ -254,7 +258,9 @@ class TmdbProvider(
             status = d.status?.ifBlank { null },
             tmdbRating = d.voteAverage?.takeIf { (d.voteCount ?: 1) > 0 && it > 0 },
             logoUrl = logo?.let { image(it.filePath, LOGO) },
-            backdropUrl = image(d.backdropPath, BACKDROP), posterUrl = image(d.posterPath, POSTER),
+            // Phone-sized: the title page's artwork is under 1080 px wide on most phones, and
+            // w780 loads about twice as fast as w1280.
+            backdropUrl = image(d.backdropPath, BACKDROP_PAGE), posterUrl = image(d.posterPath, POSTER),
             directors = crew.filter { it.job == "Director" }.map { it.name }.distinct(),
             writers = crew.filter { it.department == "Writing" && it.job in WRITER_JOBS }.map { it.name }.distinct().take(3),
             creators = d.createdBy.map { it.name },
@@ -307,6 +313,7 @@ class TmdbProvider(
         private const val STILL = "w300"
         private const val PROFILE = "w185"
         private const val LOGO = "w500"
+        private const val BACKDROP_PAGE = "w780"
         private const val POSTER_LARGE = "w780"
         private const val LOGO_SMALL = "w185"
         private const val MAX_COMPANIES = 6

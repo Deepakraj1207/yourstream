@@ -123,6 +123,7 @@ class TitleStreamsCrashTest {
                 AppResult.Err(AppError.NotConfigured("no key"))
         }
         val vm = CatalogTitleViewModel(saved, store, media, episodes, noTmdb)
+        kotlin.test.assertFalse(vm.state.value.detailsLoading, "without a TMDB key the page never waits for it")
         compose.setContent {
             YourStreamTheme(WindowLayout.COMPACT) {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -155,6 +156,7 @@ class TitleStreamsCrashTest {
         compose.setContent { YourStreamTheme(WindowLayout.COMPACT) { val state by vm.state.collectAsStateWithLifecycle(); CatalogTitleScreen(state, vm::onAction, {}, {}, onStream = {}) } }
         compose.waitUntil(10_000) { !vm.state.value.loadingStreams && vm.state.value.streams.isNotEmpty() }
         kotlin.test.assertEquals("PG", vm.state.value.details?.certification)
+        kotlin.test.assertFalse(vm.state.value.detailsLoading, "TMDB answered: the page fills in")
         kotlin.test.assertEquals(listOf("tt7000007"), asked)
         kotlin.test.assertFalse(vm.state.value.streamsOpen, "the details page first; Play opens the streams")
         vm.onAction(dev.yourstream.ui.screens.addon.CatalogTitleAction.Play)

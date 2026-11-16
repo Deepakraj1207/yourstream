@@ -1005,3 +1005,26 @@ player (taps, double-tap and swipe seek, scrubbing, brightness and volume steps,
 lock). See UI.md for the full map. It follows the phone's touch-feedback setting, and Settings →
 Haptic feedback turns it off. Tests: `HapticsTest`. Gate: 693 tests, 0 failures; lint 0 errors,
 15 warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING (vibration cannot be felt in tests).
+
+## Device report 10 (16 Nov 2026): slow, glitchy title page; cut-off add-on chips
+
+From the user's two screen recordings:
+* **The title page glitched.** It drew the add-on's details first (plain title, genres,
+  "Movie Details", cast initials), then TMDB's answer replaced them: the picture blanked to grey
+  before the backdrop came in, and new rows pushed the page down.
+  * While TMDB answers (`detailsLoading`, at most `DETAILS_WAIT_MS` = 4 s), the page keeps
+    fixed space: an empty logo and genres area and placeholder bars. Then it fills in once.
+  * The list's poster shows at once, and TMDB's backdrop is drawn over it only when it has
+    loaded (`Artwork(placeholder = false)`), so the picture never blanks.
+  * Without a TMDB key the page never waits. A TMDB answer after 4 s still fills the page.
+* **The poster loaded slowly.**
+  * TMDB remembers each IMDb → TMDB id, so a title seen before (in the carousel, or on a
+    revisit) needs one request instead of two.
+  * The page's backdrop is w780 instead of w1280.
+* **The add-on chips were cut off** ("8" for "All · 8"): they scrolled in a strip between
+  Sort & filter and refresh. Now Sort & filter and refresh sit on their own row at the page's
+  edges, and the chips scroll edge to edge below with the first on the page's edge.
+* Tests: `TitleDetailsPageTest.whileTmdbAnswersThePageKeepsItsSpace`, `TitleStreamsCrashTest`
+  (loading cleared; never set without a key), `TmdbProviderTest` (id remembered, w780). Gate:
+  694 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
+  TESTING.

@@ -206,6 +206,12 @@ class TmdbProviderTest {
         val before = requests.size
         p.details(MetadataType.MOVIE, null, "555", "ta-IN", "IN")
         assertEquals(before, requests.size)
+        // By IMDb id for another region: the page is fetched again, but the IMDb → TMDB id is
+        // remembered, so there is no second /find.
+        val before2 = requests.size
+        p.details(MetadataType.MOVIE, "tt9000001", null, "ta-IN", "GB")
+        assertEquals(listOf("/3/movie/555"), requests.drop(before2).map { it.url.encodedPath })
+        assertEquals("https://image.tmdb.org/t/p/w780/b.jpg", d.backdropUrl)
         // Elsewhere: the US rating.
         assertEquals("R", (p.details(MetadataType.MOVIE, null, "555", "ta-IN", "DE") as AppResult.Ok).value.certification)
     }

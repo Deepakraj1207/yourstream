@@ -50,7 +50,7 @@ internal fun SortFilterButton(filter: StreamFilter, onClick: () -> Unit) {
         selected = active > 0, onClick = onClick,
         label = { Text(if (active > 0) stringResource(R.string.streams_filters_active, active) else stringResource(R.string.streams_sort_filter), maxLines = 1) },
         leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
-        modifier = Modifier.padding(end = 8.dp).focusHighlight(MaterialTheme.shapes.small).testTag("streams-sort-filter"),
+        modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("streams-sort-filter"),
     )
 }
 

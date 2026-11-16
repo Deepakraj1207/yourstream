@@ -114,4 +114,28 @@ class TitleDetailsPageTest {
         compose.onNodeWithText("Powered by TMDB").assertDoesNotExist()
         compose.onNodeWithTag("title-library").assertDoesNotExist()
     }
+
+    /**
+     * Reported from a device: the page drew the add-on's details, then TMDB's replaced them and
+     * everything jumped. While TMDB answers, its space is kept instead; then the page fills once.
+     */
+    @Test
+    fun whileTmdbAnswersThePageKeepsItsSpace() {
+        var state by mutableStateOf(CatalogTitleUiState("Mandaadi", 2026, "https://p/poster.jpg", loadingMeta = false, detailsLoading = true,
+            meta = CatalogMetadata(ref, "Mandaadi", 2026, "Plot.", genres = listOf("Action", "Drama", "Sport"), cast = listOf("Soori"))))
+        compose.setContent { YourStreamTheme(WindowLayout.COMPACT) { CatalogTitleScreen(state, {}, {}, {}, onStream = {}) } }
+        compose.onNodeWithTag("title-logo-space").assertExists()
+        compose.onNodeWithTag("title-details-loading").assertExists()
+        compose.onNodeWithTag("title-play").assertExists()
+        // Nothing of the add-on's to be replaced a moment later.
+        compose.onNodeWithText("Mandaadi").assertDoesNotExist()
+        compose.onNodeWithTag("title-genres").assertDoesNotExist()
+        compose.onNodeWithText("Plot.").assertDoesNotExist()
+        // TMDB answered: the page fills in once.
+        state = state.copy(detailsLoading = false, details = details)
+        compose.onNodeWithTag("title-details-loading").assertDoesNotExist()
+        compose.onNodeWithTag("title-logo").assertExists()
+        compose.onNodeWithTag("title-genres").assertTextContains("Drama • Comedy • Action")
+        compose.onNodeWithTag("title-backdrop").assertDoesNotExist() // this sample has no backdrop
+    }
 }

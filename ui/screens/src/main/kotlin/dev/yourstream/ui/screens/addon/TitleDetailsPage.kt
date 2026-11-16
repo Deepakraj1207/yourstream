@@ -115,6 +115,12 @@ internal fun TitleDetailsPage(
         LazyColumn(Modifier.fillMaxSize().testTag("catalog-title"), state = list, contentPadding = PaddingValues(bottom = LocalBottomClearance.current + 24.dp)) {
             item(key = "hero") { Hero(state, title, heroHeight) }
             item(key = "actions") { Actions(state, onAction, onOpenLibrary) }
+            // Reported from a device: the page drew the add-on's details, then TMDB's replaced
+            // them and everything jumped. While TMDB answers (at most a few seconds), its space.
+            if (state.detailsLoading) {
+                item(key = "details-loading") { DetailsPlaceholder() }
+                return@LazyColumn
+            }
             item(key = "facts") { Facts(state) }
             if (layout.showOverview) item(key = "overview") { Overview(d?.overview ?: m?.description) }
             if (state.series) episodes(state, onAction, layout.episodeCards == dev.yourstream.ui.screens.settings.EpisodeCards.HORIZONTAL)
@@ -167,20 +173,27 @@ private fun Hero(state: CatalogTitleUiState, title: String, height: androidx.com
     val d = state.details
     val background = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().height(height).testTag("title-hero")) {
-        Artwork(d?.backdropUrl ?: state.meta?.backdropUrl ?: state.poster ?: d?.posterUrl, title, Modifier.fillMaxSize(), showInitials = false)
+        // The poster from the list (already loaded) at once; TMDB's backdrop is drawn over it when
+        // it has loaded, so the picture never blanks while the larger image comes in.
+        Artwork(state.meta?.backdropUrl ?: state.poster ?: d?.posterUrl, title, Modifier.fillMaxSize(), showInitials = false)
+        d?.backdropUrl?.let { b -> Artwork(b, title, Modifier.fillMaxSize().testTag("title-backdrop"), showInitials = false, placeholder = false) }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
             0f to Color.Black.copy(alpha = 0.35f), 0.25f to Color.Transparent, 0.55f to Color.Transparent, 0.85f to background.copy(alpha = 0.9f), 1f to background,
         )))
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val logo = d?.logoUrl
-            if (logo != null) {
+            if (state.detailsLoading) {
+                // The logo's place, kept empty until TMDB answers (no title text swapped for a logo).
+                Box(Modifier.fillMaxWidth(0.75f).height(110.dp).testTag("title-logo-space"))
+            } else if (logo != null) {
                 Artwork(logo, title, Modifier.fillMaxWidth(0.75f).height(110.dp).testTag("title-logo"), contentScale = ContentScale.Fit, showInitials = false, placeholder = false)
             } else {
                 Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
             }
             val genres = d?.genres?.ifEmpty { null } ?: state.meta?.genres.orEmpty()
-            if (genres.isNotEmpty()) {
+            if (state.detailsLoading) Box(Modifier.height(40.dp))
+            else if (genres.isNotEmpty()) {
                 Text(genres.take(3).joinToString(" • "), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).testTag("title-genres"))
@@ -444,6 +457,18 @@ private fun MoreLikeThis(items: List<TitleDetails.Recommendation>, onOpen: (Open
     }
     Column(Modifier.padding(top = 16.dp).testTag("title-similar")) {
         MediaRow(stringResource(R.string.title_more_like_this), tiles, tileCard(), { onOpen(it.open) })
+    }
+}
+
+/** The details' space while TMDB answers: soft bars where the year, ratings, crew and overview go. */
+@Composable
+private fun DetailsPlaceholder() {
+    val g = LocalDimens.current.gutter
+    val bar = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    Column(Modifier.fillMaxWidth().padding(horizontal = g, vertical = 8.dp).testTag("title-details-loading"), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        listOf(0.45f, 0.35f, 0.6f, 0.55f, 1f, 1f, 0.7f).forEach { w ->
+            Box(Modifier.fillMaxWidth(w).height(18.dp).clip(RoundedCornerShape(6.dp)).background(bar))
+        }
     }
 }
 
