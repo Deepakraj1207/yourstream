@@ -147,6 +147,8 @@ data class AppSettings(
      * icon stay still. The system "Remove animations" option has the same effect.
      */
     val reduceMotion: Boolean = false,
+    /** Haptic feedback on taps, toggles and player gestures (the phone's own setting also applies). */
+    val haptics: Boolean = true,
     val homeRows: HomeRowsShown = HomeRowsShown(),
     val layout: LayoutSettings = LayoutSettings(),
     /** The title page's stream Sort & filter choice (kept for every title). */
@@ -214,6 +216,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("amoled", s.amoledBlack)
             .putBoolean("dock_labels", s.dockLabels)
             .putBoolean("reduce_motion", s.reduceMotion)
+            .putBoolean("haptics", s.haptics)
             .putInt("poster_width", s.layout.posterWidth)
             .putInt("poster_radius", s.layout.posterRadius ?: -1)
             .putBoolean("hide_labels", s.layout.hideLabels)
@@ -289,6 +292,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         amoledBlack = prefs.getBoolean("amoled", false),
         dockLabels = prefs.getBoolean("dock_labels", true),
         reduceMotion = prefs.getBoolean("reduce_motion", false),
+        haptics = prefs.getBoolean("haptics", true),
         layout = LayoutSettings(
             // Before 0.11.4: small / medium / large posters.
             posterWidth = prefs.getInt("poster_width", when (prefs.getString("poster_size", null)) { "SMALL" -> 104; "LARGE" -> 140; else -> 120 })

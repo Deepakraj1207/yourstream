@@ -996,3 +996,12 @@ Checked on the published files (run 27):
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Haptic feedback (16 Nov 2026)
+
+The user asked for haptic feedback in the app. It is one shared helper (`Haptic`, `rememberHaptics`)
+used for tabs, chips, switches, the title page, Sort & filter, the carousel, Search and the
+player (taps, double-tap and swipe seek, scrubbing, brightness and volume steps, hold-for-speed,
+lock). See UI.md for the full map. It follows the phone's touch-feedback setting, and Settings →
+Haptic feedback turns it off. Tests: `HapticsTest`. Gate: 693 tests, 0 failures; lint 0 errors,
+15 warnings (unchanged). Status: NEEDS REAL-DEVICE TESTING (vibration cannot be felt in tests).

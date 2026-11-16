@@ -143,6 +143,11 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(reduceMotion = it))
         }
     })
+    add(entry("haptics", ap, R.string.settings_group_accessibility, R.string.settings_haptics, "haptic vibration feedback touch buzz") {
+        SettingToggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), AppIcons.Volume, prefs.haptics, "pref-haptics") {
+            change(prefs.copy(haptics = it))
+        }
+    })
 
     // ---- Layout (and its own pages)
     addAll(layoutEntries())

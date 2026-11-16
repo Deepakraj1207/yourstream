@@ -459,3 +459,23 @@ The add-on title page is a Nuvio detail page, filled from TMDB when its key is s
 - **Tests:** `TitleDetailsPageTest`, `TmdbProviderTest.titleDetailsForTheTitlePage`, and
   `TitleStreamsCrashTest.titleOpenedByTmdbIdAsksAddonsWithItsImdbId`.
 
+
+## Haptic feedback (0.12.4)
+
+One helper decides how each kind of touch feels: `Haptic` and `rememberHaptics()` in
+`ui/core/Haptics.kt`. It plays through Compose's haptics, so the phone's own touch-feedback
+setting applies. It can be turned off in Settings → Appearance → Accessibility → Haptic feedback
+(on by default).
+
+| Feel | Where |
+|---|---|
+| Select tick | another tab (every navigation style), chips, stream add-on chips, Sort & filter options, Discover drop-downs, player menu choices, a swiped carousel slide (not auto-advance) |
+| Tap | play/pause, seek ±10 s, player pills and buttons |
+| Confirm | Play on a title page, tapping a stream, applying Sort & filter, unlocking the player |
+| Toggle on / off | every settings switch, add-ons, hero catalogs, Home rows, Telegram chats, My library (+) |
+| Long press | a poster's actions menu, hold-for-speed in the player |
+| Threshold | double-tap seek, start of a swipe seek or timeline scrub, locking the player |
+| Steps | each 10 % of brightness, each volume step, every 10 s of a swipe seek, every minute of a scrub |
+
+Tests: `HapticsTest` (tabs, chips and switches are felt; the setting silences them; the switch is
+saved).

@@ -910,4 +910,6 @@
     <string name="title_language">Original Language</string>
     <string name="title_more_like_this">More Like This</string>
     <string name="title_powered_by_tmdb">Powered by TMDB</string>
+    <string name="settings_haptics">Haptic feedback</string>
+    <string name="settings_haptics_detail">A light vibration when you switch tabs, toggle a setting, play, seek or swipe in the player.</string>
 </resources>

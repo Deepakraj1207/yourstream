@@ -132,6 +132,7 @@ private fun CardFrame(
     content: @Composable (openMenu: () -> Unit) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val haptics = rememberHaptics()
     val progressText = model.progress?.let { stringResource(R.string.cd_progress, (it * 100).toInt()) }
     val watchedText = if (model.watched) stringResource(R.string.cd_watched) else null
     val description = listOfNotNull(model.title, model.subtitle, model.caption, model.badge, progressText, watchedText).joinToString(", ")
@@ -142,7 +143,7 @@ private fun CardFrame(
             .onPreviewKeyEvent { e ->
                 if (actions.isNotEmpty() && e.type == KeyEventType.KeyDown && e.key == Key.Menu) { menu = true; true } else false
             }
-            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = if (actions.isEmpty()) null else ({ haptics.perform(Haptic.LONG_PRESS); menu = true }))
             .semantics(mergeDescendants = true) {
                 contentDescription = description
                 if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.onClick(); true } }

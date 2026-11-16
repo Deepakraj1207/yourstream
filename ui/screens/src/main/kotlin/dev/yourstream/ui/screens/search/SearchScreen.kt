@@ -240,6 +240,7 @@ private fun DiscoverChips(d: DiscoverUiState, onAction: (SearchAction) -> Unit) 
 @Composable
 private fun DropdownChip(label: String, tag: String, options: List<Pair<String, String>>, enabled: Boolean, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     Box {
         FilterChip(
             selected = false, onClick = { open = true }, enabled = enabled, label = { Text(label, maxLines = 1) },
@@ -249,7 +250,7 @@ private fun DropdownChip(label: String, tag: String, options: List<Pair<String, 
         )
         DropdownMenu(open, onDismissRequest = { open = false }) {
             options.forEach { (id, text) ->
-                DropdownMenuItem(text = { Text(text) }, onClick = { open = false; onPick(id) }, modifier = Modifier.testTag("$tag:$id"))
+                DropdownMenuItem(text = { Text(text) }, onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); open = false; onPick(id) }, modifier = Modifier.testTag("$tag:$id"))
             }
         }
     }

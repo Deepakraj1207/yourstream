@@ -365,6 +365,7 @@ class HomeCatalogsViewModel @Inject constructor(
  */
 @Composable
 private fun HeroCatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val list by vm.catalogs.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
     val all = list.orEmpty()
@@ -389,7 +390,7 @@ private fun HeroCatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
                     Text(c.customName ?: c.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(c.addon, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                Switch(checked = c.hero, onCheckedChange = { vm.setHero(c.key, it) }, enabled = canTurnOn,
+                Switch(checked = c.hero, onCheckedChange = { haptics.toggle(it); vm.setHero(c.key, it) }, enabled = canTurnOn,
                     modifier = Modifier.focusHighlight().testTag("hero-catalog-on:${c.key}"))
             }
         }
@@ -398,6 +399,7 @@ private fun HeroCatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
 
 @Composable
 private fun CatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val list by vm.catalogs.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<CatalogChoice?>(null) }
     val movies = stringResource(R.string.nav_movies)
@@ -426,7 +428,7 @@ private fun CatalogList(vm: HomeCatalogsViewModel = hiltViewModel()) {
                         IconButton(onClick = { vm.move(c.key, 1) }, enabled = i < list!!.lastIndex, modifier = Modifier.focusHighlight().testTag("home-catalog-down:${c.key}")) {
                             Icon(Icons.Filled.KeyboardArrowDown, stringResource(R.string.addons_move_down, c.name))
                         }
-                        Switch(checked = c.shown, onCheckedChange = { vm.setShown(c.key, it) }, modifier = Modifier.focusHighlight().testTag("home-catalog-shown:${c.key}"))
+                        Switch(checked = c.shown, onCheckedChange = { haptics.toggle(it); vm.setShown(c.key, it) }, modifier = Modifier.focusHighlight().testTag("home-catalog-shown:${c.key}"))
                     }
                 }
                 SettingRow(stringResource(R.string.layout_reset), stringResource(R.string.layout_reset_catalogs_detail), Icons.Filled.Refresh, tag = "home-catalogs-reset") { vm.reset() }

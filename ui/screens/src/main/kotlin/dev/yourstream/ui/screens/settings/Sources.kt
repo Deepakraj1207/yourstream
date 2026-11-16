@@ -112,6 +112,7 @@ fun SourcesRoute(onBack: () -> Unit, vm: SourcesViewModel = hiltViewModel()) {
 
 @Composable
 fun SourcesScreen(state: SourcesUiState, onAction: (SourcesAction) -> Unit, onBack: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     ScreenScaffold(stringResource(R.string.settings_sources), onBack = onBack) {
         StateContent(state.chats) { rows ->
             LazyColumn(Modifier.testTag("sources")) {
@@ -128,7 +129,7 @@ fun SourcesScreen(state: SourcesUiState, onAction: (SourcesAction) -> Unit, onBa
                         title = r.title, supporting = status,
                         onClick = { onAction(SourcesAction.Toggle(r.chatId, !r.enabled)) },
                         trailing = {
-                            Switch(checked = r.enabled, onCheckedChange = { onAction(SourcesAction.Toggle(r.chatId, it)) },
+                            Switch(checked = r.enabled, onCheckedChange = { haptics.toggle(it); onAction(SourcesAction.Toggle(r.chatId, it)) },
                                 modifier = Modifier.semantics { contentDescription = toggleLabel }.testTag("toggle:${r.chatId}"))
                         },
                     )

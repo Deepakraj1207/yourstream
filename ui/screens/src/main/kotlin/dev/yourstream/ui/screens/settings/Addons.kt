@@ -393,6 +393,7 @@ private fun AddBox(state: AddonsUiState, onAction: (AddonsAction) -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddonCard(row: AddonRow, first: Boolean, last: Boolean, onAction: (AddonsAction) -> Unit, onDelete: () -> Unit, onConfigure: (() -> Unit)?) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val a = row.addon
     val c = MaterialTheme.colorScheme
     Surface(shape = CardShape, color = c.surfaceContainer,
@@ -406,7 +407,7 @@ private fun AddonCard(row: AddonRow, first: Boolean, last: Boolean, onAction: (A
                         ?: if (a.builtIn) stringResource(R.string.addons_built_in) else a.manifestUrl?.substringAfter("://")?.substringBefore('/')
                     sub?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
-                Switch(checked = a.enabled, onCheckedChange = { onAction(AddonsAction.SetEnabled(a.id, it)) },
+                Switch(checked = a.enabled, onCheckedChange = { haptics.toggle(it); onAction(AddonsAction.SetEnabled(a.id, it)) },
                     modifier = Modifier.focusHighlight().testTag("addon-toggle:${a.id}"))
             }
             // Move up · move down · refresh · settings · delete (right-aligned, like Nuvio's).

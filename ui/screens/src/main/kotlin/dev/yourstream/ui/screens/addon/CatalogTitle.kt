@@ -574,8 +574,9 @@ private fun StreamTabs(state: CatalogTitleUiState, onAction: (CatalogTitleAction
 
 @Composable
 private fun StreamChip(label: String, selected: Boolean, loading: Boolean, tag: String, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     FilterChip(
-        selected = selected, onClick = onClick, label = { Text(label, maxLines = 1) },
+        selected = selected, onClick = { if (!selected) haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); onClick() }, label = { Text(label, maxLines = 1) },
         leadingIcon = when {
             loading -> ({ CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp) })
             selected -> ({ Icon(Icons.Filled.Check, contentDescription = null) })
@@ -622,11 +623,12 @@ private fun Missing(groups: List<StreamGroup>) {
 
 @Composable
 private fun StreamRow(s: AddonStream, torrents: Boolean, onStream: (AddonStream) -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     // Torrents stay tappable while turned off: the tap asks to turn them on (TorrentConsentDialog).
     val usable = s.isLibrary || s.playable || s.externalUrl != null || s.isTorrent
     Surface(
         shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().focusHighlight().clickable(enabled = usable) { onStream(s) }.testTag("stream"),
+        modifier = Modifier.fillMaxWidth().focusHighlight().clickable(enabled = usable) { haptics.perform(dev.yourstream.ui.core.Haptic.CONFIRM); onStream(s) }.testTag("stream"),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(s.name.replace('\n', ' '), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(96.dp), maxLines = 3, overflow = TextOverflow.Ellipsis)

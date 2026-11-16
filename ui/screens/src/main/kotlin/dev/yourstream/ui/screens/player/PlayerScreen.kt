@@ -331,7 +331,8 @@ fun PlayerScreen(
         // Picture-in-picture: only the video; controls come back with the full screen.
         if (inPip) return@Box
         if (locked) {
-            LockedOverlay { locked = false; poke() }
+            val unlockFeel = dev.yourstream.ui.core.rememberHaptics()
+            LockedOverlay { unlockFeel.perform(dev.yourstream.ui.core.Haptic.CONFIRM); locked = false; poke() }
             return@Box
         }
         // Gesture layer above the video (the video view itself does not take touches).
@@ -339,13 +340,14 @@ fun PlayerScreen(
         val brightness = stringResource(R.string.player_brightness)
         val volume = stringResource(R.string.player_volume)
         val holdLabel = stringResource(R.string.player_speed_hold)
+        val haptics = dev.yourstream.ui.core.rememberHaptics()
         Box(
             Modifier.fillMaxSize().testTag("player-gestures").playerGestures(
                 context,
                 onTap = { if (controls) controls = false else poke() },
-                onSeek = { forward -> seek(if (forward) seekStepMs else -seekStepMs) },
+                onSeek = { forward -> haptics.perform(dev.yourstream.ui.core.Haptic.THRESHOLD); seek(if (forward) seekStepMs else -seekStepMs) },
                 onHoldSpeed = { holding ->
-                    if (holding) { speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
+                    if (holding) { haptics.perform(dev.yourstream.ui.core.Haptic.LONG_PRESS); speedBeforeHold = state.speed; onAction(PlayerAction.SetSpeed(settings.holdSpeed)); hint = PlayerHint(AppIcons.FastForward, holdLabel) }
                     else { onAction(PlayerAction.SetSpeed(speedBeforeHold ?: 1f)); speedBeforeHold = null; hint = null }
                 },
                 onHint = { hint = it },
@@ -354,12 +356,18 @@ fun PlayerScreen(
                     val duration = state.durationMs ?: 0
                     if (duration <= 0) return@playerGestures
                     when (phase) {
-                        SwipePhase.START -> { swipeFrom = state.positionMs; swipeTo = state.positionMs }
-                        SwipePhase.MOVE -> swipeFrom?.let { from -> swipeTo = swipeSeekTarget(from, duration, fraction) }
+                        SwipePhase.START -> { haptics.perform(dev.yourstream.ui.core.Haptic.THRESHOLD); swipeFrom = state.positionMs; swipeTo = state.positionMs }
+                        // A tick for every 10 s crossed, so the jump is felt as well as seen.
+                        SwipePhase.MOVE -> swipeFrom?.let { from ->
+                            val to = swipeSeekTarget(from, duration, fraction)
+                            if ((to - from) / 10_000 != ((swipeTo ?: from) - from) / 10_000) haptics.perform(dev.yourstream.ui.core.Haptic.STEP)
+                            swipeTo = to
+                        }
                         SwipePhase.END -> { swipeTo?.let { onAction(PlayerAction.SeekTo(it)) }; swipeFrom = null; swipeTo = null }
                         SwipePhase.CANCEL -> { swipeFrom = null; swipeTo = null }
                     }
                 },
+                onStep = { haptics.perform(dev.yourstream.ui.core.Haptic.STEP) },
             ),
         )
         // While swiping: where the video will land, and by how much.
@@ -624,9 +632,10 @@ private fun SeekButton(icon: ImageVector, label: String, amount: String, tag: St
 /** An icon-only pill (previous / next episode), the same height and colour as the labelled pills. */
 @Composable
 private fun IconPill(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     Surface(
         shape = CircleShape, color = Color.Black.copy(alpha = 0.45f), contentColor = Color.White,
-        modifier = Modifier.size(PillTouch).focusHighlight(CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+        modifier = Modifier.size(PillTouch).focusHighlight(CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button) { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }
             .padding((PillTouch - PillHeight) / 2).semantics { contentDescription = label }.testTag(tag),
     ) { Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) } }
 }
@@ -634,8 +643,9 @@ private fun IconPill(icon: ImageVector, label: String, tag: String, onClick: () 
 @Composable
 private fun PlayPause(state: PlayerUiState, size: androidx.compose.ui.unit.Dp, focus: FocusRequester, onAction: (PlayerAction) -> Unit) {
     val label = stringResource(if (state.isPlaying) R.string.player_pause else R.string.player_play)
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     FilledIconButton(
-        onClick = { onAction(PlayerAction.TogglePlay) },
+        onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onAction(PlayerAction.TogglePlay) },
         modifier = Modifier.size(size).focusRequester(focus).focusHighlight(MaterialTheme.shapes.extraLarge).testTag("play-pause")
             .semantics { contentDescription = label },
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
@@ -646,15 +656,17 @@ private fun PlayPause(state: PlayerUiState, size: androidx.compose.ui.unit.Dp, f
 
 @Composable
 private fun RoundIcon(icon: ImageVector, label: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     IconButton(
-        onClick = onClick, modifier = modifier.size(size).focusHighlight(MaterialTheme.shapes.extraLarge),
+        onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }, modifier = modifier.size(size).focusHighlight(MaterialTheme.shapes.extraLarge),
         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.35f), contentColor = Color.White),
     ) { Icon(icon, label, Modifier.size(size * 0.55f)) }
 }
 
 @Composable
 private fun BarIcon(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag(tag)) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    IconButton(onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }, modifier = Modifier.focusHighlight(MaterialTheme.shapes.extraLarge).testTag(tag)) {
         Icon(icon, label, tint = Color.White)
     }
 }
@@ -777,13 +789,14 @@ private fun BoxScope.Panel(
 @Composable
 private fun Options(options: List<Pair<String?, String>>, selected: String?, onSelect: (String?) -> Unit) {
     val focus = remember { FocusRequester() }
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val initial = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     LazyColumn(state = rememberLazyListState(initial)) {
         items(options.size) { i ->
             val (id, label) = options[i]
             Row(
                 Modifier.fillMaxWidth().then(if (i == initial) Modifier.focusRequester(focus) else Modifier)
-                    .selectable(selected = id == selected, role = Role.RadioButton, onClick = { onSelect(id) })
+                    .selectable(selected = id == selected, role = Role.RadioButton, onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); onSelect(id) })
                     .focusHighlight().padding(start = 22.dp, end = 24.dp, top = 4.dp, bottom = 4.dp).testTag("option:$label"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

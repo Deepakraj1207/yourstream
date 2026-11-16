@@ -391,7 +391,10 @@ internal fun SettingRow(title: String, supporting: String?, icon: androidx.compo
 
 @Composable
 internal fun SettingToggle(title: String, supporting: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = { onChange(!checked) },
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    ListRow(title, supporting = supporting, leading = { Icon(icon, contentDescription = null) }, onClick = {
+        haptics.perform(if (checked) dev.yourstream.ui.core.Haptic.TOGGLE_OFF else dev.yourstream.ui.core.Haptic.TOGGLE_ON); onChange(!checked)
+    },
         trailing = { androidx.compose.material3.Switch(checked = checked, onCheckedChange = null) }, modifier = Modifier.testTag(tag))
 }
 

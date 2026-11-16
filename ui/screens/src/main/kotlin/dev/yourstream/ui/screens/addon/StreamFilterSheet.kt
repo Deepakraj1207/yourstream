@@ -68,6 +68,7 @@ internal fun StreamFilterSheet(filter: StreamFilter, groups: List<StreamGroup>, 
 @Composable
 internal fun StreamFilterContent(filter: StreamFilter, groups: List<StreamGroup>, onApply: (StreamFilter) -> Unit) {
     var draft by remember(filter) { mutableStateOf(filter) }
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     val names: (String) -> String = { LanguageCatalog.displayName(it) }
     val shown = draft.apply(groups, names).sumOf { it.streams.size }
     val languages = remember(groups, filter) { (languagesIn(groups) + filter.languages).distinct() }
@@ -109,7 +110,7 @@ internal fun StreamFilterContent(filter: StreamFilter, groups: List<StreamGroup>
             }
         }
         Button(
-            onClick = { onApply(draft) }, shape = CircleShape,
+            onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.CONFIRM); onApply(draft) }, shape = CircleShape,
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(bottom = 12.dp).focusHighlight(CircleShape).testTag("stream-filter-apply"),
         ) { Text(pluralStringResource(R.plurals.streams_show, shown, shown), fontWeight = FontWeight.Bold) }
     }
@@ -126,8 +127,9 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun Option(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     FilterChip(
-        selected = selected, onClick = onClick, label = { Text(label, maxLines = 1) },
+        selected = selected, onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); onClick() }, label = { Text(label, maxLines = 1) },
         leadingIcon = if (selected) ({ Icon(Icons.Filled.Check, contentDescription = null) }) else null,
         modifier = Modifier.focusHighlight(MaterialTheme.shapes.small).testTag("stream-filter:$tag"),
     )

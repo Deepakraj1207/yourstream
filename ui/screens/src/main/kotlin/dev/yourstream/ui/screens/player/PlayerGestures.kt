@@ -79,6 +79,8 @@ fun Modifier.playerGestures(
     brightnessLabel: String,
     volumeLabel: String,
     onSwipeSeek: ((SwipePhase, Float) -> Unit)? = null,
+    /** Each step of brightness (10 %) or volume while swiping: a haptic tick. */
+    onStep: () -> Unit = {},
 ): Modifier = this
     .pointerInput(onSwipeSeek != null) {
         val swipe = onSwipeSeek ?: return@pointerInput
@@ -128,12 +130,14 @@ fun Modifier.playerGestures(
                 // A full-height swipe goes from 0 to 100 %.
                 level = (level - dy / size.height).coerceIn(0f, 1f)
                 if (leftSide) {
+                    val before = ((activity?.window?.attributes?.screenBrightness ?: level) * 10).toInt()
                     activity?.window?.let { w -> w.attributes = w.attributes.apply { screenBrightness = level.coerceAtLeast(0.01f) } }
+                    if ((level * 10).toInt() != before) onStep()
                     onHint(PlayerHint(AppIcons.Brightness, "$brightnessLabel ${(level * 100).toInt()}%", level))
                 } else if (audio != null) {
                     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     val v = (level * max).toInt()
-                    if (v != audio.getStreamVolume(AudioManager.STREAM_MUSIC)) audio.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0)
+                    if (v != audio.getStreamVolume(AudioManager.STREAM_MUSIC)) { audio.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0); onStep() }
                     onHint(PlayerHint(AppIcons.Volume, "$volumeLabel $v/$max", level))
                 }
             },

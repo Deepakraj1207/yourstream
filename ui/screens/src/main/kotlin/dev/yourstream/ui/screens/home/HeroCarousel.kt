@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +69,11 @@ fun HeroCarousel(slides: List<HeroSlide>, onOpen: (OpenTarget) -> Unit, modifier
     val pager = rememberPagerState { slides.size }
     val reduced = LocalReducedMotion.current
     val dragged by pager.interactionSource.collectIsDraggedAsState()
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    // A tick when a swipe lands on another slide (the auto-advance stays silent).
+    var swiped by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(dragged) { if (dragged) swiped = true }
+    LaunchedEffect(pager.settledPage) { if (swiped) { haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); swiped = false } }
     // Keyed on the settled page: currentPage changes halfway through a move, and restarting
     // there cancelled the animation and left two slides half on screen.
     LaunchedEffect(pager.settledPage, dragged, reduced, slides.size) {

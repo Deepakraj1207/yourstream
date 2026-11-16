@@ -152,7 +152,8 @@ private fun TopBar(state: CatalogTitleUiState, title: String, collapsed: Boolean
         }
         val inLibrary = state.inLibrary
         if (inLibrary != null) {
-            IconButton(onClick = { onAction(CatalogTitleAction.ToggleLibrary) }, modifier = Modifier.focusHighlight(CircleShape).testTag("title-library")) {
+            val haptics = dev.yourstream.ui.core.rememberHaptics()
+            IconButton(onClick = { haptics.toggle(!inLibrary); onAction(CatalogTitleAction.ToggleLibrary) }, modifier = Modifier.focusHighlight(CircleShape).testTag("title-library")) {
                 Icon(if (inLibrary) Icons.Filled.Check else Icons.Filled.Add,
                     contentDescription = stringResource(if (inLibrary) R.string.title_remove_library else R.string.title_add_library),
                     tint = if (collapsed) MaterialTheme.colorScheme.onBackground else Color.White)
@@ -193,10 +194,11 @@ private fun Hero(state: CatalogTitleUiState, title: String, height: androidx.com
 private fun Actions(state: CatalogTitleUiState, onAction: (CatalogTitleAction) -> Unit, onOpenLibrary: (Long) -> Unit) {
     val g = LocalDimens.current.gutter
     var menu by remember { mutableStateOf(false) }
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     Row(Modifier.fillMaxWidth().padding(horizontal = g, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         val episode = state.episode?.takeIf { state.series }
         Button(
-            onClick = { onAction(CatalogTitleAction.Play) }, shape = CircleShape, enabled = !state.series || state.episodes.isNotEmpty(),
+            onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.CONFIRM); onAction(CatalogTitleAction.Play) }, shape = CircleShape, enabled = !state.series || state.episodes.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
             modifier = Modifier.weight(1f).height(56.dp).focusHighlight(CircleShape).testTag("title-play"),
         ) {

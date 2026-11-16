@@ -72,6 +72,7 @@ fun YourStreamUi(appVersion: String? = null, layout: WindowLayout = rememberWind
     androidx.compose.runtime.CompositionLocalProvider(
         dev.yourstream.ui.screens.settings.LocalAppSettings provides settings,
         dev.yourstream.ui.core.LocalReducedMotion provides reducedMotion,
+        dev.yourstream.ui.core.LocalHapticsEnabled provides settings.haptics,
     ) {
     YourStreamTheme(
         layout, darkTheme = dark, manga = settings.style == dev.yourstream.ui.screens.settings.UiStyle.MANGA,
@@ -121,6 +122,9 @@ fun AdaptiveShell(
     onIndexing: () -> Unit = {},
     content: @Composable (Modifier) -> Unit,
 ) {
+    // A light tick when another tab is chosen (every navigation style goes through here).
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    val pick: (TopLevel) -> Unit = { t -> if (t != current?.tab) haptics.perform(dev.yourstream.ui.core.Haptic.SELECT); onSelect(t) }
     val withStatus: @Composable (Modifier) -> Unit = { m ->
         androidx.compose.foundation.layout.Box(m) {
             content(Modifier.fillMaxSize())
@@ -133,7 +137,7 @@ fun AdaptiveShell(
             val settings = dev.yourstream.ui.screens.settings.LocalAppSettings.current
             val floating = settings.layout.navStyle.floating(dev.yourstream.ui.core.LocalMangaStyle.current)
             if (floating) {
-                FloatingShell(current, onSelect, showBar, settings.layout.navStyle == dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE, indexing, onIndexing, content)
+                FloatingShell(current, pick, showBar, settings.layout.navStyle == dev.yourstream.ui.screens.settings.NavStyle.ADAPTIVE, indexing, onIndexing, content)
                 return
             }
             // A bar under the content on the main tabs (Panel Grid or the Material bar); other pages
@@ -151,7 +155,7 @@ fun AdaptiveShell(
                     content(Modifier.fillMaxSize())
                     IndexingPill(indexing, onIndexing, Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 8.dp))
                 }
-                if (showBar) MainNavigationBar(current, onSelect)
+                if (showBar) MainNavigationBar(current, pick)
             }
         }
 
@@ -159,7 +163,7 @@ fun AdaptiveShell(
             NavigationRail(Modifier.testTag("nav:rail")) {
                 MAIN_TABS.forEach { t ->
                     NavigationRailItem(
-                        selected = t == current?.tab, onClick = { onSelect(t) },
+                        selected = t == current?.tab, onClick = { pick(t) },
                         icon = { Icon(t.icon, contentDescription = null) }, label = { Text(stringResource(t.label)) },
                         modifier = Modifier.focusHighlight().testTag("nav:${t.name}"),
                     )
@@ -173,7 +177,7 @@ fun AdaptiveShell(
                 PermanentDrawerSheet(Modifier.width(240.dp).testTag("nav:drawer")) {
                     MAIN_TABS.forEach { t ->
                         NavigationDrawerItem(
-                            label = { Text(stringResource(t.label)) }, selected = t == current?.tab, onClick = { onSelect(t) },
+                            label = { Text(stringResource(t.label)) }, selected = t == current?.tab, onClick = { pick(t) },
                             icon = { Icon(t.icon, contentDescription = null) },
                             modifier = Modifier.padding(horizontal = 12.dp).focusHighlight().testTag("nav:${t.name}"),
                         )
@@ -182,7 +186,7 @@ fun AdaptiveShell(
             },
         ) { withStatus(Modifier.fillMaxSize()) }
 
-        WindowLayout.TV -> TvShell(current, onSelect, withStatus)
+        WindowLayout.TV -> TvShell(current, pick, withStatus)
     }
 }
 

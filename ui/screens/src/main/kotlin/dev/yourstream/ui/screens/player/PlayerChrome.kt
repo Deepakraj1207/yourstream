@@ -66,13 +66,14 @@ internal val PillTouch = 48.dp
 /** A labelled action on the player's bottom bar: drawn [PillHeight] tall, touched over 48 dp. */
 @Composable
 fun ActionPill(label: String, tag: String, icon: ImageVector? = null, active: Boolean = false, onClick: () -> Unit) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
     Surface(
         shape = CircleShape,
         color = if (active) Color.White else PillColor,
         contentColor = if (active) Color.Black else Color.White,
         // The touch area (48 dp) includes the 2 dp around the drawn pill.
         modifier = Modifier.heightIn(min = PillTouch).focusHighlight(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick).padding(vertical = (PillTouch - PillHeight) / 2).testTag(tag),
+            .clickable(role = Role.Button) { haptics.perform(dev.yourstream.ui.core.Haptic.TAP); onClick() }.padding(vertical = (PillTouch - PillHeight) / 2).testTag(tag),
     ) {
         Row(Modifier.heightIn(min = PillHeight).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp)) }
@@ -93,7 +94,8 @@ fun TimePill(text: String, tag: String, modifier: Modifier = Modifier) {
 /** The lock button in the top bar: locking hides every control and ignores touches on the video. */
 @Composable
 fun LockButton(onLock: () -> Unit) {
-    IconButton(onClick = onLock, modifier = Modifier.focusHighlight().testTag("player-lock")) {
+    val haptics = dev.yourstream.ui.core.rememberHaptics()
+    IconButton(onClick = { haptics.perform(dev.yourstream.ui.core.Haptic.THRESHOLD); onLock() }, modifier = Modifier.focusHighlight().testTag("player-lock")) {
         Icon(Icons.Filled.Lock, stringResource(R.string.player_lock), tint = Color.White)
     }
 }
