@@ -33,17 +33,29 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 
 <div align="center">
 
-| Home (dark) | Home (light) | Library | Details |
+**🌸 Manga style**
+
+| Home (light) | Home (dark) | Discover | Settings |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/home-dark.png" width="200" alt="Home in the manga style, dark"/> | <img src="docs/screenshots/home-light.png" width="200" alt="Home in the manga style, light"/> | <img src="docs/screenshots/library.png" width="200" alt="Library grid with filters"/> | <img src="docs/screenshots/details.png" width="200" alt="A title's page with resume"/> |
-| **Search** | **Settings** | **First run** | **Library status** |
-| <img src="docs/screenshots/search.png" width="200" alt="Search answering a plain-language question"/> | <img src="docs/screenshots/settings.png" width="200" alt="Settings hub"/> | <img src="docs/screenshots/first-run.png" width="200" alt="Guided first run"/> | <img src="docs/screenshots/library-status.png" width="200" alt="Indexing and matching progress"/> |
+| <img src="docs/screenshots/home-manga-light.jpg" width="200" alt="Home in the manga style, light: popular movies and series with posters"/> | <img src="docs/screenshots/home-manga-dark.jpg" width="200" alt="Home in the manga style, dark"/> | <img src="docs/screenshots/search-manga-light.jpg" width="200" alt="Search and Discover in the manga style, light, browsing an add-on catalog"/> | <img src="docs/screenshots/settings-manga-light.jpg" width="200" alt="Settings in the manga style, light"/> |
 
-| ▶️ Player | 📺 Android TV | 📱 Tablet |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/player.png" width="280" alt="Player with controls"/> | <img src="docs/screenshots/tv-home.png" width="280" alt="Home on Android TV"/> | <img src="docs/screenshots/tablet-home.png" width="280" alt="Home on a tablet"/> |
+**🎬 Classic style & title page**
 
-<sub>Rendered from the app's own screens by its screenshot tests. Titles are sample data and artwork shows placeholders; on your device you see your own library with posters.</sub>
+| Home | Discover | Settings | Title page |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/home-classic-dark.jpg" width="200" alt="Home in the classic style, AMOLED black"/> | <img src="docs/screenshots/search-classic-dark.jpg" width="200" alt="Search and Discover in the classic style"/> | <img src="docs/screenshots/settings-classic-dark.jpg" width="200" alt="Settings in the classic style"/> | <img src="docs/screenshots/title-page.jpg" width="200" alt="A title page from TMDB: logo, genres, runtime, IMDb and TMDB ratings, director, plot and production companies"/> |
+
+<details>
+<summary>More: manga style, dark</summary>
+<br/>
+
+| Discover | Settings |
+|:---:|:---:|
+| <img src="docs/screenshots/search-manga-dark.jpg" width="200" alt="Search and Discover in the manga style, dark"/> | <img src="docs/screenshots/settings-manga-dark.jpg" width="200" alt="Settings in the manga style, dark"/> |
+
+</details>
+
+<sub>Real screenshots from a phone running YourStream. The <b>Telegram</b> badge on a poster means that title can be played from your own Telegram chats.</sub>
 
 </div>
 
@@ -54,6 +66,7 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 ### 📚 A real library from your Telegram chats
 - 🔑 **Sign in with your own Telegram account**: phone number and code, or a QR code from Telegram on another device.
 - 📂 **Pick the channels, groups or chats** that hold your videos; YourStream indexes them in the background.
+- 🚀 **Fast indexing, even for channels with 100,000+ files**: big channels are read in parallel slices, and when Telegram says "too fast" the indexer slows down by itself and speeds up again later.
 - 🎞️ **Movies and series → seasons → episodes**, several versions of one title, duplicates recognised.
 - 🧠 **Smart file-name parsing**: titles, years, episodes, languages, quality, even from messy names like `@Channel_LinkZ_Movie_2023_1080p_Tam_+_Tel.mkv`.
 - ⏸️ **Indexing you control**: pause, resume, stop; Wi-Fi only; waits when the battery is low.
@@ -62,12 +75,15 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 - 📁 **Add folders** from your phone (no permission needed: only the folder you pick), or all videos on the device.
 - 🔗 The same film on Telegram and on your phone becomes **one title with two versions**.
 
-### 🖼️ Posters and details
+### 🖼️ One poster per title, a page like a streaming app
+- 🏷️ **One poster per movie or series**: your Telegram files show up as a stream source on it, marked with a **Telegram** badge, not as a separate copy.
 - 🎨 Posters, plots and ratings from **TMDB** or **Cinemeta**, matched from the title and year in the file name.
+- 📄 **Title page from TMDB** (with your own free API key): logo, backdrop, genres, runtime, certification, **IMDb and TMDB ratings**, director and writers, cast, trailers, production companies and recommendations.
 - ✅ A **review screen** for unsure matches, and **Fix match** for anything wrong.
 
 ### ▶️ Playback that just works
 - ⚡ **Streams while downloading**: seek anywhere without waiting for the whole file.
+- 🎚️ **Sort and filter streams** by quality, size or source before you press play.
 - 🗣️ **Audio and subtitle languages by preference**, remembered per movie and series; FFmpeg audio for formats your phone lacks.
 - 🔒 **Background playback** with lock-screen and headset controls, picture-in-picture, next episode.
 - 📥 **Offline downloads**: save a version and watch without a connection.
@@ -76,15 +92,18 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 - ⏯️ Continue watching, next episode, recently added, favorites, statistics, all computed on the device.
 - 🔄 Optional **end-to-end encrypted progress sync** across your devices, stored in your own Saved Messages.
 
-### 🔎 Search that understands you
-- Offline, fuzzy, transliteration-aware search, plus plain-language questions such as *"Telugu movies I haven't watched"*.
+### 🔎 Search and Discover
+- 🔍 Offline, fuzzy, transliteration-aware search, plus plain-language questions such as *"Telugu movies I haven't watched"*.
+- 🧭 **Discover**: browse add-on catalogs by type and catalog (for example *Series · Tamil – Indian Regional*), with ratings on every poster.
 
 ### 🧩 Optional extras
-- 🧭 **Stremio-protocol add-ons** for discovery catalogs and web streams (with resume).
+- 🧩 **Stremio-protocol add-ons** (the same kind Nuvio uses) for discovery catalogs and web streams (with resume).
 - 🧲 **Torrent streaming**: off by default; turning it on explains that peers see your IP address.
 
 ### 🎨 Made to feel good
 - 🖌️ **Manga** and **Classic** styles, dark / light / AMOLED black.
+- 🎠 A **hero carousel** on Home that opens instantly, kept between tabs instead of reloading.
+- 📳 **Haptic feedback** on taps, toggles and long presses (follows your system setting).
 - 🧭 Simple navigation: **Home · Search · Library · Settings**.
 - 👋 A guided first run, **reduce motion** support, 48 dp touch targets, screen-reader labels.
 - 📺 Phone, tablet and **Android TV** layouts with full remote control.
@@ -161,7 +180,7 @@ cp secrets.properties.example secrets.properties   # add your Telegram api_id / 
 
 ## 🧪 Quality
 
-- ✅ **600+ JVM tests** (Robolectric, real Room databases, Media3 against simulated Telegram files), lint, a debug build and a minified release build on **every push**.
+- ✅ **700+ JVM tests** (Robolectric, real Room databases, Media3 against simulated Telegram files), lint, a debug build and a minified release build on **every push**.
 - 🔐 Releases are **signed with one pinned key**, and CI checks every APK's certificate before publishing.
 - 📋 What still needs a real phone is listed, with step-by-step checks, in [`docs/IMPLEMENTATION_PROGRESS.md`](docs/IMPLEMENTATION_PROGRESS.md).
 
