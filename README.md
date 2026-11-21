@@ -17,6 +17,7 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 ![Media3](https://img.shields.io/badge/Media3-ExoPlayer-FF6F00?style=flat-square&logo=youtube&logoColor=white)
 ![TDLib](https://img.shields.io/badge/Telegram-TDLib-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Android TV](https://img.shields.io/badge/Android%20TV-ready-000000?style=flat-square&logo=androidtv&logoColor=white)
+![4K](https://img.shields.io/badge/4K-supported-E50914?style=flat-square)
 
 [📥 Download](https://github.com/Deepakraj1207/yourstream/releases/latest) ·
 [✨ Features](#-features) ·
@@ -83,6 +84,7 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 
 ### ▶️ Playback that just works
 - ⚡ **Streams while downloading**: seek anywhere without waiting for the whole file.
+- 🎬 **4K support**: 4K / 2160p files are recognised from their names and marked with a **4K** badge, you can sort and filter streams by quality (4K / 1080p / 720p / SD) and search for *"… in 4K"*. 4K movies split into pieces to fit Telegram's upload limit (`.mkv.001`, `.002`, …) play as one movie. 4K, HEVC and HDR play when your phone or TV's hardware can decode them.
 - 🎚️ **Sort and filter streams** by quality, size or source before you press play.
 - 🗣️ **Audio and subtitle languages by preference**, remembered per movie and series; FFmpeg audio for formats your phone lacks.
 - 🔒 **Background playback** with lock-screen and headset controls, picture-in-picture, next episode.
