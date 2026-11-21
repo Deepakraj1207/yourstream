@@ -1053,3 +1053,19 @@ From the user's two screen recordings:
   * the gate halves and recovers;
   * small chats are not split.
 * Status: NEEDS REAL-DEVICE TESTING (real Telegram timings and flood limits).
+
+## v0.12.4 release (21 Nov 2026)
+
+Published as the latest release on the user's instruction. It contains:
+- haptic feedback;
+- device report 10: the title page loading and the add-on chips;
+- device report 11: the player edge strip and buffering ring, and fast indexing of huge
+  channels.
+
+Checked on the published files (run 28):
+- `releases/latest` is v0.12.4 and is not a pre-release.
+- The arm64 APK's SHA-256 (`9317b4ed…e9e6`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 28 and versionName 0.12.4.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING.
