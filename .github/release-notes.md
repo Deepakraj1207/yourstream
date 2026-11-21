@@ -1,3 +1,17 @@
+## What's new in 0.12.4
+
+- **Much faster indexing of very big channels** (100,000+ files): the history is read in 4 parts
+  at once, each resuming exactly where it stopped. Requests slow down by themselves when
+  Telegram says "too fast". Titles from the post above are filled in after the scan.
+- **Haptic feedback:** a light vibration when you switch tabs, toggle settings, play, seek, swipe
+  in the player and more. Turn it off in Settings → Appearance → Accessibility.
+- **Title page:** no more flicker while TMDB loads. The poster shows at once, and the backdrop
+  fades in over it.
+- **Streams page:** the add-on buttons are no longer cut off. Sort & filter and refresh have their
+  own row.
+- **Player:** no bright strip beside the camera in landscape, and the controls stay centred.
+  Buffering shows as a ring around the Play button, not a spinner behind it.
+
 ## What's new in 0.12.3
 
 - **The hero carousel no longer reloads** when you come back to Home from another tab, and it
