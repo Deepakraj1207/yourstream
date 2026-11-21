@@ -18,4 +18,8 @@ interface ScanCursorDao {
 
     @Query("DELETE FROM scan_cursor WHERE chat_id = :chatId")
     suspend fun deleteForChat(chatId: Long)
+
+    /** Segment rows of a split backfill ("VIDEO@%"). */
+    @Query("DELETE FROM scan_cursor WHERE chat_id = :chatId AND filter LIKE :pattern")
+    suspend fun deleteLike(chatId: Long, pattern: String)
 }

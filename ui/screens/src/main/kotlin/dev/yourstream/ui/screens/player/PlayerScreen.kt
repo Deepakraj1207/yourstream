@@ -1,5 +1,6 @@
 package dev.yourstream.ui.screens.player
 
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
@@ -383,7 +384,6 @@ fun PlayerScreen(
         }
 
         val showSpinner = state.loading && state.error == null
-        if (showSpinner && !(controls && !tv)) Buffering(Modifier.align(Alignment.Center))
 
         AnimatedVisibility(
             controls && state.error == null,
@@ -393,6 +393,9 @@ fun PlayerScreen(
             Controls(state, tv, layout == WindowLayout.COMPACT, playFocus, onAction, onBack, onPlay, { panel = it }, ::poke, ::seek, onRotate, onFit, fitLabel,
                 onLock = if (tv) null else ({ locked = true; panel = null }))
         }
+        // Buffering: one ring in the middle of the screen, drawn above the controls. With the
+        // controls up it circles the Play button (reported: a spinner showed behind Play).
+        if (showSpinner) Buffering(Modifier.align(Alignment.Center), aroundPlay = controls && !tv)
         PlayerHintBubble(hint, onDone = { if (speedBeforeHold == null) hint = null }, Modifier.align(Alignment.Center))
 
         state.recovery?.let { r ->
@@ -456,13 +459,20 @@ private fun SeekFlashBubble(f: SeekFlash, modifier: Modifier) {
     }
 }
 
+/**
+ * The buffering ring. [aroundPlay]: the controls are up, so it is drawn just outside the 80 dp
+ * Play button (same centre); otherwise alone, on a dark disc so it reads on bright video.
+ */
 @Composable
-private fun Buffering(modifier: Modifier) {
+private fun Buffering(modifier: Modifier, aroundPlay: Boolean = false) {
     val label = stringResource(R.string.player_buffering)
-    CircularProgressIndicator(
-        modifier.size(56.dp).testTag("player-loading").semantics { contentDescription = label },
-        color = MaterialTheme.colorScheme.primary, strokeWidth = 4.dp,
-    )
+    Box(modifier.size(96.dp).testTag("player-loading").semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
+        if (!aroundPlay) Box(Modifier.size(72.dp).background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.CircleShape))
+        CircularProgressIndicator(
+            Modifier.size(if (aroundPlay) 96.dp else 56.dp),
+            color = if (aroundPlay) Color.White else MaterialTheme.colorScheme.primary, strokeWidth = if (aroundPlay) 3.dp else 4.dp,
+        )
+    }
 }
 
 private val TopScrim = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent))
@@ -492,17 +502,19 @@ private fun Controls(
     // further out, so their icons line up with that edge too.
     val gutter = if (tv) 48.dp else if (compact) 20.dp else 28.dp
     val iconInset = 12.dp
-    Box(
-        Modifier.fillMaxSize()
-            // Landscape phones: keep clear of the camera cutout and the gesture area.
-            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.displayCutout
-                .union(androidx.compose.foundation.layout.WindowInsets.navigationBars)
-                .only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)),
-    ) {
+    // Landscape phones: the controls keep clear of the camera cutout and the gesture area, with
+    // the same margin on both sides so they stay centred on the screen. The shading behind them
+    // still reaches the edges (reported: a bright strip beside the cutout).
+    val insets = androidx.compose.foundation.layout.WindowInsets.displayCutout
+        .union(androidx.compose.foundation.layout.WindowInsets.navigationBars).asPaddingValues()
+    val direction = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val side = maxOf(insets.calculateLeftPadding(direction), insets.calculateRightPadding(direction))
+    val edge = gutter + side
+    Box(Modifier.fillMaxSize().testTag("player-controls")) {
         // Top: back, title, quality, lock, rotate; the resume note under the title.
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(TopScrim).padding(top = if (tv) 27.dp else 8.dp, bottom = 16.dp)) {
             Row(
-                Modifier.fillMaxWidth().padding(start = if (tv) gutter else gutter - iconInset, end = if (tv) gutter else gutter - iconInset).heightIn(min = 56.dp).testTag("player-top"),
+                Modifier.fillMaxWidth().padding(start = if (tv) edge else edge - iconInset, end = if (tv) edge else edge - iconInset).heightIn(min = 56.dp).testTag("player-top"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (!tv) {
@@ -534,7 +546,7 @@ private fun Controls(
                 }
             }
             state.resumedFromMs?.let { r ->
-                ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.padding(start = gutter, top = 8.dp))
+                ResumeChip(r, { onAction(PlayerAction.StartOver) }, { onAction(PlayerAction.DismissResume) }, Modifier.padding(start = edge, top = 8.dp))
             }
         }
 
@@ -544,7 +556,7 @@ private fun Controls(
                 horizontalArrangement = Arrangement.spacedBy(if (compact) 40.dp else 64.dp)) {
                 SeekButton(AppIcons.FastRewind, stringResource(R.string.player_rewind), "−$seekSeconds", "rewind") { seek(-seekStepMs) }
                 Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
-                    if (state.loading) Buffering(Modifier) else PlayPause(state, 80.dp, playFocus, onAction)
+                    PlayPause(state, 80.dp, playFocus, onAction)
                 }
                 SeekButton(AppIcons.FastForward, stringResource(R.string.player_forward), "+$seekSeconds", "forward") { seek(seekStepMs) }
             }
@@ -556,7 +568,7 @@ private fun Controls(
         ) {
             val duration = state.durationMs ?: 0
             val seekLabel = stringResource(R.string.player_seek_bar)
-            Row(Modifier.fillMaxWidth().padding(horizontal = gutter).testTag("player-times"), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = edge).testTag("player-times"), verticalAlignment = Alignment.CenterVertically) {
                 TimePill(timeLabel(state.positionMs), "position")
                 Spacer(Modifier.weight(1f))
                 if (duration > 0) TimePill(
@@ -570,13 +582,13 @@ private fun Controls(
                     onScrubEnd = { onAction(PlayerAction.ScrubEnd(it)) },
                     timeLabel = ::timeLabel,
                     onInteraction = poke,
-                    modifier = Modifier.padding(horizontal = gutter).focusHighlight(MaterialTheme.shapes.small).testTag("seek")
+                    modifier = Modifier.padding(horizontal = edge).focusHighlight(MaterialTheme.shapes.small).testTag("seek")
                         .semantics { contentDescription = seekLabel },
                 )
             }
             // Labelled actions (Nuvio's pills), centred. Phones wrap them onto a second centred
             // line when they do not fit (portrait); TV keeps one row the remote moves along.
-            ActionsRow(tv, gutter) {
+            ActionsRow(tv, edge) {
                     state.previous?.let { p -> IconPill(AppIcons.SkipPrevious, stringResource(R.string.player_previous_episode), "previous-episode") { onPlay(p.play) } }
                     if (tv) {
                         BarIcon(AppIcons.FastRewind, stringResource(R.string.player_rewind), "rewind") { seek(-seekStepMs) }

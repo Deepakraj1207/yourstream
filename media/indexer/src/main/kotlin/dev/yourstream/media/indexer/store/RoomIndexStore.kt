@@ -38,6 +38,14 @@ class RoomIndexStore @Inject constructor(
 
     override suspend fun saveCursor(cursor: ScanCursor) = cursors.upsert(cursor.toEntity())
 
+    override suspend fun segments(chatId: Long, filter: MediaSearchFilter): List<ScanCursor> =
+        cursors.forChat(chatId).mapNotNull { e ->
+            val lower = e.filter.takeIf { it.startsWith(filter.name + SEGMENT) }?.substringAfter(SEGMENT)?.toLongOrNull() ?: return@mapNotNull null
+            ScanCursor(chatId, filter, e.newestMessageId, e.backfillFromMessageId, e.backfillComplete, e.estimatedTotal, segmentLowerBound = lower)
+        }.sortedByDescending { it.segmentLowerBound }
+
+    override suspend fun deleteSegments(chatId: Long, filter: MediaSearchFilter) = cursors.deleteLike(chatId, filter.name + SEGMENT + "%")
+
     override suspend fun resetCursors(chatId: Long) = cursors.deleteForChat(chatId)
 
     override suspend fun savePage(items: List<NormalizedMedia>, cursor: ScanCursor?): WriteResult =
@@ -201,7 +209,9 @@ class RoomIndexStore @Inject constructor(
 
     private fun ScanCursor.toEntity() = ScanCursorEntity(
         chatId = chatId,
-        filter = filter.name,
+        // A segment is its own row ("VIDEO@51200"): the status query's MIN(backfill_complete)
+        // stays 0 until every segment is done, with no schema change.
+        filter = segmentLowerBound?.let { filter.name + SEGMENT + it } ?: filter.name,
         newestMessageId = newestMessageId,
         backfillFromMessageId = backfillFromMessageId,
         backfillComplete = backfillComplete,
@@ -213,5 +223,6 @@ class RoomIndexStore @Inject constructor(
         /** Stays far below SQLite's bound-parameter limit. */
         const val SQL_CHUNK = 500
         const val RUN_HISTORY = 20
+        const val SEGMENT = "@"
     }
 }

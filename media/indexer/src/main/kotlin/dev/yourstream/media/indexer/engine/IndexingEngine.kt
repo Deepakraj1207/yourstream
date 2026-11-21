@@ -60,6 +60,9 @@ class IndexingEngine @Inject constructor(
 ) {
     private val concurrency = Semaphore(config.maxConcurrentChats)
 
+    /** Telegram requests in flight, all chats together; backs off on FLOOD_WAIT. */
+    private val gate = RequestGate(config.maxRequestsInFlight)
+
     /** Ends the run early but successfully: cursors are saved, the caller re-queues. */
     private class BudgetExhausted : Exception()
 
@@ -211,32 +214,106 @@ class IndexingEngine @Inject constructor(
             store.saveCursor(cursor)
         }
 
-        // BACKFILL: continue towards the oldest message. The next page is fetched while the
-        // current one is parsed and written (network and database overlap).
-        if (!cursor.backfillComplete) {
-            run.phase = IndexPhase.BACKFILL
-            var from = cursor.backfillFromMessageId
-            var pending = async { fetchPage(run, filter, from) }
-            while (true) {
-                run.checkBudget()
-                val page = pending.await()
-                if (page.nextFromMessageId != 0L && page.messages.isNotEmpty()) {
-                    val next = page.nextFromMessageId
-                    pending = async { delay(config.pageDelay); fetchPage(run, filter, next) }
-                }
-                val pageNewest = page.messages.maxOfOrNull { it.messageId } ?: 0
-                val done = page.nextFromMessageId == 0L || page.messages.isEmpty()
-                cursor = cursor.copy(
-                    // First page of a first scan sets the high-water mark for future head passes.
-                    newestMessageId = if (cursor.newestMessageId == 0L) pageNewest else cursor.newestMessageId,
-                    backfillFromMessageId = if (done) 0 else page.nextFromMessageId,
-                    backfillComplete = done,
-                    estimatedTotal = page.totalCount,
-                )
-                write(run, filter, page, normalize(run, page.messages, page.messages, context), cursor)
-                if (done) break
-                from = page.nextFromMessageId
+        // BACKFILL: continue towards the oldest message.
+        if (cursor.backfillComplete) return@coroutineScope
+        run.phase = IndexPhase.BACKFILL
+        var segments = store.segments(run.chatId, filter)
+        if (segments.isEmpty() && cursor.backfillFromMessageId == 0L) {
+            // The first page of a first scan: it sets the high-water mark for future head passes
+            // and tells how big the chat is.
+            run.checkBudget()
+            val page = fetchPage(run, filter, 0)
+            val done = page.nextFromMessageId == 0L || page.messages.isEmpty()
+            cursor = cursor.copy(
+                newestMessageId = if (cursor.newestMessageId == 0L) page.messages.maxOfOrNull { it.messageId } ?: 0 else cursor.newestMessageId,
+                backfillFromMessageId = if (done) 0 else page.nextFromMessageId,
+                backfillComplete = done,
+                estimatedTotal = page.totalCount,
+            )
+            write(run, filter, page, normalize(run, page.messages, page.messages, context), cursor)
+            if (done) return@coroutineScope
+        }
+        if (segments.isEmpty()) {
+            segments = split(cursor)
+            segments.forEach { store.saveCursor(it) }
+        }
+        if (segments.isNotEmpty()) {
+            // Big chat: its message-id ranges are read side by side, each with its own saved
+            // position (a stop or the time budget resumes every range where it was).
+            segments.filter { !it.backfillComplete }.map { seg -> async { scanSegment(run, filter, seg) } }.awaitAll()
+            cursor = cursor.copy(backfillFromMessageId = 0, backfillComplete = true)
+            store.saveCursor(cursor)
+            store.deleteSegments(run.chatId, filter)
+            return@coroutineScope
+        }
+        // Small chat: one walk. The next page is fetched while the current one is parsed and
+        // written (network and database overlap).
+        var from = cursor.backfillFromMessageId
+        var pending = async { fetchPage(run, filter, from) }
+        while (true) {
+            run.checkBudget()
+            val page = pending.await()
+            if (page.nextFromMessageId != 0L && page.messages.isNotEmpty()) {
+                val next = page.nextFromMessageId
+                pending = async { delay(config.pageDelay); fetchPage(run, filter, next) }
             }
+            val done = page.nextFromMessageId == 0L || page.messages.isEmpty()
+            cursor = cursor.copy(
+                backfillFromMessageId = if (done) 0 else page.nextFromMessageId,
+                backfillComplete = done,
+                estimatedTotal = page.totalCount,
+            )
+            write(run, filter, page, normalize(run, page.messages, page.messages, context), cursor)
+            if (done) break
+            from = page.nextFromMessageId
+        }
+    }
+
+    /**
+     * The rest of a backfill as [EngineConfig.segmentsPerFilter] ranges of message ids, highest
+     * first, when Telegram estimates at least [EngineConfig.segmentThreshold] files left; empty
+     * otherwise. A chat's message ids count its messages, so equal id ranges hold about equal
+     * numbers of messages. Each range is walked down to (not including) its lower bound.
+     */
+    internal fun split(cursor: ScanCursor): List<ScanCursor> {
+        val from = cursor.backfillFromMessageId
+        val k = config.segmentsPerFilter
+        if (from <= k || k < 2 || cursor.estimatedTotal < 0) return emptyList()
+        // What is left, if files are spread evenly over the ids seen so far.
+        val left = if (cursor.newestMessageId > 0) cursor.estimatedTotal * (from.toDouble() / cursor.newestMessageId) else cursor.estimatedTotal.toDouble()
+        if (left < config.segmentThreshold) return emptyList()
+        // TDLib's message ids are Telegram's message numbers × 2^20, and it refuses a starting id
+        // off that grid: boundaries are cut in message numbers and turned back into ids.
+        val unit = if (from >= TDLIB_ID_UNIT && from % TDLIB_ID_UNIT == 0L) TDLIB_ID_UNIT else 1L
+        val n = from / unit
+        return (0 until k).map { i ->
+            val top = (n - n * i / k) * unit
+            val lower = if (i == k - 1) 0 else (n - n * (i + 1) / k) * unit
+            // From one message above the top: whether Telegram counts the starting id in or out,
+            // the range's top message is read (an overlap is only an idempotent upsert).
+            ScanCursor(cursor.chatId, cursor.filter, newestMessageId = top, backfillFromMessageId = top + unit, segmentLowerBound = lower)
+        }
+    }
+
+    /** Walks one range down to its lower bound, saving its position with every page. */
+    private suspend fun scanSegment(run: Run, filter: MediaSearchFilter, start: ScanCursor): Unit = coroutineScope {
+        val lower = start.segmentLowerBound ?: 0
+        var segment = start
+        var pending = async { fetchPage(run, filter, segment.backfillFromMessageId) }
+        while (true) {
+            run.checkBudget()
+            val page = pending.await()
+            val inRange = page.messages.filter { it.messageId > lower }
+            val done = page.messages.isEmpty() || page.nextFromMessageId == 0L || page.nextFromMessageId <= lower || inRange.size < page.messages.size
+            if (!done) {
+                val next = page.nextFromMessageId
+                pending = async { delay(config.pageDelay); fetchPage(run, filter, next) }
+            }
+            segment = segment.copy(backfillFromMessageId = if (done) 0 else page.nextFromMessageId, backfillComplete = done)
+            // Titles from the post above are looked up after the scan (TITLES), not here: the
+            // ranges would otherwise each wait on extra history requests.
+            write(run, filter, page.copy(messages = inRange), normalize(run, inRange, inRange, null), segment)
+            if (done) break
         }
     }
 
@@ -269,14 +346,14 @@ class IndexingEngine @Inject constructor(
         run: Run,
         page: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>,
         which: List<dev.yourstream.telegram.api.model.TelegramMediaMessage>,
-        context: ContextFinder,
+        context: ContextFinder?,
     ): List<dev.yourstream.media.parser.NormalizedMedia> {
         if (which.isEmpty()) return emptyList()
         val albums = page.filter { it.albumId != 0L && it.caption.isNotBlank() }.associate { it.albumId to it.caption }
         val stored = store.contextCaptions(run.chatId, which.map { it.messageId })
         return which.mapNotNull { m ->
             val first = normalizer.normalize(m, run.chatTitle, albums[m.albumId], stored[m.messageId]) ?: return@mapNotNull null
-            if (!config.contextLookups || !first.needsContext) return@mapNotNull first
+            if (!config.contextLookups || context == null || !first.needsContext) return@mapNotNull first
             when (val post = context.find(run.chatId, m.messageId, m.date)) {
                 null -> first // the chat could not be read now: looked up again on a later run
                 "" -> first.copy(contextCaption = "")
@@ -314,7 +391,7 @@ class IndexingEngine @Inject constructor(
     }
 
     private suspend fun fetchPage(run: Run, filter: MediaSearchFilter, from: Long): MediaMessagePage =
-        withRetry("searchMedia") { messages.searchMedia(run.chatId, filter, from, config.pageSize) }
+        withRetry("searchMedia") { gate.withPermit { messages.searchMedia(run.chatId, filter, from, config.pageSize) } }
 
     // ---------------- deletion check ----------------
 
@@ -331,7 +408,7 @@ class IndexingEngine @Inject constructor(
                 store.setVerifyCursor(run.chatId, 0, finished = true)
                 return
             }
-            val lookups = withRetry("lookupMessages") { messages.lookupMessages(run.chatId, ids) }
+            val lookups = withRetry("lookupMessages") { gate.withPermit { messages.lookupMessages(run.chatId, ids) } }
             val gone = lookups.filter { it is MessageLookup.Missing || it is MessageLookup.NoMedia }.map { it.messageId }
             val alive = lookups.filterIsInstance<MessageLookup.Found>()
             // Re-upsert the living: catches replaced files and refreshes session file ids.
@@ -365,9 +442,10 @@ class IndexingEngine @Inject constructor(
         var floodWaited = 0L
         while (true) {
             when (val result = block()) {
-                is AppResult.Ok -> return result.value
+                is AppResult.Ok -> { gate.onSuccess(); return result.value }
                 is AppResult.Err -> when (val error = result.error) {
                     is AppError.RateLimited -> {
+                        gate.onFlood()
                         val wait = maxOf(1, error.retryAfterSeconds).seconds
                         if (wait > config.maxInlineFloodWait || floodWaited > config.maxInlineFloodWait.inWholeSeconds * 3) {
                             throw RetryLater(error)
@@ -392,5 +470,7 @@ class IndexingEngine @Inject constructor(
 
     private companion object {
         const val TAG = "Indexer"
+        /** TDLib message id = server message number shl 20. */
+        const val TDLIB_ID_UNIT = 1L shl 20
     }
 }

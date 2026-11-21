@@ -287,4 +287,20 @@ class PlayerScreenTest {
         compose.onNodeWithTag("play-next").performClick()
         assertTrue(played.single() == episode(7))
     }
+
+    /** Reported from a device: a spinner showed behind the Play button while buffering. */
+    @Test
+    fun bufferingRingsPlayInsteadOfHidingBehindIt() {
+        state = base.copy(status = dev.yourstream.playback.media3.PlaybackStatus.BUFFERING)
+        show(WindowLayout.COMPACT)
+        // Both there: Play keeps its place (and still works), the ring is drawn around it.
+        compose.onNodeWithTag("play-pause").assertExists().performClick()
+        compose.onNodeWithTag("player-loading").assertExists()
+        assertEquals(PlayerAction.TogglePlay, actions.last())
+        val play = compose.onNodeWithTag("play-pause").fetchSemanticsNode().boundsInRoot
+        val ring = compose.onNodeWithTag("player-loading").fetchSemanticsNode().boundsInRoot
+        assertEquals(play.center.x, ring.center.x, 1f)
+        assertEquals(play.center.y, ring.center.y, 1f)
+        kotlin.test.assertTrue(ring.width > play.width, "the ring is outside the button")
+    }
 }

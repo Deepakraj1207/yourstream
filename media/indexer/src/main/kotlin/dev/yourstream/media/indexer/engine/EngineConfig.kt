@@ -34,4 +34,15 @@ data class EngineConfig(
     val contextLookups: Boolean = true,
     /** Files indexed earlier whose post above is looked up, per run. */
     val titleBackfillPerRun: Int = 5_000,
+    /**
+     * A backfill with at least this many files left (Telegram's estimate) is split into
+     * [segmentsPerFilter] ranges of message ids that are read side by side.
+     */
+    val segmentThreshold: Int = 1_500,
+    val segmentsPerFilter: Int = 4,
+    /**
+     * Telegram requests in flight for the whole indexer (all chats, filters and segments). Halved
+     * on every FLOOD_WAIT, grown back slowly after successes (see RequestGate).
+     */
+    val maxRequestsInFlight: Int = 6,
 )

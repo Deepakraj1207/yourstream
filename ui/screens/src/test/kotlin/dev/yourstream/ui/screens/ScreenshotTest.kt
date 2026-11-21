@@ -364,6 +364,10 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
     fun phonePlayer() = playerShot("phone-player", WindowLayout.COMPACT, playerState)
 
+    @Test @Config(qualifiers = "w891dp-h411dp-xxhdpi")
+    fun phonePlayerBuffering() = playerShot("phone-player-buffering", WindowLayout.COMPACT,
+        playerState.copy(resumedFromMs = null, status = dev.yourstream.playback.media3.PlaybackStatus.BUFFERING))
+
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun phonePlayerPortrait() = playerShot("phone-player-portrait", WindowLayout.COMPACT, playerState)
 

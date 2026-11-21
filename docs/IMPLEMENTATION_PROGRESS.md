@@ -1028,3 +1028,28 @@ From the user's two screen recordings:
   (loading cleared; never set without a key), `TmdbProviderTest` (id remembered, w780). Gate:
   694 tests, 0 failures; lint 0 errors, 15 warnings (unchanged). Status: NEEDS REAL-DEVICE
   TESTING.
+
+## Device report 11 (21 Nov 2026): player edge strip and spinner; fast indexing of huge channels
+
+* **Player, from the user's screenshot** (landscape, camera cutout on the left):
+  * The whole control layer, its shading included, was pushed in by the cutout inset, so a
+    bright unshaded strip stayed beside the cutout. Now the shading reaches the screen edges,
+    and only the controls keep clear of the cutout, by the larger inset on both sides so they
+    stay centred on the screen.
+  * A loading spinner showed behind Play. The centre swapped between the spinner and Play, and
+    a second spinner drawn under the controls showed while they faded. Now Play always stays,
+    and buffering is one ring drawn around it, on top (alone, on a dark disc, when the controls
+    are hidden).
+  * Tests: `PlayerScreenTest.bufferingRingsPlayInsteadOfHidingBehindIt`, screenshot
+    `phone-player-buffering`. The cutout itself cannot be produced in Robolectric.
+* **Fast indexing for very large channels.** See INDEXING.md "Very large channels": split backfill
+  into 4 parallel id ranges, each resumable, with TDLib's id grid respected; one adaptive request
+  gate (6 at once, halved on FLOOD_WAIT); titles from the post above deferred to the TITLES step
+  for split scans. `LargeChannelIndexingTest`:
+  * a split scan indexes every file once, across many budget stops;
+  * 12,000 files at 300 ms per request: 39.5 s one page after another, 10.2 s split, with one
+    extra request;
+  * FLOOD_WAIT backs off and the scan finishes;
+  * the gate halves and recovers;
+  * small chats are not split.
+* Status: NEEDS REAL-DEVICE TESTING (real Telegram timings and flood limits).

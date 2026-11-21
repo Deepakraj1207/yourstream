@@ -122,6 +122,40 @@ the parser takes title, year and season from it, and the episode from the file.
   to 5,000 per run and chat (`IndexPhase.TITLES`).
 - A failed request stops lookups for the rest of the run (no hammering); they are retried later.
 
+## Very large channels (100,000+ files)
+
+Telegram's search returns at most 100 messages per request, so reading a 100,000-file channel
+one page after another costs about 1,000 round trips in a row: around 5 minutes at 300 ms each,
+for every filter.
+
+- **Split backfill.** After the first page, a backfill with at least 1,500 files left (Telegram's
+  estimate, scaled by how far down the ids the scan already is) is cut into 4 ranges of message
+  ids (`IndexingEngine.split`). A chat's message ids count its messages, so equal id ranges hold
+  about equal numbers of files. The ranges are read side by side, each walking down to its lower
+  bound.
+- **Resumable per range.** Each range's position is its own `scan_cursor` row (`VIDEO@<lower>`, no
+  schema change). It is saved in the same transaction as that page's files, so a stop, a crash
+  or the 8-minute budget resumes every range exactly where it was. When all ranges are done they
+  are dropped and the filter's backfill is complete. The status query's
+  `MIN(backfill_complete)` reads "not complete" while any range is open.
+- **TDLib ids.** TDLib's message ids are Telegram's message numbers × 2^20, and it refuses a
+  starting id off that grid. Boundaries are cut in message numbers and turned back into ids.
+  Each range starts one message above its top, so its top message is read whichever way Telegram
+  counts the starting id (an overlap is only an idempotent upsert).
+- **One request gate** (`RequestGate`) for the whole indexer: at most 6 Telegram requests in
+  flight across all chats, filters and ranges. Each FLOOD_WAIT halves the limit (down to 1), and
+  it grows back by one after 20 successes in a row.
+- **Titles after the scan.** Files in split scans that need the post above them are not looked up
+  while scanning (that would add history requests to every range). They are looked up in the
+  run's TITLES step, newest first, up to 5,000 per run.
+
+Measured with a fake 12,000-file channel at 300 ms per request (`LargeChannelIndexingTest`;
+virtual time, no database): one page after another took 39.5 s for 120 requests. The split scan
+took 10.2 s for 121 requests, 3.9× faster. For 100,000 files that is about 5½ minutes against
+1½ minutes of Telegram round trips, per filter. Database writes overlap with the network, so
+they add little on top. Real-device timings depend on Telegram's answers and still need
+measuring.
+
 ## Incremental indexing, by example
 
 A chat with 50,000 messages, 3,000 of them media, gets 20 new files overnight:

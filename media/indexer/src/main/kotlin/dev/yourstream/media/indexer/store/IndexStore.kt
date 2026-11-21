@@ -27,6 +27,11 @@ data class ScanCursor(
     val backfillFromMessageId: Long = 0,
     val backfillComplete: Boolean = false,
     val estimatedTotal: Int = -1,
+    /**
+     * Set for one segment of a split backfill (see IndexingEngine): the segment walks from its
+     * own position down to (not including) this message id. Null for the filter's main cursor.
+     */
+    val segmentLowerBound: Long? = null,
 )
 
 data class WriteResult(val added: Int = 0, val updated: Int = 0, val unchanged: Int = 0) {
@@ -53,6 +58,12 @@ interface IndexStore {
     /** Records the post above [file] ("" = none) and re-parses the file with it. */
     suspend fun applyContext(file: UntitledFile, context: String) {}
     suspend fun cursor(chatId: Long, filter: MediaSearchFilter): ScanCursor
+
+    /** The segments of [filter]'s split backfill, highest first (empty: not split). */
+    suspend fun segments(chatId: Long, filter: MediaSearchFilter): List<ScanCursor> = emptyList()
+
+    /** Drops [filter]'s segments (its backfill is complete). */
+    suspend fun deleteSegments(chatId: Long, filter: MediaSearchFilter) {}
     suspend fun saveCursor(cursor: ScanCursor)
     suspend fun resetCursors(chatId: Long)
 
