@@ -124,6 +124,15 @@ jobs:
       - name: Desktop tests
         run: ./gradlew --continue :desktop:test
 
+      # Which tests ran, per class (a skipped VLC or TDLib test would show here).
+      - name: Desktop test counts
+        if: always()
+        run: |
+          for f in desktop/build/test-results/test/*.xml; do
+            grep -oE '<testsuite name="[^"]+" tests="[0-9]+" skipped="[0-9]+" failures="[0-9]+" errors="[0-9]+"' "$f" | sed -E 's/<testsuite name="dev.yourstream.desktop.//'
+          done
+          echo "VLC bundled: $(cat desktop/appResources/windows/vlc/VERSION.txt 2>/dev/null || echo none)"
+
       - name: Windows installer
         run: |
           ./gradlew :desktop:packageMsi
