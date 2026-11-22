@@ -1130,3 +1130,29 @@ library and playback; details in `docs/WINDOWS.md`.
 * Status: NEEDS REAL-DEVICE TESTING on a Windows PC: real sign-in, indexing real chats, the video
   window (VLC in the app window, fullscreen, focus), large real files, and install, upgrade and
   uninstall.
+
+## v0.13.0 release (22 Nov 2026)
+
+Published as the latest release on the user's instruction ("Release it with the Windows
+installer and also add universal apk to releases"). Release run 30, from `main` at the merge of
+pull request #8.
+- The APKs as before, with the universal APK now named `YourStream-v0.13.0-universal.apk` (the
+  updater's choice is unchanged, see VersionTest).
+- New: `YourStream-v0.13.0-windows-x64.msi` (294 MB, VLC 3.0.24 inside) and
+  `SHA256SUMS-windows.txt`. The Windows job ran the desktop tests on Windows and checked that the
+  Telegram credentials are built in.
+- A first attempt (run 29) was cancelled before publishing: the desktop tests hung on the Linux
+  runner. vlcj's discovery walked whole system library folders when VLC was missing; outside
+  Windows the app now asks the system loader instead. Each desktop test also has a time limit now.
+
+Checked on the published files:
+- `releases/latest` is v0.13.0 and is not a pre-release. It has 9 assets: the universal APK, 4
+  per-CPU APKs, the MSI and 2 checksum files.
+- The arm64 APK's SHA-256 (`d82002dc…2519`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 30 and versionName 0.13.0.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+- The MSI's SHA-256 in `SHA256SUMS-windows.txt` (`b4cb1eb7…4a88`) equals GitHub's digest of the
+  uploaded file.
+
+Status: NEEDS REAL-DEVICE TESTING (Android as before). For Windows: install, sign in, play,
+upgrade and uninstall on a real PC (docs/WINDOWS.md).
