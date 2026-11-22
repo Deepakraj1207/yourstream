@@ -29,11 +29,22 @@ object Vlc {
         // The bundled copy is offered to vlcj first by BundledVlcDirectory (registered in
         // META-INF/services); vlcj then also points VLC at its plugins folder.
         return try {
-            NativeDiscovery().discover().also { logger.i("Vlc", if (it) "VLC found" else "VLC not found") }
+            // Windows: vlcj looks in VLC's install folders and the copy shipped with the app.
+            // Elsewhere its discovery walks whole system library folders, which can take minutes
+            // when VLC is not installed; asking the system loader for libvlc is instant.
+            val found = if (isWindows) NativeDiscovery().discover() else systemHasLibVlc()
+            found.also { logger.i("Vlc", if (it) "VLC found" else "VLC not found") }
         } catch (t: Throwable) {
             logger.w("Vlc", "looking for VLC failed", t)
             false
         }
+    }
+
+    private fun systemHasLibVlc(): Boolean = try {
+        com.sun.jna.NativeLibrary.getInstance(uk.co.caprica.vlcj.binding.support.runtime.RuntimeUtil.getLibVlcLibraryName())
+        true
+    } catch (_: UnsatisfiedLinkError) {
+        false
     }
 
     /** VLC shipped with the app (Compose's packaging puts app resources in this folder). */
