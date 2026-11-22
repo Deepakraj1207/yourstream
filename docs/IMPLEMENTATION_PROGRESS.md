@@ -1234,5 +1234,10 @@ Tests (30 desktop tests, all passing here with VLC 3):
 * StreamServerTest: a newer request ends the older one, and abort ends the rest.
 * TrackLabelsTest: names and language codes.
 
+* On Windows (CI run 149, bundled VLC 3.0.24): all player tests passed. VideoPlayerControllerTest
+  4/4 (frames through the callback surface, track names, preferred language, non-blocking close)
+  and PlayerScreenTest 1/1. The runner has no GPU video decoding, so VLC fell back to software
+  decoding there. The MSI is 144 MB.
+
 Status: NEEDS REAL-DEVICE TESTING on a Windows PC (smoothness of 1080p/4K playback with the
 callback surface, real Telegram files).
