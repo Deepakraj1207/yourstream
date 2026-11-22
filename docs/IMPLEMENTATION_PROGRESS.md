@@ -1172,3 +1172,21 @@ Checked in CI run 144 (Windows):
 - The Linux job is green too.
 
 Status: COMPLETED (in CI). It reaches users with the next release.
+
+## v0.13.1 release (22 Nov 2026)
+
+Published as the latest release on the user's instruction ("yes" to releasing the smaller
+installer). Release run 32, at commit `848a1f9`: `main` with pull request #9 merged into
+`develop`. A first dispatch (run 31) was cancelled before publishing: `main` did not yet contain
+the size changes.
+- Windows: `YourStream-v0.13.1-windows-x64.msi` is 144,139,380 bytes (v0.13.0: 294,338,038).
+  Its SHA-256 in `SHA256SUMS-windows.txt` (`ccc397a2…7f69`) equals GitHub's digest of the file.
+- Android: no app changes, rebuilt as 0.13.1.
+
+Checked on the published files:
+- `releases/latest` is v0.13.1, not a pre-release and not a draft, with 8 assets.
+- The arm64 APK's SHA-256 (`3c6d83ae…0be5`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 32 and versionName 0.13.1.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING (install and play on a Windows PC).
