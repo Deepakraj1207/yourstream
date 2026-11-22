@@ -19,6 +19,7 @@ import kotlin.test.assertTrue
 
 class DesktopIndexStoreTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(60)
     private val normalizer = MediaNormalizer()
 
     private fun media(chat: Long, id: Long, name: String) =

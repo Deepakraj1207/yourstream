@@ -26,6 +26,7 @@ import kotlin.test.assertTrue
  */
 class TdlibNativeTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(60)
 
     @Test
     fun tdlibStartsAndAsksForAPhoneNumber() = runBlocking {

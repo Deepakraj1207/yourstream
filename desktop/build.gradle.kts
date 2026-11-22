@@ -6,6 +6,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
+import java.time.Duration
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -114,6 +116,10 @@ dependencies {
 // build machine). Tests use it too, so CI's Windows job plays videos with that same copy.
 val appResources = layout.projectDirectory.dir("appResources")
 tasks.named<Test>("test") {
+    // A hung native call (TDLib, VLC) must fail the build, not stall it: each test also has its
+    // own time limit, and the log names every test as it runs.
+    timeout.set(Duration.ofMinutes(8))
+    testLogging { events("started", "passed", "skipped", "failed"); exceptionFormat = TestExceptionFormat.FULL }
     val osDir = appResources.dir(if (System.getProperty("os.name").startsWith("Windows")) "windows" else "linux").asFile
     if (osDir.isDirectory) systemProperty("compose.application.resources.dir", osDir.absolutePath)
 }

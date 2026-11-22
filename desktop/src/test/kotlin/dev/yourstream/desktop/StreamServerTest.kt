@@ -28,6 +28,7 @@ import kotlin.test.assertNull
  */
 class StreamServerTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(60)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var sim: SimulatedTelegramFiles
     private lateinit var server: StreamServer

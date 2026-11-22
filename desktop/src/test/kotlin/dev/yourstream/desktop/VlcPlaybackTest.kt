@@ -33,6 +33,7 @@ import kotlin.test.assertTrue
  */
 class VlcPlaybackTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(90)
 
     /** The committed clip: 30 s of 240p H.264/AAC in MKV (a test pattern made with ffmpeg; 0.5 MB). */
     @Test

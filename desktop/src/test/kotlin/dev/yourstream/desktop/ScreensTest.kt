@@ -45,6 +45,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class ScreensTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(60)
 
     private val posters by lazy {
         PosterService(MetadataMatcher(MetadataProviderManager(emptyList(), InMemoryMetadataCache(), Clock.System, NoOpLogger)), HttpClients.create(), tmp.newFolder("posters"), NoOpLogger)
