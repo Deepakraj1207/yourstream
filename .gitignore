@@ -5,6 +5,8 @@ build/
 captures/
 *.apk
 *.aab
+# VLC for the Windows installer, downloaded by desktop/scripts/fetch-vlc-windows.sh
+desktop/appResources/
 
 # IDE
 .idea/

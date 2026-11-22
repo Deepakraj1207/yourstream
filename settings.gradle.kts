@@ -64,3 +64,5 @@ include(":e2e")
 include(":ui:core")
 include(":ui:screens")
 include(":sync")
+// Windows desktop app (JVM): reuses the plain-Kotlin modules above. See docs/WINDOWS.md.
+include(":desktop")

@@ -1,5 +1,6 @@
 # Builds and tests every push and pull request: unit tests (JVM and Robolectric), Android lint
-# and a debug APK. Releases (release.yml) run the same tests before publishing.
+# and a debug APK; and, on a Windows machine, the desktop app's tests and its installer.
+# Releases (release.yml) run the same tests before publishing.
 #
 # No secrets are needed: the debug build works without the Telegram API credentials (sign-in
 # then reports that the app is not configured), and tests use made-up values.
@@ -96,4 +97,57 @@ jobs:
             **/build/reports/tests/
             **/build/test-results/
             app/build/reports/lint-results-debug.html
+          retention-days: 14
+
+  # The Windows app (desktop module) on a real Windows machine: its tests (TDLib's Windows
+  # libraries, the stream server, VLC playing through it with the VLC copy the installer ships)
+  # and the installer itself, kept as a download for 14 days.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: VLC for the installer
+        run: desktop/scripts/fetch-vlc-windows.sh
+
+      - name: Desktop tests
+        run: ./gradlew --continue :desktop:test
+
+      - name: Windows installer
+        run: |
+          ./gradlew :desktop:packageMsi
+          ls -la desktop/build/compose/binaries/main/msi/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: desktop/build/compose/binaries/main/msi/*.msi
+          retention-days: 14
+
+      - name: Failure summary
+        if: failure()
+        run: |
+          for f in $(find desktop/build/test-results -name '*.xml' 2>/dev/null); do
+            grep -oE '<testcase name="[^"]+"|<(failure|error) message="[^"]{0,400}' "$f" | grep -B1 -E 'failure|error' || true
+          done
+
+      - name: Reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-reports
+          path: |
+            desktop/build/reports/tests/
+            desktop/build/test-results/
           retention-days: 14

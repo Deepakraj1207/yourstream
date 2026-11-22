@@ -1081,3 +1081,41 @@ was removed again afterwards.
   recorded when it was released.
 * Installed apps keep updating: the updater reads only `releases/latest`.
 * Status: COMPLETED
+
+## Windows app, stage 1 (22 Nov 2026)
+
+User request: "Make windows version of this app". Stage 1, as proposed earlier: the Telegram
+library and playback; details in `docs/WINDOWS.md`.
+
+* New `:desktop` module (Compose Multiplatform 1.12.2, JVM). The Android app and its modules are
+  unchanged.
+  * It reuses the plain-Kotlin modules as they are, and compiles the TDLib client and the indexing
+    engine from their Android modules' source files.
+  * TDLib comes from tdl-coroutines' JVM build, which includes the Windows DLLs.
+* Replaced for the desktop:
+  * Room → `DesktopIndexStore`, a JSON-lines journal: crash-safe appends, cut-off lines skipped,
+    compaction.
+  * WorkManager → `IndexRunner`.
+  * Media3 → VLC through vlcj, fed by `StreamServer` (HTTP byte ranges on 127.0.0.1 with a random
+    path).
+  * Screens → sign-in (phone, code, password, QR), Library, title page (versions; seasons and
+    episodes), Chats, Settings, Player (tracks, resume, next episode, fullscreen, keys).
+* Installer: MSI, per-user, with a fixed upgrade code. It ships VLC's 64-bit libraries, which CI
+  downloads from VideoLAN and checks against VideoLAN's SHA-256. The app icon is rendered from
+  the Android launcher icon.
+* CI: a new `windows` job on windows-latest runs the desktop tests (with the bundled VLC) and
+  builds the MSI as a downloadable artifact.
+* Tests (18 in `:desktop:test`, all passing here on Linux with VLC 3 installed; none skipped):
+  * TDLib native start up to the phone-number step;
+  * the index store (restart, cut-off line, removal, compaction);
+  * the shared engine indexing a fake chat into titles;
+  * the stream server over real HTTP against the simulated TDLib download;
+  * real VLC playing an MKV through the server, and seeking with a new byte range;
+  * screens rendered with sample data, with clicks.
+* Checked by running it here (Linux, Xvfb): the app starts, real TDLib 1.8.69 reaches "wait for
+  phone number", and the sign-in screen renders.
+* Not in stage 1: split files (.001…) as one movie; files on the PC; downloads; add-ons and
+  Discover; sync with the phone.
+* Status: NEEDS REAL-DEVICE TESTING on a Windows PC: real sign-in, indexing real chats, the video
+  window (VLC in the app window, fullscreen, focus), large real files, and install, upgrade and
+  uninstall.
