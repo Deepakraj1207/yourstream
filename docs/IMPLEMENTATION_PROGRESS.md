@@ -1069,3 +1069,15 @@ Checked on the published files (run 28):
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING.
+
+## Old releases removed (2026-11-22)
+
+User request: keep the latest release as the first and only one. A one-off `workflow_dispatch`
+job (run 44975383534, success) deleted the 22 releases v0.2.0 to v0.12.3 and their tags. The job
+was removed again afterwards.
+
+* Checked after the run: the only tag on GitHub is `v0.12.4`. `releases/latest` is v0.12.4, not a
+  pre-release, with all six assets. The arm64 APK's digest is still `9317b4ed…e9e6`, the value
+  recorded when it was released.
+* Installed apps keep updating: the updater reads only `releases/latest`.
+* Status: COMPLETED
