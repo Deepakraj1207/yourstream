@@ -1156,3 +1156,19 @@ Checked on the published files:
 
 Status: NEEDS REAL-DEVICE TESTING (Android as before). For Windows: install, sign in, play,
 upgrade and uninstall on a real PC (docs/WINDOWS.md).
+
+## Smaller Windows installer (22 Nov 2026)
+
+User request: "Reduce the installer size". Done three ways:
+- TDLib keeps only the build machine's platform (111 MB jar → about 20 MB on Windows x64).
+- Only the icons the app uses are kept (36 MB → 0.05 MB).
+- VLC plugins a player inside the app does not use are left out (143 MB → 98 MB).
+
+Checked in CI run 144 (Windows):
+- The MSI is 144,135,284 bytes, down from 294,338,039: 51 % smaller.
+- Desktop tests pass on the slimmed jars and the trimmed VLC: SlimJarsTest 3/3, TdlibNativeTest
+  1/1, and VlcPlaybackTest's playback test passed with the trimmed copy (the seek test is skipped
+  on Windows: no ffmpeg). The rest pass as before.
+- The Linux job is green too.
+
+Status: COMPLETED (in CI). It reaches users with the next release.
