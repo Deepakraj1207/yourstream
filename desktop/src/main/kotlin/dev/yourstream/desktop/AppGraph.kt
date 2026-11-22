@@ -101,7 +101,12 @@ class AppGraph(val build: BuildInfo = BuildInfo.load(), val dataDir: File = AppP
         }
     }, logger)
 
+    /** VLC, started once in the background (see VlcEngine). */
+    val vlc = dev.yourstream.desktop.playback.VlcEngine(logger)
+
     override fun close() {
+        runCatching { settings.flush() }
+        vlc.close()
         streamServer.close()
         index.close()
         scope.cancel()

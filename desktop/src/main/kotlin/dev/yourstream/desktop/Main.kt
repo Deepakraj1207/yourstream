@@ -97,7 +97,11 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
         SignInScreen(graph.auth)
         return
     }
-    LaunchedEffect(Unit) { graph.indexer.start() }
+    LaunchedEffect(Unit) {
+        graph.indexer.start()
+        // VLC loads its plugins once, now, so pressing Play later starts at once.
+        graph.vlc.start()
+    }
 
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var open by remember { mutableStateOf<LibraryTitle?>(null) }
@@ -112,7 +116,7 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
     val mediaCount = remember(records) { records.filter { it.video }.groupingBy { it.chatId }.eachCount() }
 
     playing?.let { request ->
-        PlayerScreen(request, graph.logger, fullscreen, onFullscreen) { onFullscreen(false); playing = null }
+        PlayerScreen(request, graph.vlc, graph.logger, fullscreen, onFullscreen) { onFullscreen(false); playing = null }
         return
     }
 
@@ -152,5 +156,15 @@ private fun playRequest(graph: AppGraph, title: LibraryTitle, queue: List<dev.yo
         val keep = if (len > 0 && t > len * 0.95) 0L else t
         graph.settings.update { s -> s.copy(positions = (s.positions - r.remoteFileId).let { if (keep > 0) it + (r.remoteFileId to keep) else it }) }
     },
-    release = { r -> graph.scope.launch { graph.streamer.release(r.fileId) } },
+    release = { r ->
+        // End the server's reads first (VLC may be waiting in one), then the Telegram download.
+        graph.streamServer.abort(r.fileId)
+        graph.scope.launch { graph.streamer.release(r.fileId) }
+    },
+    audioLanguages = { listOfNotNull(graph.settings.settings.value.audioLanguage) },
+    subtitleLanguages = { listOfNotNull(graph.settings.settings.value.subtitleLanguage) },
+    onAudioPicked = { lang -> if (lang != null) graph.settings.update { it.copy(audioLanguage = lang) } },
+    onSubtitlePicked = { lang -> graph.settings.update { it.copy(subtitleLanguage = lang) } },
+    initialVolume = graph.settings.settings.value.volume,
+    onVolume = { v -> graph.settings.update { it.copy(volume = v.coerceIn(0, 150)) } },
 )

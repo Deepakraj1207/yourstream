@@ -12,7 +12,7 @@ it yet.
 | Sign in | Telegram's own login: phone number and code, two-step password, or a QR code scanned with Telegram on a phone. The session is stored by TDLib in the data folder. |
 | Chats | Pick the channels, groups or chats that hold your videos; they are indexed in the background while the app is open, and checked for new posts every 15 minutes. |
 | Library | Movies with their versions (4K first), series with seasons and episodes, search, a Movies/Series filter. Posters from Cinemeta, or TMDB with your key (Settings). |
-| Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded. Resume, next episode, audio and subtitle tracks, fullscreen (F / double-click), keyboard controls (Space, ←/→ 10 s, N next, Esc). |
+| Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded. VLC draws into the app's own window, so the controls sit over the picture and hide while playing. Resume (with *Start over*), next episode, audio and subtitle tracks named by language and format (the language you pick is remembered), speed, Fit/Fill/Stretch, volume (wheel), fullscreen. Keys: Space/K play-pause, ←/→ 10 s (Shift 60 s), ↑/↓ volume, M mute, F or double-click fullscreen, N next, Esc back. |
 
 Not yet: movies split into pieces (`.mkv.001`, `.002`, …) only show their first piece and are not
 playable as one movie; files on the PC; downloads for offline viewing; add-ons and Discover;
@@ -55,6 +55,13 @@ Signing out (Settings → Account) ends the session with Telegram.
   the indexing engine with its store contract (`media/indexer`: `engine/`, `store/IndexStore.kt`).
 * **TDLib** comes from `tdl-coroutines`' JVM build, which carries TDLib for Windows (x64 and
   arm64), macOS and Linux.
+* **Player.** One libvlc instance for the app, started in the background after sign-in (it
+  loads the plugins once). Each playback is a `VideoPlayerController`: every VLC call runs on its
+  own thread, never the UI thread, and closing returns at once. Frames go through a callback
+  surface into three Skia bitmaps (one copy per frame, straight from VLC's buffer, no allocation),
+  drawn by Compose and cropped to the picture (VLC's buffers include block padding). The stream
+  server lets the newest request for a file win (a seek ends the old read) and aborts a file's
+  reads when its playback ends.
 * **Replaced for the desktop:** Room → `DesktopIndexStore` (an append-only JSON-lines journal:
   every write is one flushed append, media before their cursor, a cut-off last line is skipped,
   and the journal is rewritten when it grows far beyond the live records); WorkManager →

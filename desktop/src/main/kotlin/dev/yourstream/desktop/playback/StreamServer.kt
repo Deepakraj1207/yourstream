@@ -3,6 +3,7 @@ package dev.yourstream.desktop.playback
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import dev.yourstream.core.common.Logger
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.net.InetAddress
@@ -39,7 +40,14 @@ class StreamServer(private val source: ByteSource, private val logger: Logger) :
         start()
     }
 
+    private val active = java.util.concurrent.ConcurrentHashMap<Int, Job>()
+
     val port: Int get() = server.address.port
+
+    /** Ends every read of [fileId] now (playback of it ended), so nothing waits for its data. */
+    fun abort(fileId: Int) {
+        active.remove(fileId)?.cancel()
+    }
 
     /** The address the player opens for a file. [name] only helps the player guess the format. */
     fun urlFor(fileId: Int, name: String = "video"): String {
@@ -76,6 +84,12 @@ class StreamServer(private val source: ByteSource, private val logger: Logger) :
             exchange.sendResponseHeaders(if (partial) 206 else 200, if (length >= 0) length else 0)
             val out = exchange.responseBody
             runBlocking {
+                // The newest request for a file wins: a player reads one range at a time, and a
+                // seek opens a new connection. The old one could otherwise sit waiting for data
+                // at the old position and keep the Telegram download there.
+                val job = coroutineContext[Job]!!
+                active.put(fileId, job)?.cancel()
+                try {
                 source.open(fileId, start).use { reader ->
                     val buffer = ByteArray(256 * 1024)
                     var remaining = if (length >= 0) length else Long.MAX_VALUE
@@ -86,8 +100,13 @@ class StreamServer(private val source: ByteSource, private val logger: Logger) :
                         remaining -= n
                     }
                 }
+                } finally {
+                    active.remove(fileId, job)
+                }
             }
             out.flush()
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            // Replaced by a newer request for the same file, or playback ended.
         } catch (_: IOException) {
             // The player closed the connection (it seeks by opening a new one): normal.
         } catch (e: Exception) {

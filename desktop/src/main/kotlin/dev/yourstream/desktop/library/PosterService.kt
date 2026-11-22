@@ -98,9 +98,24 @@ class PosterService(
                 }
             }
         } ?: return null
-        val bitmap = try { Image.makeFromEncoded(bytes).toComposeImageBitmap() } catch (_: Exception) { file.delete(); null } ?: return null
+        // Decoded and shrunk to the size it is shown at, off the UI thread: full-size posters
+        // decoded on the UI thread made scrolling the library stutter.
+        val bitmap = withContext(Dispatchers.Default) {
+            try { Image.makeFromEncoded(bytes).let { downscale(it, if (it.width > it.height) 1280 else 360) } } catch (_: Exception) { file.delete(); null }
+        } ?: return null
         synchronized(memory) { memory[url] = bitmap }
         return bitmap
+    }
+
+    /** The image at most [maxWidth] pixels wide (aspect kept), as a Compose bitmap. */
+    private fun downscale(image: Image, maxWidth: Int): ImageBitmap {
+        if (image.width <= maxWidth) return image.toComposeImageBitmap()
+        val w = maxWidth
+        val h = (image.height.toLong() * maxWidth / image.width).toInt().coerceAtLeast(1)
+        val surface = org.jetbrains.skia.Surface.makeRasterN32Premul(w, h)
+        surface.canvas.drawImageRect(image, org.jetbrains.skia.Rect.makeWH(image.width.toFloat(), image.height.toFloat()),
+            org.jetbrains.skia.Rect.makeWH(w.toFloat(), h.toFloat()), org.jetbrains.skia.SamplingMode.LINEAR, null, true)
+        return surface.makeImageSnapshot().toComposeImageBitmap()
     }
 
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }

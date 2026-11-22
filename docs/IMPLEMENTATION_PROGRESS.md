@@ -1190,3 +1190,49 @@ Checked on the published files:
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING (install and play on a Windows PC).
+
+## Windows player rebuilt (device report, 22 Nov 2026)
+
+User report on the Windows app: "App is stuck on sometimes", "Audio track not detecting
+properly", "Improve player design or ui", "The stream rendering or loading is very slow".
+
+Causes found in the code, and fixes:
+* **Stuck:** VLC was stopped and released on the UI thread. Stopping waits for VLC's network read,
+  and that read could be waiting for Telegram data, so the window froze. The VLC search and
+  poster decoding also ran on the UI thread, and settings were written there.
+  Fix: all VLC calls run on the player's own thread, and closing never waits. A file's server
+  reads are aborted first. Posters are decoded and shrunk in the background; settings are written
+  in the background.
+* **Slow start:** each Play created a new libvlc instance (it loads all plugins, 1–2 s), and VLC
+  buffered 4 s. Fix: one instance, started in the background after sign-in; a 1.5 s network cache.
+* **Slow after seeks:** the old connection's read kept waiting at the old position and held the
+  Telegram download there. Fix: the newest request for a file wins.
+* **Audio tracks:** the menu showed VLC's raw names, read once when it opened, with no remembered
+  language. Fix: names are built from the track's language, its own title, codec and channels
+  ("Tamil · DD 5.1 · AC3 5.1"). They refresh when VLC adds or selects a track, and the picked
+  language is saved and preferred next time (VLC's audio-language). The same goes for subtitles,
+  which are off unless picked.
+* **Design:** VLC drew into a native window that nothing could overlap, so the controls sat in a
+  bar under the picture. Fix: VLC renders through a callback surface into Skia bitmaps drawn by
+  Compose (one copy per frame). The controls overlay the picture, auto-hide while playing, hide
+  the cursor, and add speed, Fit/Fill/Stretch, a wheel volume, keys and a "Resumed from … / Start
+  over" note.
+* Found by the new tests: VLC's buffers are block-aligned (a 180-line video arrives in 194
+  lines), so the padding would have shown as a stripe. The picture is cropped to VLC's video
+  dimension.
+
+Tests (30 desktop tests, all passing here with VLC 3):
+* VideoPlayerControllerTest (real VLC, a test MKV with Tamil AC3 5.1 + English AAC + English
+  subtitles, through the stream server and the simulated Telegram download):
+  * frames reach the app's buffers at 320×180 with a real picture;
+  * tracks are named exactly as above, the file's default plays, subtitles start off, and
+    switching works;
+  * a preferred language is picked at start;
+  * close returns in under 100 ms while VLC waits for a stalled download.
+* PlayerScreenTest renders the real player screen with VLC playing: the overlay, the audio menu
+  by language, and a pick remembered (screenshots in desktop/build/screenshots).
+* StreamServerTest: a newer request ends the older one, and abort ends the rest.
+* TrackLabelsTest: names and language codes.
+
+Status: NEEDS REAL-DEVICE TESTING on a Windows PC (smoothness of 1080p/4K playback with the
+callback surface, real Telegram files).

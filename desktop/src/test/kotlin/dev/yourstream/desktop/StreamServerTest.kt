@@ -20,6 +20,7 @@ import kotlin.random.Random
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The local server VLC reads from, over real HTTP on 127.0.0.1, in front of the real
@@ -117,6 +118,31 @@ class StreamServerTest {
         assertEquals(416, get(server.urlFor(42), "bytes=${bytes.size + 10}-").first)
         // A path without this run's random token is refused.
         assertEquals(404, get("http://127.0.0.1:${server.port}/not-the-token/42/x.mkv").first)
+    }
+
+    /** A seek opens a new connection: the old one stops waiting at once, and abort ends the rest. */
+    @Test
+    fun aNewerRequestReplacesTheOlderOneForTheSameFile() {
+        start()
+        sim.online = false // no data arrives: every read waits
+        val url = server.urlFor(42, "movie.mkv")
+        fun openAsync(range: String) = java.util.concurrent.CompletableFuture.supplyAsync {
+            val c = URI(url).toURL().openConnection() as HttpURLConnection
+            c.setRequestProperty("Range", range)
+            c.readTimeout = 20_000
+            val t0 = System.nanoTime()
+            runCatching { c.inputStream.use { it.readBytes() } }
+            (System.nanoTime() - t0) / 1_000_000
+        }
+        val first = openAsync("bytes=0-")
+        Thread.sleep(800)
+        val second = openAsync("bytes=1000000-")
+        val firstMs = first.get(10, java.util.concurrent.TimeUnit.SECONDS)
+        assertTrue(firstMs < 5_000, "the older request ended when the newer came: $firstMs ms")
+        Thread.sleep(300)
+        server.abort(42)
+        val secondMs = second.get(10, java.util.concurrent.TimeUnit.SECONDS)
+        assertTrue(secondMs < 5_000, "abort ended the remaining read: $secondMs ms")
     }
 
     @Test
