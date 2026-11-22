@@ -25,6 +25,7 @@ import kotlin.time.Duration.Companion.minutes
 
 class LibraryTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(60)
 
     private fun video(chat: Long, id: Long, name: String, height: Int? = 1080) =
         mediaMessage(chat, id, name, TelegramMediaContentType.VIDEO, mime = "video/x-matroska", height = height)
