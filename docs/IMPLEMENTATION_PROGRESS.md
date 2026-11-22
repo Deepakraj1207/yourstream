@@ -1114,6 +1114,17 @@ library and playback; details in `docs/WINDOWS.md`.
   * screens rendered with sample data, with clicks.
 * Checked by running it here (Linux, Xvfb): the app starts, real TDLib 1.8.69 reaches "wait for
   phone number", and the sign-in screen renders.
+* Checked on Windows (CI run 132, windows-latest):
+  * the VLC download (vlc-3.0.24-win64.zip) matched VideoLAN's SHA-256, and 143 MB went into the
+    installer;
+  * the desktop tests ran with these counts: DesktopIndexStoreTest 4/4, LibraryTest 2/2,
+    ScreensTest 5/5, StreamServerTest 4/4, TdlibNativeTest 1/1 (TDLib's Windows DLLs), and
+    VlcPlaybackTest 1 passed with the bundled VLC (the seek test was skipped: no ffmpeg on the
+    runner; it passes on Linux);
+  * `packageMsi` built `YourStream-0.12.4.msi` (294 MB), kept as a CI artifact.
+* Size: most of the installer is VLC (143 MB) and the TDLib jar, which also carries TDLib for
+  Linux and macOS (unused on Windows). Dropping those from the Windows package is a possible
+  follow-up.
 * Not in stage 1: split files (.001…) as one movie; files on the PC; downloads; add-ons and
   Discover; sync with the phone.
 * Status: NEEDS REAL-DEVICE TESTING on a Windows PC: real sign-in, indexing real chats, the video
