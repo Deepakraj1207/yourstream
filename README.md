@@ -17,6 +17,7 @@ Posters, episodes, resume and smart playback, streamed straight from Telegram. N
 ![Media3](https://img.shields.io/badge/Media3-ExoPlayer-FF6F00?style=flat-square&logo=youtube&logoColor=white)
 ![TDLib](https://img.shields.io/badge/Telegram-TDLib-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Android TV](https://img.shields.io/badge/Android%20TV-ready-000000?style=flat-square&logo=androidtv&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white)
 ![4K](https://img.shields.io/badge/4K-supported-E50914?style=flat-square)
 
 [📥 Download](https://github.com/Deepakraj1207/yourstream/releases/latest) ·
@@ -138,9 +139,16 @@ Full details: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
    |---|---|
    | `YourStream-…-arm64-v8a.apk` | 📱 Almost every phone and tablet from recent years |
    | `YourStream-…-armeabi-v7a.apk` | 📺 Older phones, many TV sticks and boxes |
-   | `YourStream-….apk` | 🤷 Any device (bigger). Not sure? Take this one |
+   | `YourStream-…-universal.apk` | 🤷 Any device (bigger). Not sure? Take this one |
 
 3. Open it and allow **"Install unknown apps"** when asked. On a TV: `adb install YourStream-*.apk`.
+
+### 🪟 Windows
+
+Download **`YourStream-…-windows-x64.msi`** from the same release and run it (per-user install,
+no administrator rights). It is the first desktop version: sign in, choose chats, browse and play
+your library; VLC comes inside the installer. Details and what is not there yet:
+[`docs/WINDOWS.md`](docs/WINDOWS.md).
 
 🔄 **Updates come by themselves**: the app downloads only the APK for your device and checks it against the release's checksums before installing.
 

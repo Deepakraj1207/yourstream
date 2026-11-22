@@ -1,3 +1,16 @@
+## What's new in 0.13.0
+
+- **YourStream for Windows (first version).** Download `YourStream-…-windows-x64.msi` below and
+  run it (no administrator rights needed; if Windows SmartScreen warns, choose *More info → Run
+  anyway*: the installer is not code-signed). Sign in with Telegram (phone number or QR code),
+  choose your chats, and play your library on the PC: movies with their versions (4K first),
+  series with seasons and episodes, posters, search, resume, next episode, audio and subtitle
+  tracks, fullscreen and keyboard controls. Videos stream while downloading, played by VLC, which
+  comes inside the installer. Not in the Windows app yet: add-ons and Discover, movies split into
+  pieces, files on the PC, downloads and sync with the phone.
+- The APK for any device is now named **`…-universal.apk`**, so it is easy to find among the
+  others. The app's updater still picks the right one by itself.
+
 ## What's new in 0.12.4
 
 - **Much faster indexing of very big channels** (100,000+ files): the history is read in 4 parts
@@ -148,7 +161,7 @@
 1. Download the APK for your device below (Android 8.0 or newer):
    - **YourStream-…-arm64-v8a.apk**: almost every phone and tablet from the last years.
    - **YourStream-…-armeabi-v7a.apk**: older phones and many TV sticks and boxes (32-bit).
-   - **YourStream-….apk** (no suffix): works on any device, larger download. Not sure? Take this one.
+   - **YourStream-…-universal.apk**: works on any device, larger download. Not sure? Take this one.
 2. Open it and allow "Install unknown apps" for your browser or file manager when asked.
    On a TV: `adb install YourStream-*.apk`, or a file manager app.
 

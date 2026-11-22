@@ -27,5 +27,9 @@ class VersionTest {
         assertEquals("no matching split: the universal APK", 0, GitHubAppUpdates.pickApk(assets, listOf("riscv64")))
         assertEquals("releases before splits", 0, GitHubAppUpdates.pickApk(listOf("YourStream-v0.7.0.apk", "SHA256SUMS.txt"), listOf("arm64-v8a")))
         assertNull(GitHubAppUpdates.pickApk(listOf("SHA256SUMS.txt"), listOf("arm64-v8a")))
+        // Since 0.13.0 the universal APK is named "-universal" and a Windows installer sits beside it.
+        val named = listOf("YourStream-v0.13.0-universal.apk", "SHA256SUMS.txt", "YourStream-v0.13.0-arm64-v8a.apk", "YourStream-v0.13.0-windows-x64.msi", "SHA256SUMS-windows.txt")
+        assertEquals("a split for this device", 2, GitHubAppUpdates.pickApk(named, listOf("arm64-v8a")))
+        assertEquals("the universal APK, never the installer", 0, GitHubAppUpdates.pickApk(named, listOf("riscv64")))
     }
 }

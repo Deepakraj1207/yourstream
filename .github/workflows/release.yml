@@ -128,7 +128,7 @@ jobs:
           # The universal APK (any device; what earlier versions' updater downloads) and one per
           # CPU type (what the in-app updater picks: a much smaller download).
           mkdir -p dist dist-abi
-          cp app/build/outputs/apk/release/app-universal-release.apk "dist/YourStream-${TAG}.apk"
+          cp app/build/outputs/apk/release/app-universal-release.apk "dist/YourStream-${TAG}-universal.apk"
           for abi in arm64-v8a armeabi-v7a x86_64 x86; do
             cp "app/build/outputs/apk/release/app-${abi}-release.apk" "dist-abi/YourStream-${TAG}-${abi}.apk"
           done
@@ -160,7 +160,8 @@ jobs:
           # The in-app updater reads /releases/latest, which never returns a pre-release.
           PRERELEASE: ${{ inputs.prerelease == true && '--prerelease' || '' }}
         run: |
-          # The universal APK goes up first: updaters before 0.8 take the first .apk they see.
+          # The universal APK ("-universal", any device) goes up first: updaters before 0.8 take the
+          # first .apk they see; later ones take it when no per-CPU APK fits the device.
           gh release create "$TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "YourStream $TAG" \
