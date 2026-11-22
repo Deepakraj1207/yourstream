@@ -60,6 +60,12 @@ Signing out (Settings → Account) ends the session with Telegram.
   and the journal is rewritten when it grows far beyond the live records); WorkManager →
   `IndexRunner` (coroutines); Media3 → VLC through vlcj, fed by `StreamServer`; the Android
   screens → Compose for Desktop screens in `desktop/src/main/kotlin/…/ui`.
+* **Installer size.** Two jars are slimmed at build time (`SlimJar` in `desktop/build.gradle.kts`):
+  TDLib keeps only the build machine's platform (Windows x64 for the installer; the jar carries six),
+  and the Material icons keep only the icons the source names (`SlimJarsTest` checks both). The VLC
+  copy leaves out plugins a player inside the app does not use (VLC's own window, scripting,
+  visualisers, network browsing, stream output and encoders); see
+  `desktop/scripts/fetch-vlc-windows.sh`.
 * **Credentials** come from the same place as the Android app's (`TELEGRAM_API_ID` /
   `TELEGRAM_API_HASH`, or `secrets.properties`) into a resource read at start; they are never
   printed or logged.

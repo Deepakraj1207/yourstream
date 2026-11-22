@@ -33,6 +33,19 @@ unzip -q "$WORK/$ZIP" -d "$WORK/x"
 SRC=$(ls -d "$WORK"/x/vlc-*/ | head -1)
 cp "$SRC/libvlc.dll" "$SRC/libvlccore.dll" "$OUT/"
 cp -r "$SRC/plugins" "$OUT/"
+BEFORE=$(du -sm "$OUT" | cut -f1)
+# Not needed to play videos inside YourStream (they make up a large part of the download):
+#  gui            VLC's own window (Qt, skins)
+#  lua            VLC's scripting (playlist parsers, extensions)
+#  visualization  music visualisers
+#  services_discovery  network/UPnP/podcast browsing
+#  stream_out, access_output, mux  writing or re-streaming videos
+#  video encoders (x264, x265), MP2/MP3 encoders (twolame, shine)
+# Kept: every demuxer and decoder, HTTP and file input, audio/video output, subtitles, filters.
+for d in gui lua visualization services_discovery stream_out access_output mux; do rm -rf "$OUT/plugins/$d"; done
+rm -f "$OUT"/plugins/codec/libx264_plugin.dll "$OUT"/plugins/codec/libx26410b_plugin.dll "$OUT"/plugins/codec/libx265_plugin.dll \
+      "$OUT"/plugins/codec/libtwolame_plugin.dll "$OUT"/plugins/codec/libshine_plugin.dll
+echo "VLC plugins trimmed: ${BEFORE} MB -> $(du -sm "$OUT" | cut -f1) MB"
 # VLC's licence and authors travel with it.
 for f in COPYING.txt AUTHORS.txt README.txt; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$OUT/VLC-$f"; done
 echo "${ZIP%-win64.zip}" > "$OUT/VERSION.txt"
