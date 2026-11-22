@@ -22,7 +22,8 @@ echo "VLC: $ZIP"
 curl -fsSL -o "$WORK/$ZIP" "$BASE$ZIP"
 curl -fsSL -o "$WORK/$ZIP.sha256" "$BASE$ZIP.sha256"
 EXPECTED=$(grep -oE '[0-9a-f]{64}' "$WORK/$ZIP.sha256" | head -1)
-ACTUAL=$(sha256sum "$WORK/$ZIP" | cut -d' ' -f1)
+# From stdin and only the hex digits: Git Bash's sha256sum prefixes "\" for Windows paths.
+ACTUAL=$(sha256sum < "$WORK/$ZIP" | grep -oE '[0-9a-f]{64}' | head -1)
 if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
   echo "Checksum mismatch for $ZIP: expected '$EXPECTED', got '$ACTUAL'"; exit 1
 fi
