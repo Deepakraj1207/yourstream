@@ -1,3 +1,10 @@
+## What's new in 0.13.1
+
+- **Windows installer half the size:** 144 MB instead of 294 MB. The installer now carries only
+  what Windows needs: the Telegram library for Windows alone, just the icons the app uses, and
+  VLC without the parts a built-in player never uses. Playback is unchanged.
+- Android: no changes in this version.
+
 ## What's new in 0.13.0
 
 - **YourStream for Windows (first version).** Download `YourStream-…-windows-x64.msi` below and
