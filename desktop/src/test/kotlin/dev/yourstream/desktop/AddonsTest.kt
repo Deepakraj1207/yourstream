@@ -2,9 +2,11 @@ package dev.yourstream.desktop
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.sun.net.httpserver.HttpServer
 import dev.yourstream.catalog.api.AddonStream
@@ -142,9 +144,14 @@ class AddonsTest {
         val item = opened!!
         runDesktopComposeUiTest(1280, 900) {
             setContent { YourStreamTheme(true, manga = false) { Surface { CatalogTitleScreen(item, s, posters, emptyList(), {}, {}) { _, _, st -> played = st } } } }
-            waitUntil(timeoutMillis = 30_000) { onAllNodes(hasText("Test 1080p")).fetchSemanticsNodes().isNotEmpty() }
+            // The streams are below the details, in a lazy list: scroll to them as a user would
+            // (how far down they sit depends on the platform's fonts).
             onNodeWithText("A test film.").assertExists()
+            val list = onNode(hasScrollAction())
+            waitUntil(timeoutMillis = 30_000) { runCatching { list.performScrollToNode(hasText("Test 1080p")) }.isSuccess }
+            list.performScrollToNode(hasText("Test 4K"))
             onNodeWithText("Test 4K").assertExists() // the torrent, listed but not playable here
+            list.performScrollToNode(hasText("Test 1080p"))
             onNodeWithText("Test 1080p").performClick()
         }
         assertEquals("Test\n1080p", played?.name)

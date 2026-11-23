@@ -103,7 +103,8 @@ class VideoPlayerControllerTest {
     @Test
     fun audioTracksAreNamedByLanguageAndFormat() {
         val p = start()
-        val s = p.waitFor(what = "two audio tracks") { it.audio.size == 2 }
+        // VLC reports the tracks and then which one it picked; wait for both.
+        val s = p.waitFor(what = "two audio tracks, one playing") { it.audio.size == 2 && it.audioSelected >= 0 }
         val labels = s.audio.map { it.label }
         assertEquals(listOf("Tamil · DD 5.1 · AC3 5.1", "English · AAC Stereo"), labels)
         assertEquals(listOf("ta", "en"), s.audio.map { it.language })
