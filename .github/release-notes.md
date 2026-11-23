@@ -1,3 +1,22 @@
+## What's new in 0.13.2
+
+Windows app:
+- **No more freezes** when closing a video or switching episodes, and smoother scrolling in the
+  library (posters load in the background).
+- **Faster start and seeking:** the player is ready right after sign-in instead of loading on
+  every Play, starts after 1.5 s of video instead of 4 s, and a seek no longer competes with the
+  old position for the download.
+- **Audio tracks named properly**, e.g. "Tamil · DD 5.1 · AC3 5.1". The language you pick is
+  remembered and chosen automatically next time; the same for subtitles (off unless you turn them
+  on).
+- **New player design:** the controls sit over the video and hide while it plays. Big −10 s /
+  play / +10 s in the middle, seek bar with remaining time, Audio, Subtitles, Speed,
+  Fit/Fill/Stretch, volume with the mouse wheel, "Resumed from … · Start over". Keys: Space,
+  ←/→ (Shift for 60 s), ↑/↓, M, F, N, Esc.
+- Fixed: a stripe of stray pixels at the bottom of some videos.
+
+Android: no changes in this version.
+
 ## What's new in 0.13.1
 
 - **Windows installer half the size:** 144 MB instead of 294 MB. The installer now carries only
