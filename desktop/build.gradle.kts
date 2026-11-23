@@ -190,6 +190,8 @@ tasks.named<Test>("test") {
     // A hung native call (TDLib, VLC) must fail the build, not stall it: each test also has its
     // own time limit, and the log names every test as it runs.
     timeout.set(Duration.ofMinutes(8))
+    // Opt-in measurements (StreamingBenchmark): -Dbench=true, -Dbench.clip=..., -Dbench.mbps=...
+    systemProperties(providers.systemPropertiesPrefixedBy("bench").get())
     testLogging { events("started", "passed", "skipped", "failed"); exceptionFormat = TestExceptionFormat.FULL }
     val osDir = appResources.dir(if (System.getProperty("os.name").startsWith("Windows")) "windows" else "linux").asFile
     if (osDir.isDirectory) systemProperty("compose.application.resources.dir", osDir.absolutePath)

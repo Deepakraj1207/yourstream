@@ -131,7 +131,13 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
             when (tab) {
                 Tab.LIBRARY -> {
                     val title = open?.let { o -> titles.firstOrNull { it.key == o.key } ?: o }
+                    // The page is open: fetch the start and end of what Play would play.
+                    LaunchedEffect(title?.key) {
+                        val first = title?.let { t -> if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull() }
+                        if (first != null) graph.warmer.warm(first.fileId, first.sizeBytes) else graph.warmer.stop()
+                    }
                     if (title != null) TitleScreen(title, graph.posters, resumeMs = { positionOf(graph, it) }, onBack = { open = null }) { item, queue ->
+                        graph.warmer.stop()
                         playing = playRequest(graph, title, queue.ifEmpty { listOf(item) })
                     } else LibraryScreen(titles, graph.posters, indexing = current != null, onOpen = { open = it }, onAddChats = { tab = Tab.CHATS })
                 }

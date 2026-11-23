@@ -137,12 +137,12 @@ class VideoPlayerController(factory: MediaPlayerFactory, private val logger: Log
      * codes, best first; VLC picks the matching track as the file opens. Subtitles are off when
      * [subtitleLanguages] is empty.
      */
-    fun play(url: String, startMs: Long = 0, audioLanguages: List<String> = emptyList(), subtitleLanguages: List<String> = emptyList()) = onVlc {
+    fun play(url: String, startMs: Long = 0, audioLanguages: List<String> = emptyList(), subtitleLanguages: List<String> = emptyList(), networkCachingMs: Int = NETWORK_CACHING_MS) = onVlc {
         _state.value = PlayerState(volume = _state.value.volume, rate = 1f)
         val options = buildList {
-            // VLC waits for this much before it starts; 1.5 s starts quickly and still rides out
-            // short gaps (the stream server keeps downloading ahead).
-            add(":network-caching=1500")
+            // VLC waits for this much before it starts and after a seek; the stream server keeps
+            // downloading far ahead, so a short cache is enough.
+            add(":network-caching=$networkCachingMs")
             add(":http-reconnect")
             if (startMs > 5_000) add(":start-time=${startMs / 1000.0}")
             if (audioLanguages.isNotEmpty()) add(":audio-language=${audioLanguages.joinToString(",")}")
@@ -227,6 +227,14 @@ class VideoPlayerController(factory: MediaPlayerFactory, private val logger: Log
             }
         }
         vlc.shutdown()
+    }
+
+    companion object {
+        /**
+         * How much VLC buffers before it starts and after a seek. StreamingBenchmark: 1500 ms →
+         * 600 ms makes seeks about 1 s faster; less gains nothing (Telegram's round trip dominates).
+         */
+        const val NETWORK_CACHING_MS = 600
     }
 
     /** For tests: waits until queued VLC calls are done. */
