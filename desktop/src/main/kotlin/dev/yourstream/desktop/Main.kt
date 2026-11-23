@@ -64,7 +64,9 @@ fun main() {
     Runtime.getRuntime().addShutdownHook(Thread { graph.close() })
     application {
         val windowState = rememberWindowState(size = DpSize(1280.dp, 820.dp))
-        Window(onCloseRequest = { graph.close(); exitApplication() }, state = windowState, title = "YourStream", icon = appIcon) {
+        Window(onCloseRequest = { graph.close(); exitApplication() }, state = windowState, title = "YourStream", icon = appIcon,
+            // Player shortcuts work whatever has the focus (see PlayerKeys).
+            onPreviewKeyEvent = { e -> dev.yourstream.desktop.ui.PlayerKeys.handler?.invoke(e) ?: false }) {
             val settings by graph.settings.settings.collectAsState()
             YourStreamTheme(settings.darkTheme) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -154,6 +156,11 @@ private fun positionOf(graph: AppGraph, r: dev.yourstream.desktop.data.MediaReco
 
 private fun playRequest(graph: AppGraph, title: LibraryTitle, queue: List<dev.yourstream.desktop.data.MediaRecord>) = PlayRequest(
     title = title.title,
+    versionsOf = { r ->
+        if (title.isSeries) title.files.filter { it.season == r.season && it.episode == r.episode && it.absoluteEpisode == r.absoluteEpisode }.ifEmpty { listOf(r) }
+        else title.files
+    },
+    sourceOf = { r -> graph.index.chatRows.value.firstOrNull { it.chatId == r.chatId }?.title?.let { "Telegram · $it" } ?: "Telegram" },
     queue = queue,
     urlFor = { graph.streamServer.urlFor(it.fileId, it.fileName) },
     resumeMs = { positionOf(graph, it) },

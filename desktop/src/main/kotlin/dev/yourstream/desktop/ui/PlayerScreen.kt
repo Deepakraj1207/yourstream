@@ -3,50 +3,58 @@ package dev.yourstream.desktop.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,14 +74,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -94,6 +105,7 @@ import androidx.compose.ui.unit.sp
 import dev.yourstream.core.common.Logger
 import dev.yourstream.desktop.data.MediaRecord
 import dev.yourstream.desktop.data.resolutionLabel
+import dev.yourstream.desktop.data.sizeLabel
 import dev.yourstream.desktop.playback.PlayerState
 import dev.yourstream.desktop.playback.Track
 import dev.yourstream.desktop.playback.VideoPlayerController
@@ -119,6 +131,40 @@ class PlayRequest(
     val onSubtitlePicked: (String?) -> Unit = {},
     val initialVolume: Int = 100,
     val onVolume: (Int) -> Unit = {},
+    /** Other versions of the same movie or episode (qualities, languages), for Sources. */
+    val versionsOf: (MediaRecord) -> List<MediaRecord> = { listOf(it) },
+    /** Where the file comes from, for the line under the title ("Telegram · My Movies"). */
+    val sourceOf: (MediaRecord) -> String = { "Telegram" },
+)
+
+/**
+ * Keys reach the player through the window (Main.kt), whatever has the focus: a button clicked a
+ * moment ago would otherwise take Space and press itself again instead of pausing.
+ */
+object PlayerKeys {
+    @Volatile var handler: ((KeyEvent) -> Boolean)? = null
+}
+
+/** Every shortcut, as the help panel lists them (and docs/WINDOWS.md). */
+val PLAYER_SHORTCUTS = listOf(
+    "Space / K" to "Play / pause",
+    "← / →  or  J / L" to "Back / forward 10 s",
+    "Shift + ← / →" to "Back / forward 60 s",
+    "Home / End" to "Start / end",
+    "0 – 9" to "Jump to 0 % – 90 %",
+    "↑ / ↓  or  wheel" to "Volume",
+    "M" to "Mute",
+    "A" to "Next audio track",
+    "S" to "Next subtitles",
+    "V" to "Subtitles on / off",
+    "[  /  ]" to "Slower / faster",
+    "=" to "Normal speed",
+    "Z" to "Fit / Fill / Stretch",
+    "N" to "Next episode",
+    "I" to "Info",
+    "F  or  double-click" to "Fullscreen",
+    "Esc" to "Close panel / leave fullscreen / back",
+    "?  or  H" to "This list",
 )
 
 /**
@@ -146,115 +192,191 @@ fun PlayerScreen(request: PlayRequest, engine: VlcEngine, logger: Logger, fullsc
 }
 
 private enum class Fit(val label: String) { FIT("Fit"), FILL("Fill"), STRETCH("Stretch") }
+private enum class Panel(val title: String) { AUDIO("Audio"), SUBTITLES("Subtitles"), SPEED("Speed"), ASPECT("Aspect ratio"), SOURCES("Sources"), INFO("Info"), KEYS("Keyboard shortcuts") }
 
+private val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+private val ACCENT = Color(0xFFE50914)
+
+/** A blank cursor (hidden while playing); the normal one where there is no screen (tests). */
 private val hiddenCursor by lazy {
-    PointerIcon(java.awt.Toolkit.getDefaultToolkit().createCustomCursor(java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB), java.awt.Point(0, 0), "hidden"))
+    if (java.awt.GraphicsEnvironment.isHeadless()) PointerIcon.Default else runCatching {
+        PointerIcon(java.awt.Toolkit.getDefaultToolkit().createCustomCursor(java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB), java.awt.Point(0, 0), "hidden"))
+    }.getOrDefault(PointerIcon.Default)
 }
 
 /**
- * The playing video with its controls over it. They show on mouse movement and hide after three
- * seconds of playing (with the pointer). Keys: Space/K play-pause, ←/→ 10 s (Shift: 60 s), ↑/↓
- * volume, M mute, F or double-click fullscreen, N next episode, Esc leave fullscreen / back.
+ * The playing video with Nuvio-style controls over it: title and source at the bottom left, a
+ * thin seek bar, a row of round buttons (play, aspect, speed, subtitles, audio, sources, info),
+ * volume and time on the right, and panels that slide in from the right. Controls show on mouse
+ * movement and hide after three seconds of playing; every option has a key ([PLAYER_SHORTCUTS]).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PlayerContent(request: PlayRequest, controller: VideoPlayerController, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, onClose: () -> Unit) {
     var index by remember { mutableIntStateOf(0) }
-    val item = request.queue[index]
+    var current by remember { mutableStateOf(request.queue[0]) }
     val state by controller.state.collectAsState()
     val hasNext = index < request.queue.lastIndex
     var fit by remember { mutableStateOf(Fit.FIT) }
     var activity by remember { mutableLongStateOf(System.nanoTime()) }
     var controlsVisible by remember { mutableStateOf(true) }
-    var menuOpen by remember { mutableStateOf(false) }
-    var seekPreview by remember { mutableStateOf<Float?>(null) }
+    var panel by remember { mutableStateOf<Panel?>(null) }
     var resumedFrom by remember { mutableLongStateOf(0L) }
     var mutedFrom by remember { mutableIntStateOf(-1) }
-    val focus = remember { FocusRequester() }
-    val currentState by rememberUpdatedState(state)
+    var osd by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    val s by rememberUpdatedState(state)
+    val isFullscreen by rememberUpdatedState(fullscreen)
+    val toggleFullscreen by rememberUpdatedState(onFullscreen)
+    val close by rememberUpdatedState(onClose)
+
+    fun poke() { activity = System.nanoTime() }
+    fun note(text: String) { osd = text to System.nanoTime(); poke() }
+    fun goTo(i: Int) { if (i in request.queue.indices) { index = i; current = request.queue[i] } }
 
     // Ending playback: stop reading the file first (so VLC's read returns), then free VLC in
     // the background. Nothing here waits.
     DisposableEffect(controller) {
         onDispose {
-            val s = controller.state.value
-            if (s.lengthMs > 0) request.savePosition(request.queue[index], s.timeMs, s.lengthMs)
-            request.release(request.queue[index])
+            val st = controller.state.value
+            if (st.lengthMs > 0) request.savePosition(current, st.timeMs, st.lengthMs)
+            request.release(current)
             controller.close()
         }
     }
-    DisposableEffect(item) {
+    DisposableEffect(current) {
+        val playing = current
         onDispose {
-            if (request.queue[index] != item) {
-                val s = controller.state.value
-                if (s.lengthMs > 0) request.savePosition(item, s.timeMs, s.lengthMs)
-                request.release(item)
+            if (current != playing) {
+                val st = controller.state.value
+                if (st.lengthMs > 0) request.savePosition(playing, st.timeMs, st.lengthMs)
+                request.release(playing)
             }
         }
     }
 
-    LaunchedEffect(item) {
-        val resume = request.resumeMs(item)
+    // A new item (start, next episode, another version): play it from where it was left.
+    var switchAt by remember { mutableLongStateOf(-1L) }
+    LaunchedEffect(current) {
+        val resume = if (switchAt >= 0) switchAt else request.resumeMs(current)
+        switchAt = -1
         resumedFrom = if (resume > 5_000) resume else 0
         controller.setVolume(request.initialVolume)
-        controller.play(request.urlFor(item), resume, request.audioLanguages(), request.subtitleLanguages())
-        runCatching { focus.requestFocus() }
-        // Where playback is, saved every 5 s (a crash or power cut loses little).
+        controller.play(request.urlFor(current), resume, request.audioLanguages(), request.subtitleLanguages())
         while (true) {
             delay(5_000)
-            val s = controller.state.value
-            if (s.lengthMs > 0 && s.timeMs > 0) request.savePosition(item, s.timeMs, s.lengthMs)
+            val st = controller.state.value
+            if (st.lengthMs > 0 && st.timeMs > 0) request.savePosition(current, st.timeMs, st.lengthMs)
         }
     }
     LaunchedEffect(resumedFrom) { if (resumedFrom > 0) { delay(8_000); resumedFrom = 0 } }
+    LaunchedEffect(osd) { if (osd != null) { delay(1_400); osd = null } }
     LaunchedEffect(state.finished) {
         if (!state.finished) return@LaunchedEffect
-        request.savePosition(item, state.lengthMs, state.lengthMs)
-        if (hasNext) index++ else onClose()
+        request.savePosition(current, state.lengthMs, state.lengthMs)
+        if (hasNext) goTo(index + 1) else onClose()
     }
-    LaunchedEffect(activity, state.playing, menuOpen) {
+    LaunchedEffect(activity, state.playing, panel) {
         controlsVisible = true
-        if (state.playing && !menuOpen) {
+        if (state.playing && panel == null) {
             delay(3_000)
             controlsVisible = false
         }
     }
 
-    fun poke() { activity = System.nanoTime() }
+    fun setVolume(v: Int) {
+        val vol = v.coerceIn(0, 150)
+        mutedFrom = -1
+        controller.setVolume(vol)
+        request.onVolume(vol)
+        note("Volume $vol %")
+    }
+    fun toggleMute() {
+        if (mutedFrom >= 0) { controller.setVolume(mutedFrom); note("Volume ${mutedFrom} %"); mutedFrom = -1 }
+        else { mutedFrom = s.volume; controller.setVolume(0); note("Muted") }
+    }
+    fun pickAudio(t: Track) { controller.selectAudio(t.id); request.onAudioPicked(t.language); note("Audio: ${t.label}") }
+    fun pickSubtitle(t: Track?) {
+        controller.selectSubtitle(t?.id ?: -1)
+        request.onSubtitlePicked(t?.language)
+        note(if (t == null) "Subtitles off" else "Subtitles: ${t.label}")
+    }
+    fun setRate(r: Float) { controller.setRate(r); note(if (r == 1f) "Normal speed" else "Speed ${fmtRate(r)}") }
+    fun cycleFit() { fit = Fit.entries[(fit.ordinal + 1) % Fit.entries.size]; note(fit.label) }
+    fun seekBy(ms: Long) {
+        controller.skip(ms)
+        note((if (ms < 0) "−" else "+") + "${kotlin.math.abs(ms) / 1000} s")
+    }
 
+    // Every shortcut ([PLAYER_SHORTCUTS]); registered with the window while the player is open.
+    // One handler for the player's whole life: it reads the current values when a key comes.
+    val onKey: (KeyEvent) -> Boolean = remember { { e: KeyEvent ->
+        if (e.type != KeyEventType.KeyDown) false else {
+            poke()
+            val shift = e.isShiftPressed
+            when (e.key) {
+                Key.Spacebar, Key.K -> { controller.togglePause(); note(if (s.playing) "Pause" else "Play"); true }
+                Key.DirectionLeft, Key.J -> { seekBy(if (shift) -60_000 else -10_000); true }
+                Key.DirectionRight, Key.L -> { seekBy(if (shift) 60_000 else 10_000); true }
+                Key.MoveHome -> { controller.seekTo(0); note("Start"); true }
+                Key.MoveEnd -> { if (s.lengthMs > 0) controller.seekTo(s.lengthMs - 5_000); true }
+                Key.DirectionUp -> { setVolume(s.volume + 5); true }
+                Key.DirectionDown -> { setVolume(s.volume - 5); true }
+                Key.M -> { toggleMute(); true }
+                Key.A -> {
+                    if (s.audio.size > 1) pickAudio(s.audio[(s.audio.indexOfFirst { it.id == s.audioSelected } + 1).mod(s.audio.size)])
+                    else note(s.audio.firstOrNull()?.label?.let { "Audio: $it (only track)" } ?: "No other audio track")
+                    true
+                }
+                Key.S -> {
+                    val list = listOf<Track?>(null) + s.subtitles
+                    pickSubtitle(list[(list.indexOfFirst { (it?.id ?: -1) == s.subtitleSelected } + 1).mod(list.size)])
+                    true
+                }
+                Key.V -> { pickSubtitle(if (s.subtitleSelected >= 0) null else s.subtitles.firstOrNull()); true }
+                Key.LeftBracket -> { setRate(SPEEDS.lastOrNull { it < s.rate } ?: SPEEDS.first()); true }
+                Key.RightBracket -> { setRate(SPEEDS.firstOrNull { it > s.rate } ?: SPEEDS.last()); true }
+                Key.Equals -> { setRate(1f); true }
+                Key.Z -> { cycleFit(); true }
+                Key.N -> { if (index < request.queue.lastIndex) goTo(index + 1); true }
+                Key.I -> { panel = if (panel == Panel.INFO) null else Panel.INFO; true }
+                Key.H, Key.Slash -> { panel = if (panel == Panel.KEYS) null else Panel.KEYS; true }
+                Key.F, Key.F11 -> { toggleFullscreen(!isFullscreen); true }
+                Key.Escape -> { when { panel != null -> panel = null; isFullscreen -> toggleFullscreen(false); else -> close() }; true }
+                Key.Zero, Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine -> {
+                    if (e.isCtrlPressed || s.lengthMs <= 0) false else {
+                        val tenth = listOf(Key.Zero, Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine).indexOf(e.key)
+                        controller.seekTo(s.lengthMs * tenth / 10); note("${tenth * 10} %"); true
+                    }
+                }
+                else -> false
+            }
+        }
+    } }
+    DisposableEffect(Unit) {
+        PlayerKeys.handler = onKey
+        onDispose { if (PlayerKeys.handler === onKey) PlayerKeys.handler = null }
+    }
+
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    // The player holds the keyboard focus, also after a panel (and the item clicked in it) closes.
+    LaunchedEffect(panel) { if (panel == null) runCatching { focus.requestFocus() } }
     Box(
         Modifier.fillMaxSize().background(Color.Black)
             .focusRequester(focus).focusable()
-            .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                poke()
-                when (e.key) {
-                    Key.Spacebar, Key.K -> controller.togglePause()
-                    Key.DirectionLeft, Key.J -> controller.skip(if (e.isShiftPressed) -60_000 else -10_000)
-                    Key.DirectionRight, Key.L -> controller.skip(if (e.isShiftPressed) 60_000 else 10_000)
-                    Key.DirectionUp -> controller.setVolume(currentState.volume + 5).also { request.onVolume(currentState.volume + 5) }
-                    Key.DirectionDown -> controller.setVolume(currentState.volume - 5).also { request.onVolume(currentState.volume - 5) }
-                    Key.M -> if (mutedFrom >= 0) { controller.setVolume(mutedFrom); mutedFrom = -1 } else { mutedFrom = currentState.volume; controller.setVolume(0) }
-                    Key.F -> onFullscreen(!fullscreen)
-                    Key.N -> if (hasNext) index++
-                    Key.Escape -> if (fullscreen) onFullscreen(false) else onClose()
-                    else -> return@onPreviewKeyEvent false
-                }
-                true
-            }
+            .onPreviewKeyEvent { onKey(it) }
             .onPointerEvent(PointerEventType.Move) { poke() }
             .onPointerEvent(PointerEventType.Scroll) { e ->
                 val dy = e.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                if (dy != 0f) { controller.setVolume(currentState.volume + if (dy < 0) 5 else -5); request.onVolume(currentState.volume); poke() }
+                if (dy != 0f) setVolume(s.volume + if (dy < 0) 5 else -5)
             }
             .pointerHoverIcon(if (controlsVisible || !state.playing) PointerIcon.Default else hiddenCursor)
             .testTag("player"),
     ) {
-        // The picture: VLC's newest frame, scaled on the GPU.
+        // The picture: VLC's newest frame, scaled on the GPU, cropped to the video.
         Canvas(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { poke(); controller.togglePause(); runCatching { focus.requestFocus() } },
+                    onTap = { poke(); if (panel != null) panel = null else controller.togglePause() },
                     onDoubleTap = { onFullscreen(!fullscreen) },
                 )
             },
@@ -279,171 +401,283 @@ fun PlayerContent(request: PlayRequest, controller: VideoPlayerController, fulls
             )
         }
 
-        if (state.error) ErrorCard(hasNext, onRetry = { controller.play(request.urlFor(item), state.timeMs, request.audioLanguages(), request.subtitleLanguages()) }, onNext = { index++ }, onBack = onClose)
+        if (state.error) ErrorCard(hasNext, onRetry = { controller.play(request.urlFor(current), state.timeMs, request.audioLanguages(), request.subtitleLanguages()) }, onNext = { goTo(index + 1) }, onBack = onClose)
 
-        // Buffering shows even with the controls hidden.
-        if (state.buffering && !state.error && !controlsVisible) {
+        if (state.buffering && !state.error) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(64.dp), color = Color.White, strokeWidth = 3.dp)
         }
 
         AnimatedVisibility(controlsVisible && !state.error, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
-                TopBar(request.title, item, fullscreen, onClose, Modifier.align(Alignment.TopCenter))
-                CenterControls(state, onBack10 = { poke(); controller.skip(-10_000) }, onToggle = { poke(); controller.togglePause() }, onForward10 = { poke(); controller.skip(10_000) }, modifier = Modifier.align(Alignment.Center))
-                BottomBar(
-                    state = state, seekPreview = seekPreview, hasNext = hasNext, fullscreen = fullscreen, fit = fit,
-                    onSeek = { poke(); seekPreview = it },
-                    onSeekDone = { seekPreview?.let { f -> controller.seekTo((f * state.lengthMs).toLong()) }; seekPreview = null },
+                // Shade for legibility, top and bottom.
+                Box(Modifier.fillMaxWidth().height(120.dp).align(Alignment.TopCenter).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))))
+                Box(Modifier.fillMaxWidth().height(260.dp).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))))
+                Row(Modifier.align(Alignment.TopEnd).padding(20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TopIcon(Icons.Default.Keyboard, "Keyboard shortcuts (?)") { panel = if (panel == Panel.KEYS) null else Panel.KEYS }
+                    TopIcon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, if (fullscreen) "Exit fullscreen (F)" else "Fullscreen (F)") { onFullscreen(!fullscreen) }
+                    TopIcon(Icons.Default.Close, "Close (Esc)", onClose)
+                }
+                BottomControls(
+                    request = request, item = current, state = state, hasNext = hasNext, panel = panel,
+                    onSeek = { controller.seekTo(it) },
                     onToggle = { poke(); controller.togglePause() },
-                    onNext = { index++ },
-                    onVolume = { v -> poke(); mutedFrom = -1; controller.setVolume(v); request.onVolume(v) },
-                    onMute = { if (mutedFrom >= 0) { controller.setVolume(mutedFrom); mutedFrom = -1 } else { mutedFrom = state.volume; controller.setVolume(0) } },
-                    onAudio = { t -> controller.selectAudio(t.id); request.onAudioPicked(t.language) },
-                    onSubtitle = { t -> controller.selectSubtitle(t?.id ?: -1); request.onSubtitlePicked(t?.language) },
-                    onRate = { controller.setRate(it) },
-                    onFit = { fit = Fit.entries[(fit.ordinal + 1) % Fit.entries.size] },
-                    onFullscreen = { onFullscreen(!fullscreen) },
-                    onMenu = { open -> menuOpen = open; poke() },
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onNext = { goTo(index + 1) },
+                    onPanel = { p -> poke(); panel = if (panel == p) null else p },
+                    onVolume = { setVolume(it) }, onMute = { toggleMute() },
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
+            }
+        }
+
+        // Side panels, Nuvio style.
+        AnimatedVisibility(panel != null, enter = slideInHorizontally { it } + fadeIn(), exit = slideOutHorizontally { it } + fadeOut(), modifier = Modifier.align(Alignment.CenterEnd)) {
+            val p = panel ?: Panel.INFO
+            SidePanel(p.title, onClose = { panel = null }) {
+                when (p) {
+                    Panel.AUDIO -> {
+                        if (state.audio.isEmpty()) Hint("No audio tracks yet")
+                        state.audio.forEach { t -> Choice(t.label, t.id == state.audioSelected) { pickAudio(t) } }
+                    }
+                    Panel.SUBTITLES -> {
+                        Choice("Off", state.subtitleSelected < 0) { pickSubtitle(null) }
+                        state.subtitles.forEach { t -> Choice(t.label, t.id == state.subtitleSelected) { pickSubtitle(t) } }
+                        if (state.subtitles.isEmpty()) Hint("This file has no subtitles")
+                    }
+                    Panel.SPEED -> SPEEDS.forEach { r -> Choice(if (r == 1f) "Normal" else fmtRate(r), state.rate == r) { setRate(r) } }
+                    Panel.ASPECT -> Fit.entries.forEach { f -> Choice(f.label, fit == f) { fit = f; note(f.label) } }
+                    Panel.SOURCES -> {
+                        val versions = request.versionsOf(current)
+                        versions.forEach { v ->
+                            Choice(listOfNotNull(resolutionLabel(v.resolution), v.videoCodec?.uppercase(), v.languages.takeIf { it.isNotEmpty() }?.joinToString("/") { it.uppercase() }, sizeLabel(v.sizeBytes)).joinToString(" · "), v == current, sub = v.fileName) {
+                                if (v != current) { switchAt = state.timeMs; current = v; note("Switched to ${resolutionLabel(v.resolution) ?: "another version"}") }
+                            }
+                        }
+                    }
+                    Panel.INFO -> InfoRows(current, state, request.sourceOf(current))
+                    Panel.KEYS -> PLAYER_SHORTCUTS.forEach { (k, what) -> KeyRow(k, what) }
+                }
             }
         }
 
         if (resumedFrom > 0) Surface(
             shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = 0.7f),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 84.dp),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
         ) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Resumed from ${clock(resumedFrom)}", color = Color.White, fontSize = 14.sp)
                 TextButton(onClick = { controller.seekTo(0); resumedFrom = 0 }) { Text("Start over") }
             }
         }
+
+        osd?.let { (text, _) ->
+            Surface(shape = RoundedCornerShape(10.dp), color = Color.Black.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.TopCenter).padding(top = 72.dp).testTag("player-osd")) {
+                Text(text, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+            }
+        }
     }
 }
 
 @Composable
-private fun TopBar(title: String, item: MediaRecord, fullscreen: Boolean, onBack: () -> Unit, modifier: Modifier) {
+private fun BottomControls(
+    request: PlayRequest, item: MediaRecord, state: PlayerState, hasNext: Boolean, panel: Panel?,
+    onSeek: (Long) -> Unit, onToggle: () -> Unit, onNext: () -> Unit, onPanel: (Panel) -> Unit,
+    onVolume: (Int) -> Unit, onMute: () -> Unit, modifier: Modifier,
+) {
+    Column(modifier.fillMaxWidth().padding(start = 36.dp, end = 36.dp, bottom = 22.dp)) {
+        Text(request.title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val episode = when {
+            item.season != null && item.episode != null -> "S${item.season} E${item.episode}"
+            item.episode != null -> "Episode ${item.episode}"
+            else -> null
+        }
+        val audio = state.audio.firstOrNull { it.id == state.audioSelected }?.label?.substringBefore(" · ")
+        Text(
+            listOfNotNull(episode, request.sourceOf(item), resolutionLabel(item.resolution), audio).joinToString("  •  "),
+            color = Color.White.copy(alpha = 0.78f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+        )
+        SeekBar(state.timeMs, state.lengthMs, onSeek)
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(54.dp).clip(CircleShape).background(Color.White).clickable(onClick = onToggle).testTag("player-play"),
+                contentAlignment = Alignment.Center,
+            ) { Icon(if (state.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (state.playing) "Pause (Space)" else "Play (Space)", tint = Color.Black, modifier = Modifier.size(32.dp)) }
+            Spacer(Modifier.width(14.dp))
+            BarIcon(Icons.Default.AspectRatio, "Aspect ratio (Z)", panel == Panel.ASPECT) { onPanel(Panel.ASPECT) }
+            BarIcon(Icons.Default.Speed, "Speed ([ ])", panel == Panel.SPEED, badge = if (state.rate != 1f) fmtRate(state.rate) else null) { onPanel(Panel.SPEED) }
+            BarIcon(Icons.Default.ClosedCaption, "Subtitles (S, V)", panel == Panel.SUBTITLES, tag = "player-subtitles") { onPanel(Panel.SUBTITLES) }
+            BarIcon(Icons.Default.Audiotrack, "Audio (A)", panel == Panel.AUDIO, tag = "player-audio") { onPanel(Panel.AUDIO) }
+            BarIcon(Icons.Default.Cloud, "Sources", panel == Panel.SOURCES) { onPanel(Panel.SOURCES) }
+            BarIcon(Icons.Default.Info, "Info (I)", panel == Panel.INFO) { onPanel(Panel.INFO) }
+            if (hasNext) BarIcon(Icons.Default.SkipNext, "Next episode (N)", false, onClick = onNext)
+            Spacer(Modifier.weight(1f))
+            BarIcon(if (state.volume == 0) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, "Mute (M)", false, onClick = onMute)
+            VolumeBar(state.volume, onVolume, Modifier.width(180.dp).padding(horizontal = 8.dp))
+            Text(
+                "${clock(state.timeMs)} / ${clock(state.lengthMs)}", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 10.dp).testTag("player-time"),
+            )
+        }
+    }
+}
+
+/** Thin seek bar: thicker on hover, time under the pointer, click or drag to seek. */
+@Composable
+private fun SeekBar(timeMs: Long, lengthMs: Long, onSeek: (Long) -> Unit) {
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
+    var hoverX by remember { mutableStateOf<Float?>(null) }
+    BoxWithConstraints(Modifier.fillMaxWidth().height(24.dp).hoverable(hover).testTag("player-seek")) {
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val fraction = dragFraction ?: if (lengthMs > 0) (timeMs.toFloat() / lengthMs).coerceIn(0f, 1f) else 0f
+        Canvas(
+            Modifier.fillMaxSize()
+                .onPointerEventCompat(onMove = { hoverX = it }, onExit = { hoverX = null })
+                .pointerInput(lengthMs) {
+                    detectTapGestures { o -> if (lengthMs > 0) onSeek((lengthMs * (o.x / widthPx).coerceIn(0f, 1f)).toLong()) }
+                }
+                .pointerInput(lengthMs) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { o -> dragFraction = (o.x / widthPx).coerceIn(0f, 1f) },
+                        onDragEnd = { dragFraction?.let { if (lengthMs > 0) onSeek((lengthMs * it).toLong()) }; dragFraction = null },
+                        onDragCancel = { dragFraction = null },
+                    ) { change, _ -> dragFraction = (change.position.x / widthPx).coerceIn(0f, 1f) }
+                },
+        ) {
+            val h = if (hovered || dragFraction != null) 6.dp.toPx() else 4.dp.toPx()
+            val y = (size.height - h) / 2
+            drawRoundRect(Color.White.copy(alpha = 0.3f), Offset(0f, y), Size(size.width, h), CornerRadius(h / 2))
+            drawRoundRect(Color.White, Offset(0f, y), Size(size.width * fraction, h), CornerRadius(h / 2))
+            if (hovered || dragFraction != null) drawCircle(Color.White, 7.dp.toPx(), Offset(size.width * fraction, size.height / 2))
+        }
+        val x = hoverX
+        if (x != null && lengthMs > 0) {
+            Surface(
+                shape = RoundedCornerShape(6.dp), color = Color.Black.copy(alpha = 0.8f),
+                modifier = Modifier.offset(x = with(androidx.compose.ui.platform.LocalDensity.current) { (x.toDp() - 28.dp).coerceAtLeast(0.dp) }, y = (-30).dp),
+            ) { Text(clock((lengthMs * (x / widthPx).coerceIn(0f, 1f)).toLong()), color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)) }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.onPointerEventCompat(onMove: (Float) -> Unit, onExit: () -> Unit): Modifier =
+    this.onPointerEvent(PointerEventType.Move) { e -> e.changes.firstOrNull()?.position?.x?.let(onMove) }
+        .onPointerEvent(PointerEventType.Exit) { onExit() }
+
+/** Volume: white to red gradient up to the level, 0–150 %. */
+@Composable
+private fun VolumeBar(volume: Int, onVolume: (Int) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier.height(24.dp)) {
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        fun at(x: Float) = ((x / widthPx).coerceIn(0f, 1f) * 150).toInt()
+        Canvas(
+            Modifier.fillMaxSize()
+                .pointerInput(Unit) { detectTapGestures { onVolume(at(it.x)) } }
+                .pointerInput(Unit) { detectHorizontalDragGestures { change, _ -> onVolume(at(change.position.x)) } },
+        ) {
+            val h = 4.dp.toPx()
+            val y = (size.height - h) / 2
+            val f = (volume / 150f).coerceIn(0f, 1f)
+            drawRoundRect(Color.White.copy(alpha = 0.25f), Offset(0f, y), Size(size.width, h), CornerRadius(h / 2))
+            drawRoundRect(Brush.horizontalGradient(listOf(Color.White, Color(0xFFFFB347), ACCENT), 0f, size.width), Offset(0f, y), Size(size.width * f, h), CornerRadius(h / 2))
+            drawCircle(Color.White, 8.dp.toPx(), Offset(size.width * f, size.height / 2))
+        }
+    }
+}
+
+@Composable
+private fun BarIcon(icon: ImageVector, label: String, active: Boolean, badge: String? = null, tag: String? = null, onClick: () -> Unit) {
+    Box(
+        Modifier.padding(horizontal = 3.dp).size(46.dp).clip(CircleShape)
+            .background(if (active) Color.White.copy(alpha = 0.22f) else Color.Transparent)
+            .clickable(onClick = onClick).let { if (tag != null) it.testTag(tag) else it },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp))
+        if (badge != null) Text(badge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomEnd))
+    }
+}
+
+@Composable
+private fun TopIcon(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(46.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp)) }
+}
+
+@Composable
+private fun SidePanel(title: String, onClose: () -> Unit, content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp), color = Color(0xF0141210),
+        modifier = Modifier.fillMaxHeight().width(380.dp).testTag("player-panel"),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Close, "Close panel (Esc)", tint = Color.White)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) { item { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { content() } } }
+        }
+    }
+}
+
+@Composable
+private fun Choice(label: String, selected: Boolean, sub: String? = null, onClick: () -> Unit) {
     Row(
-        modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)))
-            .padding(horizontal = 12.dp, vertical = if (fullscreen) 18.dp else 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
-        Column(Modifier.padding(start = 4.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val sub = listOfNotNull(
-                when {
-                    item.season != null && item.episode != null -> "S${item.season} · E${item.episode}"
-                    item.episode != null -> "Episode ${item.episode}"
-                    else -> null
-                },
-                resolutionLabel(item.resolution),
-            ).joinToString("  ·  ")
-            if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+        Column(Modifier.weight(1f)) {
+            Text(label, color = Color.White, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+            if (sub != null) Text(sub, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        if (selected) Box(Modifier.size(10.dp).clip(CircleShape).background(ACCENT))
     }
 }
 
 @Composable
-private fun CenterControls(state: PlayerState, onBack10: () -> Unit, onToggle: () -> Unit, onForward10: () -> Unit, modifier: Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(36.dp), verticalAlignment = Alignment.CenterVertically) {
-        RoundButton(Icons.Default.Replay10, "Back 10 seconds", 56, onBack10)
-        Box(contentAlignment = Alignment.Center) {
-            RoundButton(if (state.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (state.playing) "Pause" else "Play", 80, onToggle)
-            if (state.buffering) CircularProgressIndicator(Modifier.size(88.dp), color = Color.White, strokeWidth = 3.dp)
+private fun Hint(text: String) = Text(text, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(14.dp))
+
+@Composable
+private fun KeyRow(keys: String, what: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.14f)) {
+            Text(keys, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
         }
-        RoundButton(Icons.Default.Forward10, "Forward 10 seconds", 56, onForward10)
+        Text(what, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
     }
 }
 
 @Composable
-private fun RoundButton(icon: ImageVector, label: String, size: Int, onClick: () -> Unit) {
-    Box(
-        Modifier.size(size.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size((size * 0.55f).dp)) }
-}
-
-@Composable
-private fun BottomBar(
-    state: PlayerState, seekPreview: Float?, hasNext: Boolean, fullscreen: Boolean, fit: Fit,
-    onSeek: (Float) -> Unit, onSeekDone: () -> Unit, onToggle: () -> Unit, onNext: () -> Unit,
-    onVolume: (Int) -> Unit, onMute: () -> Unit, onAudio: (Track) -> Unit, onSubtitle: (Track?) -> Unit,
-    onRate: (Float) -> Unit, onFit: () -> Unit, onFullscreen: () -> Unit, onMenu: (Boolean) -> Unit, modifier: Modifier,
-) {
-    val shown = seekPreview?.let { (it * state.lengthMs).toLong() } ?: state.timeMs
-    Column(
-        modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
-            .padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = if (fullscreen) 18.dp else 10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(clock(shown), color = Color.White, fontSize = 13.sp, modifier = Modifier.widthIn(min = 56.dp))
-            Slider(
-                value = if (state.lengthMs > 0) (shown.toFloat() / state.lengthMs).coerceIn(0f, 1f) else 0f,
-                onValueChange = onSeek, onValueChangeFinished = onSeekDone, enabled = state.lengthMs > 0,
-                colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color(0xFFE50914), inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp).testTag("player-seek"),
-            )
-            Text(if (state.lengthMs > 0) "-" + clock(state.lengthMs - shown) else "", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, textAlign = TextAlign.End, modifier = Modifier.widthIn(min = 64.dp))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onToggle) { Icon(if (state.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (state.playing) "Pause" else "Play", tint = Color.White) }
-            if (hasNext) IconButton(onClick = onNext) { Icon(Icons.Default.SkipNext, "Next episode", tint = Color.White) }
-            IconButton(onClick = onMute) { Icon(if (state.volume == 0) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp, "Mute", tint = Color.White) }
-            Slider(
-                value = state.volume.toFloat(), onValueChange = { onVolume(it.toInt()) }, valueRange = 0f..150f,
-                colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
-                modifier = Modifier.width(110.dp),
-            )
-            Spacer(Modifier.weight(1f))
-            val audioLabel = state.audio.firstOrNull { it.id == state.audioSelected }?.label?.substringBefore(" · ") ?: "Audio"
-            PillMenu(Icons.Default.Audiotrack, audioLabel, "player-audio", onMenu) { close ->
-                if (state.audio.isEmpty()) DropdownMenuItem(text = { Text("No audio tracks yet") }, onClick = close, enabled = false)
-                state.audio.forEach { t -> MenuChoice(t.label, t.id == state.audioSelected) { onAudio(t); close() } }
-            }
-            val subLabel = state.subtitles.firstOrNull { it.id == state.subtitleSelected }?.label?.substringBefore(" · ") ?: "Off"
-            PillMenu(Icons.Default.Subtitles, subLabel, "player-subtitles", onMenu) { close ->
-                MenuChoice("Off", state.subtitleSelected < 0) { onSubtitle(null); close() }
-                state.subtitles.forEach { t -> MenuChoice(t.label, t.id == state.subtitleSelected) { onSubtitle(t); close() } }
-            }
-            PillMenu(Icons.Default.Speed, if (state.rate == 1f) "1×" else "${state.rate}×", "player-speed", onMenu) { close ->
-                listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { r -> MenuChoice(if (r == 1f) "Normal" else "$r×", state.rate == r) { onRate(r); close() } }
-            }
-            Pill(Icons.Default.AspectRatio, fit.label, onFit)
-            IconButton(onClick = onFullscreen) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen, if (fullscreen) "Exit fullscreen" else "Fullscreen", tint = Color.White) }
-        }
-    }
-}
-
-@Composable
-private fun Pill(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f)).clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
-        Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp))
-    }
-}
-
-@Composable
-private fun PillMenu(icon: ImageVector, label: String, tag: String, onMenu: (Boolean) -> Unit, items: @Composable (close: () -> Unit) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Pill(icon, label, { open = true; onMenu(true) }, Modifier.testTag(tag))
-        DropdownMenu(open, onDismissRequest = { open = false; onMenu(false) }) { items { open = false; onMenu(false) } }
-    }
-}
-
-@Composable
-private fun MenuChoice(label: String, selected: Boolean, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
-        leadingIcon = { Text(if (selected) "✓" else "", modifier = Modifier.width(16.dp)) },
-        onClick = onClick,
+private fun InfoRows(item: MediaRecord, state: PlayerState, source: String) {
+    val rows = listOfNotNull(
+        "File" to item.fileName,
+        "Source" to source,
+        "Size" to sizeLabel(item.sizeBytes),
+        ("Picture" to "${state.videoWidth} × ${state.videoHeight}").takeIf { state.videoWidth > 0 },
+        item.videoCodec?.let { "Video" to it.uppercase() },
+        item.hdr?.let { "HDR" to it },
+        state.audio.firstOrNull { it.id == state.audioSelected }?.let { "Audio" to it.label },
+        ("Length" to clock(state.lengthMs)).takeIf { state.lengthMs > 0 },
+        ("Speed" to fmtRate(state.rate)).takeIf { state.rate != 1f },
     )
+    rows.forEach { (k, v) ->
+        Column(Modifier.padding(vertical = 6.dp)) {
+            Text(k, color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp)
+            Text(v, color = Color.White, fontSize = 14.sp)
+        }
+    }
 }
+
+private fun fmtRate(r: Float): String = (if (r == r.toInt().toFloat()) r.toInt().toString() else r.toString()) + "×"
 
 @Composable
 private fun ErrorCard(hasNext: Boolean, onRetry: () -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
@@ -451,7 +685,7 @@ private fun ErrorCard(hasNext: Boolean, onRetry: () -> Unit, onNext: () -> Unit,
         Surface(shape = RoundedCornerShape(16.dp), color = Color.Black.copy(alpha = 0.8f)) {
             Column(Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("This video could not be played", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Text("Check your connection, or try another version of the title.", color = Color.White.copy(alpha = 0.75f))
+                Text("Check your connection, or try another version (Sources).", color = Color.White.copy(alpha = 0.75f))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onRetry) { Text("Try again") }
                     if (hasNext) OutlinedButton(onClick = onNext) { Text("Next episode") }

@@ -11,6 +11,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import dev.yourstream.core.common.NoOpLogger
 import dev.yourstream.desktop.data.MediaRecord
@@ -78,14 +81,31 @@ class PlayerScreenTest {
                 waitUntil(timeoutMillis = 20_000) { controller.state.value.audio.size == 2 && controller.state.value.timeMs > 1_000 }
                 // Move the mouse: the controls show over the picture.
                 onNodeWithTag("player").performMouseInput { moveTo(center) }
-                waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Tamil")).fetchSemanticsNodes().isNotEmpty() }
+                waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Tamil", substring = true)).fetchSemanticsNodes().isNotEmpty() }
                 shot("player")
+                // Audio panel: tracks by language; picking one is remembered.
                 onNodeWithTag("player-audio").performClick()
                 onNodeWithText("English · AAC Stereo").assertExists()
-                shot("player-audio-menu", popup = true)
+                shot("player-audio-panel")
                 onNodeWithText("English · AAC Stereo").performClick()
                 waitUntil(timeoutMillis = 10_000) { controller.state.value.audio.firstOrNull { it.id == controller.state.value.audioSelected }?.language == "en" }
                 assertEquals(listOf<String?>("en"), picked)
+                // Shortcuts (sent to the player whatever was clicked last).
+                val player = onNodeWithTag("player")
+                player.performKeyInput { pressKey(Key.Escape) } // close the panel
+                onNodeWithTag("player-panel").assertDoesNotExist()
+                player.performKeyInput { pressKey(Key.A) } // next audio track: back to Tamil
+                waitUntil(timeoutMillis = 10_000) { controller.state.value.audio.firstOrNull { it.id == controller.state.value.audioSelected }?.language == "ta" }
+                onNodeWithTag("player-osd").assertExists()
+                player.performKeyInput { pressKey(Key.RightBracket) } // faster
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.rate == 1.25f }
+                player.performKeyInput { pressKey(Key.V) } // subtitles on
+                waitUntil(timeoutMillis = 5_000) { controller.state.value.subtitleSelected >= 0 }
+                player.performKeyInput { pressKey(Key.Spacebar) } // pause
+                waitUntil(timeoutMillis = 5_000) { !controller.state.value.playing }
+                player.performKeyInput { pressKey(Key.H) } // shortcut list
+                onNodeWithText("Next audio track").assertExists()
+                shot("player-shortcuts")
             }
         } finally {
             controller.close()
