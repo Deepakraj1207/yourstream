@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -80,7 +82,7 @@ fun main() {
     }
 }
 
-private enum class Tab { LIBRARY, CHATS, SETTINGS }
+private enum class Tab { LIBRARY, DISCOVER, CHATS, ADDONS, SETTINGS }
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -111,6 +113,7 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
 
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var open by remember { mutableStateOf<LibraryTitle?>(null) }
+    var openCatalog by remember { mutableStateOf<dev.yourstream.catalog.api.CatalogItem?>(null) }
     var playing by remember { mutableStateOf<PlayRequest?>(null) }
     val current by graph.indexer.current.collectAsState()
 
@@ -130,7 +133,9 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
         NavigationRail(Modifier.fillMaxHeight().width(96.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
             dev.yourstream.desktop.ui.Heading("YS", 26.sp, Modifier.padding(vertical = 16.dp))
             NavigationRailItem(tab == Tab.LIBRARY, { tab = Tab.LIBRARY; open = null }, { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("Library") })
+            NavigationRailItem(tab == Tab.DISCOVER, { tab = Tab.DISCOVER; openCatalog = null }, { Icon(Icons.Default.Explore, null) }, label = { Text("Discover") })
             NavigationRailItem(tab == Tab.CHATS, { tab = Tab.CHATS }, { Icon(Icons.Default.Forum, null) }, label = { Text("Chats") })
+            NavigationRailItem(tab == Tab.ADDONS, { tab = Tab.ADDONS }, { Icon(Icons.Default.Extension, null) }, label = { Text("Add-ons") })
             NavigationRailItem(tab == Tab.SETTINGS, { tab = Tab.SETTINGS }, { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
         }
         Column(Modifier.weight(1f).fillMaxSize()) {
@@ -148,7 +153,17 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
                         playing = playRequest(graph, title, queue.ifEmpty { listOf(item) })
                     } else LibraryScreen(titles, graph.posters, indexing = current != null, onOpen = { open = it }, onAddChats = { tab = Tab.CHATS })
                 }
+                Tab.DISCOVER -> {
+                    val item = openCatalog
+                    if (item == null) dev.yourstream.desktop.ui.DiscoverScreen(graph.addons, graph.posters) { openCatalog = it }
+                    else dev.yourstream.desktop.ui.CatalogTitleScreen(
+                        item, graph.addons, graph.posters, titles, onBack = { openCatalog = null },
+                        onPlayLibrary = { t -> tab = Tab.LIBRARY; open = t },
+                        onPlayStream = { meta, video, stream -> playing = streamRequest(graph, meta, video, stream) },
+                    )
+                }
                 Tab.CHATS -> ChatsScreen(graph.chats, graph.index, graph.indexer, mediaCount)
+                Tab.ADDONS -> dev.yourstream.desktop.ui.AddonsScreen(graph.addons)
                 Tab.SETTINGS -> SettingsScreen(graph)
             }
         }
@@ -186,3 +201,31 @@ private fun playRequest(graph: AppGraph, title: LibraryTitle, queue: List<dev.yo
     initialVolume = graph.settings.settings.value.volume,
     onVolume = { v -> graph.settings.update { it.copy(volume = v.coerceIn(0, 150)) } },
 )
+
+/** An add-on stream in the player: played from its own address; where it stopped is remembered by title/episode. */
+private fun streamRequest(graph: AppGraph, meta: dev.yourstream.catalog.api.CatalogMetadata, video: dev.yourstream.catalog.api.CatalogVideo?, stream: dev.yourstream.catalog.api.AddonStream): PlayRequest {
+    val record = dev.yourstream.desktop.ui.streamRecord(meta, video, stream)
+    return PlayRequest(
+        title = meta.title,
+        queue = listOf(record),
+        urlFor = { stream.url!! },
+        resumeMs = { positionOf(graph, it) },
+        savePosition = { r, t, len ->
+            val keep = if (len > 0 && t > len * 0.95) 0L else t
+            graph.settings.update { s -> s.copy(positions = (s.positions - r.remoteFileId).let { if (keep > 0) it + (r.remoteFileId to keep) else it }) }
+        },
+        audioLanguages = { listOfNotNull(graph.settings.settings.value.audioLanguage) },
+        subtitleLanguages = { listOfNotNull(graph.settings.settings.value.subtitleLanguage) },
+        onAudioPicked = { lang -> if (lang != null) graph.settings.update { it.copy(audioLanguage = lang) } },
+        onSubtitlePicked = { lang -> graph.settings.update { it.copy(subtitleLanguage = lang) } },
+        initialVolume = graph.settings.settings.value.volume,
+        onVolume = { v -> graph.settings.update { it.copy(volume = v.coerceIn(0, 150)) } },
+        sourceOf = { stream.addon.ifBlank { "Add-on" } },
+        vlcOptions = {
+            buildList {
+                stream.headers.entries.firstOrNull { it.key.equals("User-Agent", true) }?.let { add(":http-user-agent=${it.value}") }
+                stream.headers.entries.firstOrNull { it.key.equals("Referer", true) }?.let { add(":http-referrer=${it.value}") }
+            }
+        },
+    )
+}

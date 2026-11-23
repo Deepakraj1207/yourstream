@@ -104,6 +104,9 @@ class AppGraph(val build: BuildInfo = BuildInfo.load(), val dataDir: File = AppP
     /** Downloads the start and end of a title's file while its page is open (see StartWarmer). */
     val warmer = dev.yourstream.desktop.playback.StartWarmer(files, scope, logger)
 
+    /** Stremio / Nuvio add-ons (see AddonService). */
+    val addons = dev.yourstream.desktop.addons.AddonService(http, settings, logger)
+
     /** Updates from GitHub releases (see DesktopUpdates). */
     val updates = dev.yourstream.desktop.update.DesktopUpdates(build.version, File(dataDir, "updates"), logger)
 

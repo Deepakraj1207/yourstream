@@ -1259,3 +1259,35 @@ Checked on the published files:
 - `apksigner` shows the pinned release certificate (`35249306…07b2`).
 
 Status: NEEDS REAL-DEVICE TESTING (the Windows player on a real PC).
+
+## Windows: Nuvio player, shortcuts, faster streaming, updates, manga, add-ons (23 Nov 2026)
+
+User request (with a Nuvio player screenshot): shortcuts like other players (Space for pause),
+a player like Nuvio's with shortcuts for every option, the manga theme, the Android features such
+as Stremio/Nuvio add-ons, faster streaming, and in-app updates like Android.
+* **Shortcuts:** handled by the window (PlayerKeys), so a recently clicked button can't swallow
+  Space. The full list is in docs/WINDOWS.md and the player's "?" panel.
+  * Found while testing: the handler was recreated on every recomposition while the window kept
+    the first one, so shortcuts stopped after a redraw.
+  * Also found: focus was lost when a panel closed. Both are fixed and covered by PlayerScreenTest
+    with real VLC.
+* **Player design:** follows the screenshot. Panels for audio, subtitles, speed, aspect, sources
+  (other versions) and info slide in from the right, and actions show a short note.
+* **Streaming:** StreamingBenchmark (opt-in) measures the full chain with real VLC and a simulated
+  Telegram at 400 ms per request:
+  * first picture: 2.9–3.0 s → 0.6–1.2 s, by fetching the start and end of the file while the
+    title page is open (StartWarmer);
+  * seek: about 1 s faster with a 600 ms VLC cache;
+  * playback stayed at 24 fps.
+* **Updates:** DesktopUpdates checks the latest release, verifies the MSI against
+  SHA256SUMS-windows.txt, and installs it with msiexec /passive, then restarts. DesktopUpdatesTest
+  runs against a stand-in GitHub.
+* **Manga style:** the Android Manga.kt, ported, with the same Bangers file at build time. It is
+  the default; Classic is an option.
+* **Add-ons:** AddonService uses the shared catalog:stremio and catalog:core code. It adds the
+  Add-ons and Discover screens, an add-on title page (Telegram files first, then streams as they
+  arrive), and HTTP streams in the player. AddonsTest uses a local add-on and real VLC. Torrents
+  are not on Windows yet.
+* Desktop tests: 38, passing here with VLC 3.
+* Status: NEEDS REAL-DEVICE TESTING on a Windows PC (real add-ons, real Telegram timings, the
+  updater's msiexec step).

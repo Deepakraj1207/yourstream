@@ -135,6 +135,8 @@ class PlayRequest(
     val versionsOf: (MediaRecord) -> List<MediaRecord> = { listOf(it) },
     /** Where the file comes from, for the line under the title ("Telegram · My Movies"). */
     val sourceOf: (MediaRecord) -> String = { "Telegram" },
+    /** Extra VLC options for an item (an add-on stream's User-Agent / Referer). */
+    val vlcOptions: (MediaRecord) -> List<String> = { emptyList() },
 )
 
 /**
@@ -261,7 +263,7 @@ fun PlayerContent(request: PlayRequest, controller: VideoPlayerController, fulls
         switchAt = -1
         resumedFrom = if (resume > 5_000) resume else 0
         controller.setVolume(request.initialVolume)
-        controller.play(request.urlFor(current), resume, request.audioLanguages(), request.subtitleLanguages())
+        controller.play(request.urlFor(current), resume, request.audioLanguages(), request.subtitleLanguages(), extraOptions = request.vlcOptions(current))
         while (true) {
             delay(5_000)
             val st = controller.state.value
@@ -401,7 +403,7 @@ fun PlayerContent(request: PlayRequest, controller: VideoPlayerController, fulls
             )
         }
 
-        if (state.error) ErrorCard(hasNext, onRetry = { controller.play(request.urlFor(current), state.timeMs, request.audioLanguages(), request.subtitleLanguages()) }, onNext = { goTo(index + 1) }, onBack = onClose)
+        if (state.error) ErrorCard(hasNext, onRetry = { controller.play(request.urlFor(current), state.timeMs, request.audioLanguages(), request.subtitleLanguages(), extraOptions = request.vlcOptions(current)) }, onNext = { goTo(index + 1) }, onBack = onClose)
 
         if (state.buffering && !state.error) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(64.dp), color = Color.White, strokeWidth = 3.dp)

@@ -137,7 +137,7 @@ class VideoPlayerController(factory: MediaPlayerFactory, private val logger: Log
      * codes, best first; VLC picks the matching track as the file opens. Subtitles are off when
      * [subtitleLanguages] is empty.
      */
-    fun play(url: String, startMs: Long = 0, audioLanguages: List<String> = emptyList(), subtitleLanguages: List<String> = emptyList(), networkCachingMs: Int = NETWORK_CACHING_MS) = onVlc {
+    fun play(url: String, startMs: Long = 0, audioLanguages: List<String> = emptyList(), subtitleLanguages: List<String> = emptyList(), networkCachingMs: Int = NETWORK_CACHING_MS, extraOptions: List<String> = emptyList()) = onVlc {
         _state.value = PlayerState(volume = _state.value.volume, rate = 1f)
         val options = buildList {
             // VLC waits for this much before it starts and after a seek; the stream server keeps
@@ -147,6 +147,7 @@ class VideoPlayerController(factory: MediaPlayerFactory, private val logger: Log
             if (startMs > 5_000) add(":start-time=${startMs / 1000.0}")
             if (audioLanguages.isNotEmpty()) add(":audio-language=${audioLanguages.joinToString(",")}")
             add(if (subtitleLanguages.isNotEmpty()) ":sub-language=${subtitleLanguages.joinToString(",")}" else ":sub-track=-1")
+            addAll(extraOptions)
         }
         player.media().play(url, *options.toTypedArray())
     }

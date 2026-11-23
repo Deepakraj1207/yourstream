@@ -171,6 +171,9 @@ dependencies {
     implementation(projects.metadata.cinemeta)
     implementation(projects.core.network)
     implementation(projects.playback.stream)
+    implementation(projects.catalog.api)
+    implementation(projects.catalog.core)
+    implementation(projects.catalog.stremio)
 
     implementation(libs.tdl.coroutines)
     implementation(libs.javax.inject)

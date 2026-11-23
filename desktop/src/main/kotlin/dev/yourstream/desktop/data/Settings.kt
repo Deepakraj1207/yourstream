@@ -21,6 +21,8 @@ data class DesktopSettings(
     /** The subtitle language last picked; null = subtitles off. */
     val subtitleLanguage: String? = null,
     val volume: Int = 100,
+    /** Installed Stremio / Nuvio add-ons (manifest links), in order. Cinemeta at first, as on Android. */
+    val addons: List<String> = listOf("https://v3-cinemeta.strem.io/manifest.json"),
 )
 
 /** settings.json in the data folder. Written whole (to a temporary file, then renamed). */

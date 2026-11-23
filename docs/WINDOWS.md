@@ -1,9 +1,8 @@
 # YourStream for Windows
 
 The `desktop` module is YourStream as a Windows app (the same code also runs on Linux and macOS,
-but only a Windows installer is built). It is stage 1 of the desktop app: **your Telegram library
-and playing it**. Add-ons, Discover, torrents, downloads, sync and the TMDB title page are not in
-it yet.
+but only a Windows installer is built): your Telegram library, Stremio / Nuvio add-ons (Discover
+and streams), a Nuvio-style player, the manga style, and in-app updates.
 
 ## What it does
 
@@ -12,11 +11,15 @@ it yet.
 | Sign in | Telegram's own login: phone number and code, two-step password, or a QR code scanned with Telegram on a phone. The session is stored by TDLib in the data folder. |
 | Chats | Pick the channels, groups or chats that hold your videos; they are indexed in the background while the app is open, and checked for new posts every 15 minutes. |
 | Library | Movies with their versions (4K first), series with seasons and episodes, search, a Movies/Series filter. Posters from Cinemeta, or TMDB with your key (Settings). |
-| Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded. VLC draws into the app's own window, so the controls sit over the picture and hide while playing. Resume (with *Start over*), next episode, audio and subtitle tracks named by language and format (the language you pick is remembered), speed, Fit/Fill/Stretch, volume (wheel), fullscreen. Keys: Space/K play-pause, ←/→ 10 s (Shift 60 s), ↑/↓ volume, M mute, F or double-click fullscreen, N next, Esc back. |
+| Add-ons | Stremio / Nuvio add-ons, like on Android (the shared catalog:stremio and catalog:core code): install by link (https://…/manifest.json, stremio:// works too; plain http only on the local network), order, remove. Cinemeta is installed at first. |
+| Discover | The add-ons' catalogs as poster grids (Movies / Series, pick a catalog, Load more) and search across add-ons. A title's page shows its details, seasons and episodes, your Telegram files for it first, then every add-on's streams as they come. HTTP streams play in the player (with the stream's User-Agent / Referer); torrents are listed but not played on Windows yet. |
+| Style | Manga (default, like Android: Bangers lettering, inked panels, screentones, speed lines) or Classic; dark or light (Settings → Appearance). |
+| Updates | The latest GitHub release is checked at start (and in Settings → Updates). A newer installer is downloaded, checked against `SHA256SUMS-windows.txt`, installed over the app (msiexec), and the app restarts. |
+| Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded; the start and end of a title's file are fetched while its page is open, so Play starts at once. Nuvio-style player: title and source at the bottom left, thin seek bar, round play button, aspect / speed / subtitles / audio / sources / info panels, volume and time; controls hide while playing. Audio and subtitle tracks named by language and format (the pick is remembered); "Resumed from … · Start over". Shortcuts (handled by the window, so they always work): Space/K play-pause, ←/→ or J/L 10 s (Shift 60 s), Home/End, 0–9 jump, ↑/↓ or wheel volume, M mute, A next audio, S next subtitles, V subtitles on/off, [ ] = speed, Z aspect, N next episode, I info, F/F11 or double-click fullscreen, Esc, ?/H the list. |
 
 Not yet: movies split into pieces (`.mkv.001`, `.002`, …) only show their first piece and are not
-playable as one movie; files on the PC; downloads for offline viewing; add-ons and Discover;
-progress sync with the phone.
+playable as one movie; torrent streams; files on the PC; downloads for offline viewing; progress
+sync with the phone.
 
 ## Install
 
