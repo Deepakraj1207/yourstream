@@ -104,6 +104,9 @@ class AppGraph(val build: BuildInfo = BuildInfo.load(), val dataDir: File = AppP
     /** Downloads the start and end of a title's file while its page is open (see StartWarmer). */
     val warmer = dev.yourstream.desktop.playback.StartWarmer(files, scope, logger)
 
+    /** Updates from GitHub releases (see DesktopUpdates). */
+    val updates = dev.yourstream.desktop.update.DesktopUpdates(build.version, File(dataDir, "updates"), logger)
+
     /** VLC, started once in the background (see VlcEngine). */
     val vlc = dev.yourstream.desktop.playback.VlcEngine(logger)
 

@@ -69,6 +69,8 @@ fun SettingsScreen(graph: AppGraph) {
             if (!vlc) OutlinedButton(onClick = { runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(Vlc.DOWNLOAD_URL)) } }) { Text("Get VLC") }
         }
 
+        Section("Updates") { UpdateSection(graph.updates, graph.build.version) }
+
         Section("Storage") {
             Text("Your Telegram session, index and cache are kept in:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             Text(graph.dataDir.absolutePath, fontSize = 13.sp)

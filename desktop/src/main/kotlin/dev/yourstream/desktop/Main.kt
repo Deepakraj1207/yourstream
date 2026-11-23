@@ -103,6 +103,9 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
         graph.indexer.start()
         // VLC loads its plugins once, now, so pressing Play later starts at once.
         graph.vlc.start()
+        // A newer version? Asked quietly once at start, like the Android app.
+        kotlinx.coroutines.delay(5_000)
+        graph.updates.check(quiet = true)
     }
 
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
@@ -130,6 +133,7 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
             NavigationRailItem(tab == Tab.SETTINGS, { tab = Tab.SETTINGS }, { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
         }
         Column(Modifier.weight(1f).fillMaxSize()) {
+            dev.yourstream.desktop.ui.UpdateBanner(graph.updates)
             when (tab) {
                 Tab.LIBRARY -> {
                     val title = open?.let { o -> titles.firstOrNull { it.key == o.key } ?: o }
