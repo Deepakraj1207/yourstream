@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -59,6 +60,7 @@ fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord)
     val backdrop by posterImage(t, posters, backdrop = true)
     val poster by posterImage(t, posters)
     Box(Modifier.fillMaxSize()) {
+        if (LocalMangaStyle.current && backdrop == null) Box(Modifier.fillMaxWidth().height(420.dp).clipToBounds().speedLines(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), seed = t.key.hashCode()))
         backdrop?.let {
             Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(420.dp))
             Box(Modifier.fillMaxWidth().height(420.dp).background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
@@ -68,11 +70,13 @@ fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord)
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 Spacer(Modifier.height(120.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                    Box(Modifier.width(200.dp).height(300.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    val shape = if (LocalMangaStyle.current) MaterialTheme.shapes.medium else RoundedCornerShape(12.dp)
+                    Box(Modifier.width(200.dp).height(300.dp).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
                         poster?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                            ?: if (LocalMangaStyle.current) MangaTitleArt(t.title, Modifier.fillMaxSize()) else Unit
                     }
                     Column(Modifier.weight(1f).padding(top = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(t.title, fontSize = 40.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Heading(t.title, 40.sp, maxLines = 2)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             t.year?.let { Text(it.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             resolutionLabel(t.bestResolution)?.let { Badge(it) }
@@ -93,7 +97,7 @@ fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord)
             }
             if (t.isSeries) item { Episodes(t, resumeMs, onPlay) }
             else {
-                item { Text("Versions", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp)) }
+                item { Heading("Versions", 20.sp, Modifier.padding(bottom = 8.dp)) }
                 items(t.files, key = { "${it.chatId}:${it.messageId}" }) { f -> VersionRow(f, resumeMs(f)) { onPlay(f, listOf(f)) } }
             }
         }

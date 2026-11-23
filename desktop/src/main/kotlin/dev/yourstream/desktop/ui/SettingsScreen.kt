@@ -43,9 +43,16 @@ fun SettingsScreen(graph: AppGraph) {
     var confirmSignOut by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Settings", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Heading("Settings", 26.sp)
 
         Section("Appearance") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Manga style")
+                    Text("Comic lettering, inked panels and screentones, like the Android app. Off: classic.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(settings.mangaStyle, { on -> graph.settings.update { it.copy(mangaStyle = on) } })
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Dark theme", modifier = Modifier.weight(1f))
                 Switch(settings.darkTheme, { on -> graph.settings.update { it.copy(darkTheme = on) } })
@@ -95,9 +102,10 @@ fun SettingsScreen(graph: AppGraph) {
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().widthIn(max = 820.dp)) {
+    val shape = if (LocalMangaStyle.current) MaterialTheme.shapes.medium else RoundedCornerShape(12.dp)
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().widthIn(max = 820.dp).inkPanel(shape)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Heading(title, 17.sp)
             content()
         }
     }

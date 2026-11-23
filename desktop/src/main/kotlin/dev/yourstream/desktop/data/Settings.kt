@@ -12,6 +12,8 @@ data class DesktopSettings(
     /** TMDB API key (v3) or read token (v4) for posters; Cinemeta is used without one. */
     val tmdbKey: String = "",
     val darkTheme: Boolean = true,
+    /** The manga / comic look (the Android app's default); false = classic. */
+    val mangaStyle: Boolean = true,
     /** Where playback stopped, per Telegram remote file id, in milliseconds. */
     val positions: Map<String, Long> = emptyMap(),
     /** The audio language last picked in the player (ISO 639-1), tried first next time. */

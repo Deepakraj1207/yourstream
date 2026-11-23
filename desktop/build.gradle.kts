@@ -45,6 +45,12 @@ val sharedAndroidSources = tasks.register<Sync>("sharedAndroidSources") {
 }
 kotlin.sourceSets.named("main") { kotlin.srcDir(sharedAndroidSources) }
 
+/** The manga style's lettering (Bangers, SIL OFL), the same file the Android app uses. */
+val sharedFonts = tasks.register<Sync>("sharedFonts") {
+    from(rootProject.file("ui/core/src/main/res/font")) { include("bangers.ttf") }
+    into(layout.buildDirectory.dir("generated/sharedFonts/fonts"))
+}
+
 /** Telegram API credentials, from the same places as the Android app (docs/TELEGRAM_SETUP.md). */
 fun secret(property: String, env: String): String {
     providers.gradleProperty(property).orNull?.let { return it }
@@ -78,7 +84,10 @@ val buildInfo = tasks.register("buildInfo") {
         f.writeText("telegram.apiId=$apiId\ntelegram.apiHash=$apiHash\nversion=${version.get()}\n")
     }
 }
-sourceSets.named("main") { resources.srcDir(buildInfo) }
+sourceSets.named("main") {
+    resources.srcDir(buildInfo)
+    resources.srcDir(sharedFonts.map { it.destinationDir.parentFile })
+}
 
 /*
  * Smaller installer: two big jars are slimmed on their way into the app (and its tests).

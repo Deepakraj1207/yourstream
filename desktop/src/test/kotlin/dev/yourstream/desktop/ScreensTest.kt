@@ -90,6 +90,35 @@ class ScreensTest {
         androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background, content = content)
     }
 
+    /** The manga style (Settings → Appearance), light and dark: lettering, inked panels, screentones. */
+    @Test
+    fun mangaStyle() {
+        for (dark in listOf(false, true)) runDesktopComposeUiTest(1280, 820) {
+            val titles = LibraryBuilder.build(sample)
+            setContent {
+                YourStreamTheme(dark, manga = true) {
+                    androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                        LibraryScreen(titles, posters, indexing = false, onOpen = {}, onAddChats = {})
+                    }
+                }
+            }
+            onNodeWithText("LIBRARY").assertExists()
+            save(if (dark) "manga-library-dark" else "manga-library-light")
+        }
+        runDesktopComposeUiTest(1280, 820) {
+            val movie = LibraryBuilder.build(sample).first { it.title == "Example Film" }
+            setContent {
+                YourStreamTheme(false, manga = true) {
+                    androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                        TitleScreen(movie, posters, resumeMs = { 0 }, onBack = {}) { _, _ -> }
+                    }
+                }
+            }
+            onNodeWithText("EXAMPLE FILM").assertExists()
+            save("manga-title")
+        }
+    }
+
     @Test
     fun libraryShowsTitlesFiltersAndOpens() = runDesktopComposeUiTest(1280, 820) {
         val titles = LibraryBuilder.build(sample)

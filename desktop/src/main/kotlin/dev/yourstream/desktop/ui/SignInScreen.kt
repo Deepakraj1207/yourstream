@@ -79,7 +79,7 @@ fun SignInScreen(auth: TelegramAuthManager) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.width(420.dp)) {
             Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("🎬 YourStream", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Heading("YourStream", 30.sp)
                 val phoneStep = state == AuthState.WaitPhoneNumber || (editingPhone && (state is AuthState.WaitCode || state is AuthState.WaitOtherDeviceConfirmation))
                 if (phoneStep) PhoneStep(busy, onPhone = { submit { auth.submitPhoneNumber(it) } }, onQr = { submit { auth.requestQrCodeLogin() } })
                 else when (val s = state) {

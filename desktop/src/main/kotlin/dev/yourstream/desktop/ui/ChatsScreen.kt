@@ -69,7 +69,7 @@ fun ChatsScreen(chats: TelegramChatRepository, store: DesktopIndexStore, indexer
 
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Chats", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Heading("Chats", 26.sp)
             Box(Modifier.weight(1f))
             listOf(ChatFilter.CHANNELS to "Channels", ChatFilter.GROUPS to "Groups", ChatFilter.PRIVATE to "Private", ChatFilter.ALL to "All").forEach { (f, label) ->
                 FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(label) })

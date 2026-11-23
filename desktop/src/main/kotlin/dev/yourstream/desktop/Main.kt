@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
@@ -68,7 +69,7 @@ fun main() {
             // Player shortcuts work whatever has the focus (see PlayerKeys).
             onPreviewKeyEvent = { e -> dev.yourstream.desktop.ui.PlayerKeys.handler?.invoke(e) ?: false }) {
             val settings by graph.settings.settings.collectAsState()
-            YourStreamTheme(settings.darkTheme) {
+            YourStreamTheme(settings.darkTheme, settings.mangaStyle) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     App(graph, fullscreen = windowState.placement == WindowPlacement.Fullscreen) { on ->
                         windowState.placement = if (on) WindowPlacement.Fullscreen else WindowPlacement.Floating
@@ -127,7 +128,7 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
 
     Row(Modifier.fillMaxSize()) {
         NavigationRail(Modifier.fillMaxHeight().width(96.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-            Text("YS", fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 16.dp))
+            dev.yourstream.desktop.ui.Heading("YS", 26.sp, Modifier.padding(vertical = 16.dp))
             NavigationRailItem(tab == Tab.LIBRARY, { tab = Tab.LIBRARY; open = null }, { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("Library") })
             NavigationRailItem(tab == Tab.CHATS, { tab = Tab.CHATS }, { Icon(Icons.Default.Forum, null) }, label = { Text("Chats") })
             NavigationRailItem(tab == Tab.SETTINGS, { tab = Tab.SETTINGS }, { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })

@@ -46,8 +46,11 @@ private val Light = lightColorScheme(
 )
 
 @Composable
-fun YourStreamTheme(dark: Boolean, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (dark) Dark else Light, content = content)
+fun YourStreamTheme(dark: Boolean, manga: Boolean = false, content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalMangaStyle provides manga) {
+        if (manga) MaterialTheme(colorScheme = if (dark) Manga.ink else Manga.paper, shapes = Manga.shapes, content = content)
+        else MaterialTheme(colorScheme = if (dark) Dark else Light, content = content)
+    }
 }
 
 /** A small label on a poster or a version row: "4K", "1080p", "Telegram". */

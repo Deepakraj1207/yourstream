@@ -64,7 +64,7 @@ fun LibraryScreen(titles: List<LibraryTitle>, posters: PosterService, indexing: 
     }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Library", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Heading("Library", 26.sp)
             Box(Modifier.weight(1f))
             Show.entries.forEach { s -> FilterChip(selected = show == s, onClick = { show = s }, label = { Text(s.label) }) }
             OutlinedTextField(
@@ -108,9 +108,11 @@ fun PosterCard(t: LibraryTitle, posters: PosterService, onClick: () -> Unit) {
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     Column(Modifier.hoverable(hover).clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).scale(if (hovered) 1.03f else 1f).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        val shape = MaterialTheme.shapes.medium.takeIf { LocalMangaStyle.current } ?: RoundedCornerShape(10.dp)
+        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).scale(if (hovered) 1.03f else 1f).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
             val img = image
             if (img != null) Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            else if (LocalMangaStyle.current) MangaTitleArt(t.title, Modifier.fillMaxSize())
             else Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
                 Text(t.title, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
             }
