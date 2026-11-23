@@ -1241,3 +1241,21 @@ Tests (30 desktop tests, all passing here with VLC 3):
 
 Status: NEEDS REAL-DEVICE TESTING on a Windows PC (smoothness of 1080p/4K playback with the
 callback surface, real Telegram files).
+
+## v0.13.2 release (23 Nov 2026)
+
+Published as the latest release on the user's instruction ("Yes" to releasing the rebuilt Windows
+player). Release run 33, at commit `2b996b7` (`main` and `develop` identical).
+- Windows: the rebuilt player (see "Windows player rebuilt").
+  `YourStream-v0.13.2-windows-x64.msi` is 144,221,300 bytes. Its SHA-256 in
+  `SHA256SUMS-windows.txt` (`b69e2fe3…f4f4`) equals GitHub's digest of the file.
+- Android: no app changes, rebuilt as 0.13.2.
+
+Checked on the published files:
+- `releases/latest` is v0.13.2 (target `2b996b7`), not a pre-release and not a draft, with 8
+  assets.
+- The arm64 APK's SHA-256 (`160488c5…8756`) matches `SHA256SUMS.txt`.
+- `aapt2` shows versionCode 33 and versionName 0.13.2.
+- `apksigner` shows the pinned release certificate (`35249306…07b2`).
+
+Status: NEEDS REAL-DEVICE TESTING (the Windows player on a real PC).
