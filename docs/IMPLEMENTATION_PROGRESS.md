@@ -1291,3 +1291,48 @@ as Stremio/Nuvio add-ons, faster streaming, and in-app updates like Android.
 * Desktop tests: 38, passing here with VLC 3.
 * Status: NEEDS REAL-DEVICE TESTING on a Windows PC (real add-ons, real Telegram timings, the
   updater's msiexec step).
+
+## v0.14.0 release, without its Windows installer (24 Nov 2026)
+
+Released on the user's instruction ("Yes" to v0.14.0). Release run 45312252028, at commit
+`d384497` (`main` and `develop` identical).
+- Android: the APK job published the release. Checked: `releases/latest` was v0.14.0 (not a
+  pre-release); the arm64 APK's SHA-256 (`07ea42db…c7ee`) matches `SHA256SUMS.txt`; `aapt2` shows
+  versionCode 34 and versionName 0.14.0; `apksigner` shows the pinned certificate (`35249306…07b2`).
+- Windows: **no installer.** The Windows job failed at "Desktop tests":
+  AddonsTest.discoverAndTitlePageWithStreams showed the title page's "Streams" heading with no
+  add-on under it. The same test had failed in CI run 159.
+- Cause, reproduced here on one CPU (`taskset -c 0`, about 1 run in 4) and traced with temporary
+  logging (since removed): the add-on answered, and the screen's collector got the group and added
+  it to its state list. But the screen never showed it. The collector ran on a DefaultDispatcher
+  worker, because the deprecated `runDesktopComposeUiTest` runs composition coroutines on an
+  UnconfinedTestDispatcher. So Compose state was written from a background thread while the test
+  thread composed, and the write could be lost. This is a test-harness problem: in the app,
+  composition runs on the Swing UI thread.
+- Fix (`143ceee`, tests only): the three UI test classes use `androidx.compose.ui.test.v2`'s
+  `runDesktopComposeUiTest` (StandardTestDispatcher). On one CPU, AddonsTest passed 10 of 10 runs,
+  and ScreensTest and PlayerScreenTest passed 5 of 5.
+- Earlier on the way (`fae7866`): add-on requests run on Dispatchers.IO instead of the UI thread.
+  The title-page test now waits for the details, and its failure message shows the screen.
+- The user chose to ship the installer as v0.14.1 rather than re-run the v0.14.0 Windows job.
+
+Status: COMPLETED for Android. Superseded by v0.14.1 for Windows.
+
+## v0.14.1 release (24 Nov 2026)
+
+Released on the user's instruction ("Release v0.14.1"). Release run 45348337137, at commit
+`4f243df` (`main` and `develop` identical). The app code is the same as v0.14.0. The changes are
+the test fix above and the release notes.
+
+Checked on the published files:
+- `releases/latest` is v0.14.1 (tag at `4f243df`), not a pre-release and not a draft, with 8
+  assets.
+- The arm64 APK's SHA-256 (`e8a8d511…c683`) matches `SHA256SUMS.txt`. `aapt2` shows versionCode
+  35 and versionName 0.14.1. `apksigner` shows the pinned certificate (`35249306…07b2`).
+- `YourStream-v0.14.1-windows-x64.msi` is 144,810,157 bytes. Its SHA-256 in
+  `SHA256SUMS-windows.txt` (`1f5d58c3…0231`) equals GitHub's digest of the file. All 40 desktop
+  tests passed on Windows in the release run (2 skipped: the opt-in benchmark, and one VLC test
+  skipped there).
+
+Status: NEEDS REAL-DEVICE TESTING (the Windows app on a real PC: add-ons, the player's
+shortcuts, the manga style, and the in-app update from 0.14.1 to a later version).
