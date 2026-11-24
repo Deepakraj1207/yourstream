@@ -1,3 +1,27 @@
+## What's new in 0.14.0
+
+Windows app:
+- **Stremio / Nuvio add-ons, like on Android.** A new Add-ons page: install an add-on by its link
+  (…/manifest.json; stremio:// links work too), order them, remove them. Cinemeta comes
+  installed. A new **Discover** page shows the add-ons' catalogs (Movies / Series) and searches
+  across them. A title's page shows its details, seasons and episodes, your Telegram files for it
+  first, then every add-on's streams as they come. HTTP streams play in the app's player;
+  torrent streams are listed but not played on Windows yet.
+- **Nuvio-style player** with a shortcut key for every option: Space or K play/pause, ←/→ or J/L
+  10 s (Shift 60 s), Home/End, 0–9 jump, ↑/↓ or the mouse wheel volume, M mute, A next audio
+  track, S next subtitles, V subtitles on/off, [ ] = speed, Z aspect, N next episode, I info,
+  F/F11 or double-click fullscreen, Esc back, ? or H the full list. Panels for audio, subtitles,
+  speed, aspect, sources (other versions of the title) and info.
+- **Manga style**, like the Android app (now the default): comic lettering, inked panels,
+  screentones and speed lines. Classic style and light/dark in Settings → Appearance.
+- **In-app updates:** the app checks GitHub for a newer version at start (and in Settings →
+  Updates), downloads the installer, checks it against the published checksum, installs it and
+  restarts. From this version on; to get 0.14.0 itself, install the .msi below over the old one.
+- **Faster streaming:** the start and end of a title's file are fetched while its page is open,
+  so Play starts sooner, and seeks are quicker.
+
+Android: no changes in this version.
+
 ## What's new in 0.13.2
 
 Windows app:
