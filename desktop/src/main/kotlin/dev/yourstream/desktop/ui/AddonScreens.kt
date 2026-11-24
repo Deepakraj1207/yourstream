@@ -289,7 +289,7 @@ fun CatalogTitleScreen(
             Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(420.dp))
             Box(Modifier.fillMaxWidth().height(420.dp).background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.fillMaxSize().testTag("title-page"), contentPadding = PaddingValues(32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 Spacer(Modifier.height(100.dp))

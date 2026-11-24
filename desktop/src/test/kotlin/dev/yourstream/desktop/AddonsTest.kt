@@ -2,11 +2,13 @@ package dev.yourstream.desktop
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.sun.net.httpserver.HttpServer
 import dev.yourstream.catalog.api.AddonStream
@@ -146,9 +148,15 @@ class AddonsTest {
             setContent { YourStreamTheme(true, manga = false) { Surface { CatalogTitleScreen(item, s, posters, emptyList(), {}, {}) { _, _, st -> played = st } } } }
             // The streams are below the details, in a lazy list: scroll to them as a user would
             // (how far down they sit depends on the platform's fonts).
-            onNodeWithText("A test film.").assertExists()
-            val list = onNode(hasScrollAction())
-            waitUntil(timeoutMillis = 30_000) { runCatching { list.performScrollToNode(hasText("Test 1080p")) }.isSuccess }
+            waitUntil(timeoutMillis = 30_000) { onAllNodes(hasText("A test film.")).fetchSemanticsNodes().isNotEmpty() } // the details, once the add-on answered
+            val list = onNodeWithTag("title-page")
+            var last: Throwable? = null
+            try {
+                waitUntil(timeoutMillis = 30_000) { runCatching { list.performScrollToNode(hasText("Test 1080p")) }.onFailure { last = it }.isSuccess }
+            } catch (e: Throwable) {
+                // Say what was on screen and why scrolling failed, not only that time ran out.
+                throw AssertionError("no \"Test 1080p\" stream; last error: ${last?.message?.take(600)}\nscreen:\n" + onRoot().printToString(), e)
+            }
             list.performScrollToNode(hasText("Test 4K"))
             onNodeWithText("Test 4K").assertExists() // the torrent, listed but not playable here
             list.performScrollToNode(hasText("Test 1080p"))

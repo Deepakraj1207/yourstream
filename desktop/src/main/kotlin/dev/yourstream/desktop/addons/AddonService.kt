@@ -18,14 +18,16 @@ import dev.yourstream.core.common.Logger
 import dev.yourstream.desktop.data.SettingsStore
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** An installed add-on: its link and, once it answered, what its manifest says. */
 data class Addon(val url: String, val info: CatalogProviderInfo? = null, val error: String? = null) {
@@ -40,6 +42,9 @@ data class StreamGroup(val addon: String, val streams: List<AddonStream>, val er
  * (catalog:stremio) and catalog handling (catalog:core). The installed links are kept in
  * settings.json in their order (which orders Discover and the stream groups); Cinemeta is
  * installed at first, as on Android.
+ *
+ * Every add-on request runs on Dispatchers.IO, never on the caller's dispatcher: the screens call
+ * these from Compose (the UI thread), and reading and parsing add-on answers is not UI work.
  */
 class AddonService(private val http: HttpClient, private val settings: SettingsStore, private val logger: Logger) {
     private var providers: List<StremioCatalogProvider> = emptyList()
@@ -59,7 +64,7 @@ class AddonService(private val http: HttpClient, private val settings: SettingsS
     }
 
     /** Asks every add-on for its manifest (names, catalogs, what it offers). */
-    suspend fun refresh() = coroutineScope {
+    suspend fun refresh() = withContext(Dispatchers.IO) {
         val current = providers
         val urls = settings.settings.value.addons
         val results = current.mapIndexed { i, p -> i to p }.map { (i, p) ->
@@ -74,7 +79,9 @@ class AddonService(private val http: HttpClient, private val settings: SettingsS
     }
 
     /** Installs the add-on at [link] (a …/manifest.json link, https or stremio://). */
-    suspend fun install(link: String): AppResult<Addon> {
+    suspend fun install(link: String): AppResult<Addon> = withContext(Dispatchers.IO) { installHere(link) }
+
+    private suspend fun installHere(link: String): AppResult<Addon> {
         val url = normalize(link) ?: return AppResult.Err(dev.yourstream.core.common.AppError.InvalidState(
             if (link.contains("nuvio", ignoreCase = true) && !link.endsWith("manifest.json")) StremioCatalogProvider.NUVIO_PLUGINS
             else "Paste the add-on's link: it starts with https:// (or stremio://) and ends in manifest.json."))
@@ -109,17 +116,19 @@ class AddonService(private val http: HttpClient, private val settings: SettingsS
         _addons.value = list.map { infos[it] ?: Addon(it) }
     }
 
-    suspend fun catalogs(type: CatalogType? = null): List<CatalogDescriptor> = manager.catalogs(type).filter { !it.requiresExtra }
+    suspend fun catalogs(type: CatalogType? = null): List<CatalogDescriptor> = withContext(Dispatchers.IO) { manager.catalogs(type) }.filter { !it.requiresExtra }
 
     suspend fun page(catalog: CatalogDescriptor, skip: Int = 0, genre: String? = null): AppResult<CatalogPage> =
-        when (val r = manager.page(catalog, skip, genre)) {
-            is AppResult.Ok -> AppResult.Ok(r.value.value)
-            is AppResult.Err -> r
+        withContext(Dispatchers.IO) {
+            when (val r = manager.page(catalog, skip, genre)) {
+                is AppResult.Ok -> AppResult.Ok(r.value.value)
+                is AppResult.Err -> r
+            }
         }
 
-    suspend fun search(query: String, type: CatalogType? = null): List<CatalogItem> = manager.search(query, type).value
+    suspend fun search(query: String, type: CatalogType? = null): List<CatalogItem> = withContext(Dispatchers.IO) { manager.search(query, type).value }
 
-    suspend fun metadata(item: CatalogItem): CatalogMetadata = manager.metadata(item).value
+    suspend fun metadata(item: CatalogItem): CatalogMetadata = withContext(Dispatchers.IO) { manager.metadata(item).value }
 
     /** Streams for a movie ("tt0111161") or an episode ("tt0903747:1:2"), one add-on at a time. */
     fun streams(type: CatalogType, id: String): Flow<StreamGroup> = channelFlow {
@@ -135,7 +144,7 @@ class AddonService(private val http: HttpClient, private val settings: SettingsS
                 }
             }
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     companion object {
         const val CINEMETA = "https://v3-cinemeta.strem.io/manifest.json"
