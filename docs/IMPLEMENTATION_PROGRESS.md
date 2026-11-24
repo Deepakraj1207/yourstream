@@ -1330,9 +1330,8 @@ Checked on the published files:
 - The arm64 APK's SHA-256 (`e8a8d511…c683`) matches `SHA256SUMS.txt`. `aapt2` shows versionCode
   35 and versionName 0.14.1. `apksigner` shows the pinned certificate (`35249306…07b2`).
 - `YourStream-v0.14.1-windows-x64.msi` is 144,810,157 bytes. Its SHA-256 in
-  `SHA256SUMS-windows.txt` (`1f5d58c3…0231`) equals GitHub's digest of the file. All 40 desktop
-  tests passed on Windows in the release run (2 skipped: the opt-in benchmark, and one VLC test
-  skipped there).
+  `SHA256SUMS-windows.txt` (`1f5d58c3…0231`) equals GitHub's digest of the file. The release
+  run's Windows "Desktop tests" step passed before the installer was built.
 
 Status: NEEDS REAL-DEVICE TESTING (the Windows app on a real PC: add-ons, the player's
 shortcuts, the manga style, and the in-app update from 0.14.1 to a later version).
