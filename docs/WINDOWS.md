@@ -108,7 +108,19 @@ job, which also builds the installer):
   new byte range into data not yet downloaded. Skipped where VLC is not available.
 * `ScreensTest`: the library, a series page, a movie page and sign-in rendered with sample data;
   clicks open titles, play episodes with the rest queued, resume the right version, switch from
-  the QR code to a phone number.
+  the QR code to a phone number; the manga style.
+* `VideoPlayerControllerTest`, `TrackLabelsTest`: real VLC draws frames into the app's buffers; a
+  file with Tamil AC3 5.1, English AAC and English subtitles gets named tracks and the preferred
+  language at start; closing never waits for VLC.
+* `PlayerScreenTest`: the player's overlay, the audio panel, and the window-level shortcuts.
+* `AddonsTest`: a small add-on served on 127.0.0.1: install, catalogs, details, streams (with the
+  stream's User-Agent), Discover and an add-on title page, and an add-on stream played by VLC.
+* `DesktopUpdatesTest`: a newer release found, the installer downloaded and checked against
+  `SHA256SUMS-windows.txt` and installed; the same or an older version is up to date; a damaged
+  download is deleted and nothing is installed.
+* `SlimJarsTest`: the slimmed TDLib and icon jars keep what the app needs.
+* `StreamingBenchmark` (opt-in, `-Dbench=true`): time to first picture and seeks over a
+  simulated slow Telegram download.
 
 What the tests do **not** cover, and needs a Windows PC with a real Telegram account: signing in
 for real, indexing real chats, the video window (VLC drawing into the app window, fullscreen,
