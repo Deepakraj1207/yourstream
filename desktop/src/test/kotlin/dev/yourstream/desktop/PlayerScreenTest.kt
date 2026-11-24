@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import dev.yourstream.core.common.NoOpLogger
 import dev.yourstream.desktop.data.MediaRecord
 import dev.yourstream.desktop.playback.ByteSource

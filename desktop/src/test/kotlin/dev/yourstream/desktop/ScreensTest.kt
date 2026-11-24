@@ -10,7 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.test.DesktopComposeUiTest
 import dev.yourstream.core.common.AppResult
 import dev.yourstream.core.common.Clock
