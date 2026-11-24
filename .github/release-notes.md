@@ -1,3 +1,11 @@
+## What's new in 0.14.1
+
+- **Windows installer for 0.14.0's features.** The 0.14.0 release went out without its Windows
+  installer (a desktop test failed while building it; the test is fixed, the app is unchanged).
+  This version has it: everything listed under 0.14.0 below, for Windows. If you use the Windows
+  app, download `YourStream-v0.14.1-windows-x64.msi` below and install it over the old version.
+- Android: no changes since 0.14.0.
+
 ## What's new in 0.14.0
 
 Windows app:
