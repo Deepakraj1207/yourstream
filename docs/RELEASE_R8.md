@@ -43,7 +43,7 @@ release; installing it over a non-minified build of the same key keeps your data
 6. Add-ons: open a catalog title and play a web stream.
 7. Torrents (if used): turn them on, play a torrent stream (libtorrent JNI and callbacks).
 8. Progress sync on, sync once (kotlinx.serialization of the shared file).
-9. Settings → Storage: sizes shown; clear each cache.
+9. Settings → Clear cache (on the hub) opens Storage: sizes shown; Clear cache, then clear each cache.
 10. Sign out: the account data is removed; sign in again.
 11. Check for updates (GitHub JSON parsing; the download is checked against `SHA256SUMS.txt`).
 12. Leave it running in the background for a while, come back: no crash.

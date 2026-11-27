@@ -293,6 +293,16 @@ class ScreensTest {
     }
 
     @Test
+    fun clearCacheIsOneTapFromTheSettingsHub() {
+        var storage = 0
+        set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", links = dev.yourstream.ui.screens.settings.SettingsLinks(storage = { storage++ }))) }
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("settings-clear-cache"))
+        compose.onNodeWithText("Clear cache").assertExists()
+        compose.onNodeWithTag("settings-clear-cache").performClick()
+        assertEquals(1, storage)
+    }
+
+    @Test
     fun settingsSearchFindsAndChangesASettingInPlace() {
         var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
         set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it })) }

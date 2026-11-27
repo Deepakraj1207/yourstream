@@ -45,6 +45,17 @@ class VideoDownloads @Inject constructor(
 
     fun isKept(remoteUniqueId: String): Boolean = prefs.getBoolean(remoteUniqueId, false)
 
+    /** Whether any video is saved to this device (Settings → Storage's "Clear cache" leaves Telegram's files alone then). */
+    fun hasKept(): Boolean = prefs.all.values.any { it == true }
+
+    /** Forgets every saved video (Settings → Storage cleared Telegram's files, so none is on the device any more). */
+    fun forgetAll() {
+        watchers.values.forEach { it.cancel() }
+        watchers.clear()
+        _progress.value = emptyMap()
+        prefs.edit().clear().apply()
+    }
+
     suspend fun start(target: PlaybackTarget, mediaId: Long): AppResult<Unit> {
         val media = when (val r = telegramFile(target, mediaId)) {
             is AppResult.Ok -> r.value

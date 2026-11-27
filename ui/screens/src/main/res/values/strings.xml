@@ -664,6 +664,14 @@
     <string name="storage_telegram_confirm_title">Clear Telegram videos?</string>
     <string name="storage_telegram_confirm">This also removes videos you saved to this device. They stay in Telegram and stream again when you play them.</string>
     <string name="storage_busy">a video is playing. Stop it and try again.</string>
+    <string name="storage_clear_all">Clear cache</string>
+    <string name="storage_clear_all_confirm_title">Clear cache?</string>
+    <string name="storage_clear_all_confirm">This frees the space used by streamed videos, add-on streams, torrents, posters and thumbnails. They download again when needed. Your library, watch history, settings and sign-in are kept, and nothing is deleted from Telegram.</string>
+    <string name="storage_clear_all_keeps_downloads">You saved videos to this device, so Telegram videos are kept. To remove them too, use Clear next to Telegram videos.</string>
+    <string name="storage_cleared_all">Cache cleared: %1$s freed.</string>
+    <string name="storage_cleared_all_kept">Telegram videos were kept because they include videos you saved to this device.</string>
+    <string name="settings_clear_cache">Clear cache</string>
+    <string name="settings_clear_cache_detail">Free the space used by streamed videos, posters and add-on streams</string>
 
     <!-- Files on this device -->
     <string name="settings_local_files">Files on this device</string>

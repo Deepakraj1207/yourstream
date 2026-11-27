@@ -1373,3 +1373,34 @@ search), adapted to a large window.
 * Cinemeta is not reachable from this environment, so the screenshots use generated artwork.
 * Status: NEEDS REAL-DEVICE TESTING (on a Windows PC with real add-ons and posters: hover, tooltip
   and wheel behaviour, window sizes).
+
+## Clear cache on Android and Windows (27 Nov 2026)
+
+The user asked for a clear cache option in both versions.
+
+* **Android:** Settings → Advanced → Storage already had a Clear button for each cache. New:
+  * a **Clear cache** row on the Settings hub (System section) that opens Storage;
+  * a **Clear cache** button at the top of Storage, which asks first and then clears every cache
+    that holds something: Telegram videos, add-on streams, torrents, posters and thumbnails.
+  * **Saved downloads:** videos saved to the device sit in TDLib's cache with the streamed parts,
+    and TDLib cannot delete one without the other (`optimizeStorage` has no per-file exclusion).
+    So while any video is saved, Clear cache leaves Telegram's files alone, and both the dialog
+    and the result say so. The Telegram Clear button still clears everything after confirming,
+    and now also forgets the list of saved videos. Before this change the list stayed behind, so
+    the app kept treating deleted files as saved.
+  * **While a video plays:** Clear cache stops at the first "a video is playing" refusal.
+* **Windows:** Settings → Storage & cache (`DesktopStorage`) shows each cache's size:
+  * Telegram video parts: cleared by TDLib's `optimizeStorage`, after the title page's warm-up
+    download stops.
+  * Poster images: cleared by `PosterService.clearImages`. The poster matches are kept.
+  * Downloaded updates: cleared by `DesktopUpdates.clearDownloads`. This is refused while an
+    update downloads, and a ready update goes back to "available".
+  * Each cache has its own Clear button, plus **Clear cache** with a confirmation.
+  * The Telegram session, index, settings and watch positions are never touched.
+* **Tests:**
+  * Android: StorageTest grew from 2 to 6 tests (the Clear cache dialog, everything cleared,
+    Telegram kept with saved videos, stopping while a video plays), and a ScreensTest checks the
+    hub's Clear cache row. The 183 UI-screen tests and the app's unit tests pass.
+  * Windows: DesktopStorageTest (4) and the Settings test reaching Storage & cache. All 48 desktop
+    tests pass (1 opt-in benchmark skipped).
+* Status: NEEDS REAL-DEVICE TESTING (freeing real TDLib caches on a phone and a PC).

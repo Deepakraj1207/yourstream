@@ -286,8 +286,11 @@ plays without a connection (the resolver's offline path uses the stored file id)
 
 * Files the user downloaded are remembered by Telegram's stable unique id (`downloads`
   preferences) and never trimmed by `StreamCache`, even when played while still downloading.
-* Settings → Storage → Telegram videos clears them too (it says so before clearing). Sign-out
-  removes them (TDLib deletes its files on log-out; the list is cleared with the account data).
+* Settings → Storage → Telegram videos clears them too (it says so before clearing, and the list
+  of saved videos is forgotten with them). **Clear cache** (on the Settings hub and at the top of
+  Storage) leaves Telegram's files alone while any video is saved, because TDLib cannot delete the
+  streamed parts without the saved files, and says so. Sign-out removes them (TDLib deletes its
+  files on log-out; the list is cleared with the account data).
 * Downloads run while the app runs (no foreground service). One interrupted by the app closing
   continues from where it stopped when Download is tapped again (TDLib keeps the partial file).
 * Fixed on the way: "On this device" compared the stored state with `COMPLETED`, but the index

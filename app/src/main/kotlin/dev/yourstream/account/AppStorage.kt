@@ -33,6 +33,7 @@ class AppStorage @Inject constructor(
     private val files: dagger.Lazy<TelegramFileRepository>,
     private val webStreams: dagger.Lazy<WebStreams>,
     private val torrents: dagger.Lazy<TorrentEngine>,
+    private val downloads: dagger.Lazy<dev.yourstream.playback.media3.VideoDownloads>,
     private val playing: ActivePlayback,
 ) : DeviceStorage {
     private fun dir(area: StorageArea): File = when (area) {
@@ -55,10 +56,13 @@ class AppStorage @Inject constructor(
         return manager.getAllocatableBytes(manager.getUuidForPath(context.cacheDir))
     }
 
+    override suspend fun hasSavedDownloads(): Boolean = withContext(Dispatchers.IO) { downloads.get().hasKept() }
+
     override suspend fun clear(area: StorageArea): AppResult<Unit> {
         if (playing.current.value != null) return AppResult.Err(AppError.InvalidState(context.getString(dev.yourstream.ui.screens.R.string.storage_busy)))
         return when (area) {
-            StorageArea.TELEGRAM -> files.get().deleteAllLocalCopies()
+            // Saved videos are deleted with the rest of Telegram's files: forget them too.
+            StorageArea.TELEGRAM -> files.get().deleteAllLocalCopies().also { if (it is AppResult.Ok) downloads.get().forgetAll() }
             StorageArea.WEB_STREAMS -> attempt { webStreams.get().clearCache() }
             StorageArea.TORRENTS -> attempt { torrents.get().shutdown() }
             StorageArea.IMAGES -> attempt {

@@ -275,6 +275,13 @@ internal val SETTINGS: List<SettingEntry> = buildList {
         SettingRow(stringResource(R.string.settings_reset), stringResource(R.string.settings_reset_detail), Icons.Filled.Refresh, tag = "pref-reset") { open(SettingsDialog.RESET) }
     })
 
+    // ---- System (on the hub, after Advanced and About): Clear cache, one tap from Settings
+    add(SettingEntry("clear-cache", SettingsSection.SYSTEM, null, R.string.settings_section_system, R.string.settings_clear_cache,
+        "clear cache free space storage delete videos posters", shown = { it.links.storage != null }) {
+        SettingRow(stringResource(R.string.settings_clear_cache), stringResource(R.string.settings_clear_cache_detail), Icons.Filled.Delete,
+            tag = "settings-clear-cache", onClick = host.links.storage)
+    })
+
     // ---- About
     val ab = SettingsPage.ABOUT
     add(entry("version", ab, R.string.settings_group_app, R.string.app_name, "version") {

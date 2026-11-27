@@ -16,7 +16,8 @@ rows and streams), Nuvio-style screens and player, the manga style, and in-app u
 | Chats | Settings → Telegram chats: pick the channels, groups or chats that hold your videos; they are indexed in the background while the app is open, and checked for new posts every 15 minutes. |
 | Library | Movies with their versions (4K first), series with seasons and episodes, search, a Movies/Series filter. Posters from Cinemeta, or TMDB with your key (Settings → Posters). |
 | Add-ons | Settings → Add-ons: Stremio / Nuvio add-ons, like on Android (the shared catalog:stremio and catalog:core code): install by link (https://…/manifest.json, stremio:// works too; plain http only on the local network), order, remove. Cinemeta is installed at first. HTTP streams play in the player (with the stream's User-Agent / Referer); torrents are listed but not played on Windows yet. A row's See all opens the whole catalog as a grid (Movies / Series, another catalog, search, Load more). |
-| Settings | Sections in a list on the left: Appearance, Telegram chats, Add-ons, Player, Posters, Updates, Storage, Account. |
+| Settings | Sections in a list on the left: Appearance, Telegram chats, Add-ons, Player, Posters, Updates, Storage & cache, Account. |
+| Storage & cache | What each cache uses (Telegram video parts, poster images, downloaded updates), Clear for each, and **Clear cache** for all of them. Telegram's files are deleted by TDLib itself; poster matches, the Telegram session, the index, settings and watch positions are kept. An update that is downloading is not cleared. |
 | Style | Classic (black, white text and buttons) or Manga (default, like Android: Bangers lettering, inked panels, screentones, speed lines); dark or light (Settings → Appearance). |
 | Updates | The latest GitHub release is checked at start (and in Settings → Updates). A newer installer is downloaded, checked against `SHA256SUMS-windows.txt`, installed over the app (msiexec), and the app restarts. |
 | Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded; the start and end of a title's file are fetched while its page is open, so Play starts at once. Nuvio-style player: title and source at the bottom left, thin seek bar, round play button, aspect / speed / subtitles / audio / sources / info panels, volume and time; controls hide while playing. Audio and subtitle tracks named by language and format (the pick is remembered); "Resumed from … · Start over". Shortcuts (handled by the window, so they always work): Space/K play-pause, ←/→ or J/L 10 s (Shift 60 s), Home/End, 0–9 jump, ↑/↓ or wheel volume, M mute, A next audio, S next subtitles, V subtitles on/off, [ ] = speed, Z aspect, N next episode, I info, F/F11 or double-click fullscreen, Esc, ?/H the list. |
@@ -127,6 +128,8 @@ job, which also builds the installer):
 * `DesktopUpdatesTest`: a newer release found, the installer downloaded and checked against
   `SHA256SUMS-windows.txt` and installed; the same or an older version is up to date; a damaged
   download is deleted and nothing is installed.
+* `DesktopStorageTest`: each cache measured; Clear cache empties them through their owners and
+  keeps the session, index, settings and poster matches; one cache at a time; empty ones skipped.
 * `SlimJarsTest`: the slimmed TDLib and icon jars keep what the app needs.
 * `StreamingBenchmark` (opt-in, `-Dbench=true`): time to first picture and seeks over a
   simulated slow Telegram download.

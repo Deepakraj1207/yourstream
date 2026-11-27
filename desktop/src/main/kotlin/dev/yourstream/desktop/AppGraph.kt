@@ -110,6 +110,9 @@ class AppGraph(val build: BuildInfo = BuildInfo.load(), val dataDir: File = AppP
     /** Updates from GitHub releases (see DesktopUpdates). */
     val updates = dev.yourstream.desktop.update.DesktopUpdates(build.version, File(dataDir, "updates"), logger)
 
+    /** The caches on disk, measured and cleared in Settings → Storage (see DesktopStorage). */
+    val storage = dev.yourstream.desktop.data.DesktopStorage(dataDir, files, posters, updates, { warmer.stop() }, logger)
+
     /** VLC, started once in the background (see VlcEngine). */
     val vlc = dev.yourstream.desktop.playback.VlcEngine(logger)
 

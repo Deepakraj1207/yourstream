@@ -38,6 +38,7 @@ import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.NoOpLogger
 import dev.yourstream.core.network.HttpClients
 import dev.yourstream.desktop.addons.AddonService
+import dev.yourstream.desktop.data.CacheArea
 import dev.yourstream.desktop.data.LibraryBuilder
 import dev.yourstream.desktop.data.MediaRecord
 import dev.yourstream.desktop.data.SettingsStore
@@ -326,6 +327,11 @@ class HomeAndSearchTest {
                 onNodeWithTag("addon-link").assertExists()
                 onNodeWithTag("settings:UPDATES").performClick()
                 onNodeWithText("Check for updates").assertExists()
+                onNodeWithTag("settings:STORAGE").performClick()
+                waitUntil(timeoutMillis = 10_000) { onAllNodes(hasText("YourStream uses 0 B for caches")).fetchSemanticsNodes().isNotEmpty() }
+                onNodeWithTag("storage-clear-all").assertExists()
+                CacheArea.entries.forEach { onNodeWithTag("storage:${it.name}").assertExists() }
+                save("settings-storage")
                 onNodeWithTag("settings:ACCOUNT").performClick()
                 onNodeWithText("Sign out").assertExists()
             }

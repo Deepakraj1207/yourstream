@@ -107,6 +107,19 @@ class PosterService(
         return bitmap
     }
 
+    /** Bytes of downloaded images on disk (the title matches are not counted: they are small and kept). */
+    fun imageBytes(): Long = dir.listFiles { f -> f.name.endsWith(".img") }?.sumOf { it.length() } ?: 0L
+
+    /**
+     * Deletes the downloaded images, on disk and in memory (Settings → Storage); they download
+     * again when shown. Which poster belongs to which title is kept, so nothing is looked up again.
+     */
+    suspend fun clearImages() = withContext(Dispatchers.IO) {
+        synchronized(memory) { memory.clear() }
+        dir.listFiles { f -> f.name.endsWith(".img") }?.forEach { it.delete() }
+        Unit
+    }
+
     /** The image at most [maxWidth] pixels wide (aspect kept), as a Compose bitmap. */
     private fun downscale(image: Image, maxWidth: Int): ImageBitmap {
         if (image.width <= maxWidth) return image.toComposeImageBitmap()

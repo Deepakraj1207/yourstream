@@ -115,6 +115,18 @@ class DesktopUpdates(
     /** Runs the checked installer; the app closes so the installer can replace it. */
     fun install(ready: State.Ready) = installer.install(ready.file)
 
+    /**
+     * Deletes downloaded installers (Settings → Storage). Not while one downloads (false then); an
+     * update that was ready goes back to "available", so it can be downloaded again.
+     */
+    fun clearDownloads(): Boolean {
+        val now = _state.value
+        if (now is State.Downloading) return false
+        dir.listFiles()?.forEach { it.deleteRecursively() }
+        if (now is State.Ready) _state.value = State.Available(now.release)
+        return true
+    }
+
     private fun request(url: String) = HttpRequest.newBuilder(URI(url)).timeout(Duration.ofMinutes(10))
         .header("User-Agent", "YourStream/$installedVersion (Windows)").header("Accept", "application/vnd.github+json").build()
 

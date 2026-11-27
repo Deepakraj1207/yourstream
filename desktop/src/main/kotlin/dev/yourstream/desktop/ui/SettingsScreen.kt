@@ -51,6 +51,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.yourstream.desktop.AppGraph
+import dev.yourstream.desktop.data.CacheArea
+import dev.yourstream.desktop.data.DesktopStorage
 import dev.yourstream.desktop.playback.Vlc
 import kotlinx.coroutines.launch
 
@@ -62,7 +64,7 @@ enum class SettingsSection(val label: String, val icon: ImageVector) {
     PLAYER("Player", Icons.Default.PlayCircle),
     POSTERS("Posters", Icons.Default.Image),
     UPDATES("Updates", Icons.Default.SystemUpdate),
-    STORAGE("Storage", Icons.Default.Folder),
+    STORAGE("Storage & cache", Icons.Default.Folder),
     ACCOUNT("Account", Icons.Default.AccountCircle),
 }
 
@@ -185,13 +187,76 @@ private fun Posters(graph: AppGraph) {
     }
 }
 
+/**
+ * Storage & cache: what each cache holds and a button to clear it, "Clear cache" for all of them,
+ * and where the app keeps its data. Your Telegram session, library, settings and watch positions
+ * are never cleared here.
+ */
 @Composable
 private fun Storage(graph: AppGraph) {
+    val scope = rememberCoroutineScope()
+    var usage by remember { mutableStateOf<Map<CacheArea, Long>?>(null) }
+    var busy by remember { mutableStateOf<String?>(null) } // "all" or an area's name
+    var message by remember { mutableStateOf<String?>(null) }
+    var confirm by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { usage = graph.storage.usage() }
+    val total = usage?.values?.sum()
+    Card {
+        Text(
+            if (total == null) "Measuring…" else "YourStream uses ${DesktopStorage.sizeText(total)} for caches",
+            fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.testTag("storage-total"),
+        )
+        Note("Clearing frees space only. Your Telegram sign-in, library, settings and watch positions are kept, and nothing is deleted from Telegram.")
+        PillButton(
+            if (busy == "all") "Clearing…" else "Clear cache", { if (busy == null && (total ?: 0L) > 0L) confirm = true },
+            Modifier.testTag("storage-clear-all"),
+        )
+        message?.let { Text(it, modifier = Modifier.testTag("storage-message")) }
+    }
+    Card {
+        CacheArea.entries.forEach { area ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("storage:${area.name}")) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(area.label, fontWeight = FontWeight.SemiBold)
+                    Note((usage?.get(area)?.let(DesktopStorage::sizeText) ?: "…") + " · " + area.detail)
+                }
+                PillButton(if (busy == area.name) "Clearing…" else "Clear", {
+                    if (busy != null || (usage?.get(area) ?: 0L) == 0L) return@PillButton
+                    busy = area.name; message = null
+                    scope.launch {
+                        val r = graph.storage.clear(area)
+                        message = if (r is dev.yourstream.core.common.AppResult.Err) "${area.label} not cleared: ${r.error.message}" else "${area.label} cleared."
+                        usage = graph.storage.usage(); busy = null
+                    }
+                }, primary = false, modifier = Modifier.testTag("storage-clear:${area.name}"))
+            }
+        }
+    }
     Card {
         Note("Your Telegram session, index and cache are kept in:")
         Text(graph.dataDir.absolutePath, fontSize = 13.sp)
         PillButton("Open folder", { runCatching { java.awt.Desktop.getDesktop().open(graph.dataDir) } }, primary = false)
     }
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("Clear cache?") },
+        text = { Text("Frees ${total?.let(DesktopStorage::sizeText) ?: "the space"} used by streamed video parts, posters and downloaded updates. They download again when needed. Your sign-in, library, settings and watch positions are kept.") },
+        confirmButton = {
+            TextButton(onClick = {
+                confirm = false; busy = "all"; message = null
+                scope.launch {
+                    val before = usage?.values?.sum() ?: 0L
+                    val failed = graph.storage.clearAll()
+                    usage = graph.storage.usage()
+                    val freed = (before - (usage?.values?.sum() ?: 0L)).coerceAtLeast(0L)
+                    message = "Cache cleared: ${DesktopStorage.sizeText(freed)} freed." +
+                        failed.entries.joinToString("") { (a, why) -> "\n${a.label} not cleared: $why" }
+                    busy = null
+                }
+            }, modifier = Modifier.testTag("storage-confirm")) { Text("Clear cache") }
+        },
+        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+    )
 }
 
 @Composable
