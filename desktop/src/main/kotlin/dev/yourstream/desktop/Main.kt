@@ -8,9 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
@@ -20,6 +19,10 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,8 +43,15 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.yourstream.desktop.data.LibraryBuilder
 import dev.yourstream.desktop.data.LibraryTitle
-import dev.yourstream.desktop.ui.ChatsScreen
+import dev.yourstream.desktop.ui.CatalogTitleScreen
+import dev.yourstream.desktop.ui.DiscoverScreen
+import dev.yourstream.desktop.ui.HomeCache
+import dev.yourstream.desktop.ui.HomeScreen
 import dev.yourstream.desktop.ui.LibraryScreen
+import dev.yourstream.desktop.ui.NavDestination
+import dev.yourstream.desktop.ui.SearchScreen
+import dev.yourstream.desktop.ui.SettingsSection
+import dev.yourstream.desktop.ui.SideBar
 import dev.yourstream.desktop.ui.PlayRequest
 import dev.yourstream.desktop.ui.PlayerScreen
 import dev.yourstream.desktop.ui.SettingsScreen
@@ -69,7 +79,10 @@ fun main() {
         val windowState = rememberWindowState(size = DpSize(1280.dp, 820.dp))
         Window(onCloseRequest = { graph.close(); exitApplication() }, state = windowState, title = "YourStream", icon = appIcon,
             // Player shortcuts work whatever has the focus (see PlayerKeys).
-            onPreviewKeyEvent = { e -> dev.yourstream.desktop.ui.PlayerKeys.handler?.invoke(e) ?: false }) {
+            onPreviewKeyEvent = { e ->
+                dev.yourstream.desktop.ui.PlayerKeys.handler?.invoke(e)
+                    ?: (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && e.key == androidx.compose.ui.input.key.Key.Escape && NavKeys.back?.invoke() == true)
+            }) {
             val settings by graph.settings.settings.collectAsState()
             YourStreamTheme(settings.darkTheme, settings.mangaStyle) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -82,7 +95,22 @@ fun main() {
     }
 }
 
-private enum class Tab { LIBRARY, DISCOVER, CHATS, ADDONS, SETTINGS }
+private enum class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    HOME("Home", Icons.Default.Home), SEARCH("Search", Icons.Default.Search),
+    LIBRARY("Library", Icons.Default.VideoLibrary), SETTINGS("Settings", Icons.Default.Settings),
+}
+
+/** A page opened over a tab: a Telegram title, an add-on title, or a whole catalog ("See all"). */
+private sealed interface Page {
+    data class Title(val title: LibraryTitle) : Page
+    data class Item(val item: dev.yourstream.catalog.api.CatalogItem) : Page
+    data class Catalog(val catalog: dev.yourstream.catalog.api.CatalogDescriptor) : Page
+}
+
+/** Esc goes back a page when no player is open (see Main's window key handler). */
+internal object NavKeys {
+    @Volatile var back: (() -> Boolean)? = null
+}
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -111,11 +139,13 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
         graph.updates.check(quiet = true)
     }
 
-    var tab by remember { mutableStateOf(Tab.LIBRARY) }
-    var open by remember { mutableStateOf<LibraryTitle?>(null) }
-    var openCatalog by remember { mutableStateOf<dev.yourstream.catalog.api.CatalogItem?>(null) }
+    var tab by remember { mutableStateOf(Tab.HOME) }
+    var pages by remember { mutableStateOf(listOf<Page>()) }
+    var settingsSection by remember { mutableStateOf(SettingsSection.APPEARANCE) }
     var playing by remember { mutableStateOf<PlayRequest?>(null) }
+    val homeCache = remember { HomeCache() }
     val current by graph.indexer.current.collectAsState()
+    val settings by graph.settings.settings.collectAsState()
 
     // The library, rebuilt (off the UI thread) when the index changes.
     val records by produceState(emptyList<dev.yourstream.desktop.data.MediaRecord>(), graph) {
@@ -124,48 +154,59 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
     val titles by produceState(emptyList<LibraryTitle>(), records) { value = withContext(Dispatchers.Default) { LibraryBuilder.build(records) } }
     val mediaCount = remember(records) { records.filter { it.video }.groupingBy { it.chatId }.eachCount() }
 
+    fun open(page: Page) { pages = pages + page }
+    fun back() { pages = pages.dropLast(1) }
+    fun play(t: LibraryTitle, first: dev.yourstream.desktop.data.MediaRecord, queue: List<dev.yourstream.desktop.data.MediaRecord> = listOf(first)) {
+        graph.warmer.stop()
+        playing = playRequest(graph, t, queue.ifEmpty { listOf(first) })
+    }
+    fun chooseChats() { pages = emptyList(); tab = Tab.SETTINGS; settingsSection = SettingsSection.CHATS }
+
+    DisposableEffect(Unit) {
+        NavKeys.back = { if (playing == null && pages.isNotEmpty()) { back(); true } else false }
+        onDispose { NavKeys.back = null }
+    }
+
     playing?.let { request ->
         PlayerScreen(request, graph.vlc, graph.logger, fullscreen, onFullscreen) { onFullscreen(false); playing = null }
         return
     }
 
-    Row(Modifier.fillMaxSize()) {
-        NavigationRail(Modifier.fillMaxHeight().width(96.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-            dev.yourstream.desktop.ui.Heading("YS", 26.sp, Modifier.padding(vertical = 16.dp))
-            NavigationRailItem(tab == Tab.LIBRARY, { tab = Tab.LIBRARY; open = null }, { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("Library") })
-            NavigationRailItem(tab == Tab.DISCOVER, { tab = Tab.DISCOVER; openCatalog = null }, { Icon(Icons.Default.Explore, null) }, label = { Text("Discover") })
-            NavigationRailItem(tab == Tab.CHATS, { tab = Tab.CHATS }, { Icon(Icons.Default.Forum, null) }, label = { Text("Chats") })
-            NavigationRailItem(tab == Tab.ADDONS, { tab = Tab.ADDONS }, { Icon(Icons.Default.Extension, null) }, label = { Text("Add-ons") })
-            NavigationRailItem(tab == Tab.SETTINGS, { tab = Tab.SETTINGS }, { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
-        }
-        Column(Modifier.weight(1f).fillMaxSize()) {
-            dev.yourstream.desktop.ui.UpdateBanner(graph.updates)
-            when (tab) {
-                Tab.LIBRARY -> {
-                    val title = open?.let { o -> titles.firstOrNull { it.key == o.key } ?: o }
-                    // The page is open: fetch the start and end of what Play would play.
-                    LaunchedEffect(title?.key) {
-                        val first = title?.let { t -> if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull() }
-                        if (first != null) graph.warmer.warm(first.fileId, first.sizeBytes) else graph.warmer.stop()
-                    }
-                    if (title != null) TitleScreen(title, graph.posters, resumeMs = { positionOf(graph, it) }, onBack = { open = null }) { item, queue ->
-                        graph.warmer.stop()
-                        playing = playRequest(graph, title, queue.ifEmpty { listOf(item) })
-                    } else LibraryScreen(titles, graph.posters, indexing = current != null, onOpen = { open = it }, onAddChats = { tab = Tab.CHATS })
-                }
-                Tab.DISCOVER -> {
-                    val item = openCatalog
-                    if (item == null) dev.yourstream.desktop.ui.DiscoverScreen(graph.addons, graph.posters) { openCatalog = it }
-                    else dev.yourstream.desktop.ui.CatalogTitleScreen(
-                        item, graph.addons, graph.posters, titles, onBack = { openCatalog = null },
-                        onPlayLibrary = { t -> tab = Tab.LIBRARY; open = t },
-                        onPlayStream = { meta, video, stream -> playing = streamRequest(graph, meta, video, stream) },
+    val page = pages.lastOrNull()
+    // A Telegram title's page is open: fetch the start and end of what Play would play.
+    val openTitle = (page as? Page.Title)?.title?.let { o -> titles.firstOrNull { it.key == o.key } ?: o }
+    LaunchedEffect(openTitle?.key) {
+        val first = openTitle?.let { t -> if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull() }
+        if (first != null) graph.warmer.warm(first.fileId, first.sizeBytes) else graph.warmer.stop()
+    }
+
+    CompositionLocalProvider(dev.yourstream.desktop.ui.LocalNavInset provides 100.dp) {
+        Box(Modifier.fillMaxSize()) {
+            when (page) {
+                is Page.Title -> TitleScreen(openTitle!!, graph.posters, resumeMs = { positionOf(graph, it) }, onBack = ::back) { item, queue -> play(openTitle, item, queue) }
+                is Page.Item -> CatalogTitleScreen(
+                    page.item, graph.addons, graph.posters, titles, onBack = ::back,
+                    onPlayLibrary = { t -> open(Page.Title(t)) },
+                    onPlayStream = { meta, video, stream -> graph.warmer.stop(); playing = streamRequest(graph, meta, video, stream) },
+                )
+                is Page.Catalog -> DiscoverScreen(graph.addons, graph.posters, page.catalog, titles, onBack = ::back) { open(Page.Item(it)) }
+                null -> when (tab) {
+                    Tab.HOME -> HomeScreen(
+                        titles, settings.positions, graph.addons, graph.posters, homeCache, indexing = current != null,
+                        onOpenTitle = { open(Page.Title(it)) }, onPlay = { t, f -> play(t, f) }, onOpenItem = { open(Page.Item(it)) },
+                        onSeeAll = { open(Page.Catalog(it)) }, onSeeLibrary = { tab = Tab.LIBRARY }, onAddChats = ::chooseChats,
                     )
+                    Tab.SEARCH -> SearchScreen(titles, graph.addons, graph.posters, onOpenTitle = { open(Page.Title(it)) }, onOpenItem = { open(Page.Item(it)) })
+                    Tab.LIBRARY -> LibraryScreen(titles, graph.posters, indexing = current != null, onOpen = { open(Page.Title(it)) }, onAddChats = ::chooseChats)
+                    Tab.SETTINGS -> SettingsScreen(graph, settingsSection, { settingsSection = it }, mediaCount)
                 }
-                Tab.CHATS -> ChatsScreen(graph.chats, graph.index, graph.indexer, mediaCount)
-                Tab.ADDONS -> dev.yourstream.desktop.ui.AddonsScreen(graph.addons)
-                Tab.SETTINGS -> SettingsScreen(graph)
             }
+            SideBar(
+                Tab.entries.map { NavDestination(it.label, it.icon) }, Tab.entries.indexOf(tab),
+                { i -> tab = Tab.entries[i]; pages = emptyList() },
+                Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
+            )
+            Box(Modifier.align(Alignment.TopCenter).padding(start = 100.dp, end = 40.dp, top = 12.dp)) { dev.yourstream.desktop.ui.UpdateBanner(graph.updates) }
         }
     }
 }

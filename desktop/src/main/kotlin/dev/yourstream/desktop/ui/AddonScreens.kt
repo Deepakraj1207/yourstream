@@ -2,6 +2,8 @@ package dev.yourstream.desktop.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -90,7 +92,7 @@ import kotlinx.coroutines.launch
 
 // ---------------------------------------------------------------- Add-ons
 
-/** Installed Stremio / Nuvio add-ons: add by link, order (which orders Discover and streams), remove. */
+/** Installed Stremio / Nuvio add-ons (Settings → Add-ons): add by link, order (which orders Home's rows and the streams), remove. */
 @Composable
 fun AddonsScreen(service: AddonService) {
     val addons by service.addons.collectAsState()
@@ -99,11 +101,11 @@ fun AddonsScreen(service: AddonService) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { service.refresh() }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(end = 40.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Heading("Add-ons", 26.sp)
             Text(
-                "Stremio and Nuvio add-ons add catalogs to Discover and streams to titles. Paste an add-on's link (it ends in manifest.json).",
+                "Stremio and Nuvio add-ons add catalog rows to Home and streams to title pages. Paste an add-on's link (it ends in manifest.json).",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp),
             )
             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -148,10 +150,13 @@ fun AddonsScreen(service: AddonService) {
 
 /** The add-ons' catalogs as poster grids (Movies / Series, one catalog at a time), and search. */
 @Composable
-fun DiscoverScreen(service: AddonService, posters: PosterService, onOpen: (CatalogItem) -> Unit) {
-    var type by rememberSaveable { mutableStateOf(CatalogType.MOVIE) }
+fun DiscoverScreen(
+    service: AddonService, posters: PosterService, initial: CatalogDescriptor? = null, library: List<LibraryTitle> = emptyList(),
+    onBack: (() -> Unit)? = null, onOpen: (CatalogItem) -> Unit,
+) {
+    var type by rememberSaveable { mutableStateOf(initial?.type ?: CatalogType.MOVIE) }
     var query by rememberSaveable { mutableStateOf("") }
-    var catalogId by rememberSaveable { mutableStateOf<String?>(null) }
+    var catalogId by rememberSaveable { mutableStateOf(initial?.let { "${it.provider.value}/${it.id}" }) }
     val addons by service.addons.collectAsState()
     val catalogs by produceState(emptyList<CatalogDescriptor>(), type, addons) { value = service.catalogs(type) }
     val catalog = catalogs.firstOrNull { "${it.provider.value}/${it.id}" == catalogId } ?: catalogs.firstOrNull()
@@ -181,24 +186,28 @@ fun DiscoverScreen(service: AddonService, posters: PosterService, onOpen: (Catal
         }
     }
 
+    val inset = LocalNavInset.current
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Heading("Discover", 26.sp)
+        Row(Modifier.fillMaxWidth().padding(start = inset + 16.dp, end = 40.dp, top = 28.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (onBack != null) RoundButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+            PageTitle(catalog?.rowTitle() ?: "Discover", Modifier.weight(1f, fill = false))
             Box(Modifier.weight(1f))
-            FilterChip(type == CatalogType.MOVIE, { type = CatalogType.MOVIE; catalogId = null }, label = { Text("Movies") })
-            FilterChip(type == CatalogType.SERIES, { type = CatalogType.SERIES; catalogId = null }, label = { Text("Series") })
+            FilterPill("Movies", type == CatalogType.MOVIE) { type = CatalogType.MOVIE; catalogId = null }
+            FilterPill("Series", type == CatalogType.SERIES) { type = CatalogType.SERIES; catalogId = null }
             CatalogPicker(catalogs, catalog, addons.associate { a -> (a.info?.provider?.value ?: "") to a.name }) { catalogId = "${it.provider.value}/${it.id}" }
-            OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Search add-ons") }, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.width(280.dp))
+            SearchField(query, { query = it }, "Search add-ons", Modifier.width(280.dp), height = 46.dp)
         }
         when {
-            catalogs.isEmpty() && addons.isEmpty() -> Centered("No add-ons installed. Add one in Add-ons.")
+            catalogs.isEmpty() && addons.isEmpty() -> Centered("No add-ons installed. Add one in Settings → Add-ons.")
             items.isEmpty() && loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             items.isEmpty() -> Centered(error ?: if (query.isNotBlank()) "Nothing found for \"$query\"" else "This catalog is empty.")
-            else -> LazyVerticalGrid(GridCells.Adaptive(160.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(24.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                items(items, key = { it.ref.provider.value + it.ref.id }) { item -> CatalogCard(item, posters) { onOpen(item) } }
+            else -> LazyVerticalGrid(GridCells.Adaptive(168.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(start = inset + 16.dp, end = 40.dp, top = 12.dp, bottom = 40.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
+                items(items, key = { it.ref.provider.value + it.ref.id }) { item ->
+                    CatalogItemCard(item, posters, libraryMatches(library, item.title, item.year, item.ref.type == CatalogType.SERIES).isNotEmpty()) { onOpen(item) }
+                }
                 if (next != null) item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        if (loading) CircularProgressIndicator() else OutlinedButton(onClick = { scope.launch { load(next ?: return@launch) } }) { Text("Load more") }
+                        if (loading) CircularProgressIndicator() else PillButton("Load more", { scope.launch { load(next ?: return@launch) } }, primary = false)
                     }
                 }
             }
@@ -231,31 +240,14 @@ private fun CatalogPicker(catalogs: List<CatalogDescriptor>, selected: CatalogDe
     }
 }
 
-@Composable
-private fun CatalogCard(item: CatalogItem, posters: PosterService, onClick: () -> Unit) {
-    val image by produceState<ImageBitmap?>(null, item.posterUrl) { value = item.posterUrl?.let { posters.image(it) } }
-    val hover = remember { MutableInteractionSource() }
-    val hovered by hover.collectIsHoveredAsState()
-    val shape = if (LocalMangaStyle.current) MaterialTheme.shapes.medium else RoundedCornerShape(10.dp)
-    Column(Modifier.hoverable(hover).clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).scale(if (hovered) 1.03f else 1f).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            val img = image
-            if (img != null) Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            else if (LocalMangaStyle.current) MangaTitleArt(item.title, Modifier.fillMaxSize())
-            else Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) { Text(item.title, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold) }
-            item.rating?.let { Badge("★ %.1f".format(it), Modifier.align(Alignment.TopStart).padding(6.dp), color = Color(0xFFF5C518), onColor = Color.Black) }
-        }
-        Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
-        item.year?.let { Text(it.toString(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-
 // ---------------------------------------------------------------- An add-on title
 
 /**
- * A title from an add-on: details, seasons and episodes, then where to watch it: the user's own
- * Telegram files first (when the library has the title), then each add-on's streams as they come.
- * Torrent streams are listed but not played in the Windows app yet.
+ * A title from an add-on, laid out like the Android app's title page (and Nuvio's): the artwork
+ * across the window with the title, details and Play over it; for a series, the seasons and the
+ * episodes as cards; then where to watch: your Telegram files first (when the library has the
+ * title), then each add-on's streams as they come. Torrent streams are listed but not played in
+ * the Windows app yet.
  */
 @Composable
 fun CatalogTitleScreen(
@@ -264,8 +256,8 @@ fun CatalogTitleScreen(
 ) {
     val meta by produceState<CatalogMetadata?>(null, item.ref) { value = runCatching { service.metadata(item) }.getOrNull() }
     val m = meta
-    val backdrop by produceState<ImageBitmap?>(null, m?.backdropUrl ?: item.backdropUrl) { value = (m?.backdropUrl ?: item.backdropUrl)?.let { posters.image(it) } }
-    val poster by produceState<ImageBitmap?>(null, m?.posterUrl ?: item.posterUrl) { value = (m?.posterUrl ?: item.posterUrl)?.let { posters.image(it) } }
+    val art = m?.backdropUrl ?: item.backdropUrl ?: m?.posterUrl ?: item.posterUrl
+    val backdrop by produceState<ImageBitmap?>(null, art) { value = art?.let { posters.image(it) } }
     val seasons = remember(m) { m?.videos.orEmpty().filter { (it.season ?: 0) > 0 }.groupBy { it.season!! }.toSortedMap() }
     var season by remember(m) { mutableStateOf(seasons.keys.firstOrNull()) }
     var episode by remember(m) { mutableStateOf<CatalogVideo?>(null) }
@@ -279,104 +271,111 @@ fun CatalogTitleScreen(
         service.streams(item.ref.type, streamId).collect { groups += it }
         waiting = false
     }
-    val owned = remember(library, item) {
-        val key = item.title.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
-        library.filter { t -> t.isSeries == isSeries && t.title.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim() == key && (isSeries || t.year == null || item.year == null || kotlin.math.abs(t.year - item.year!!) <= 1) }
-    }
+    val owned = remember(library, item) { libraryMatches(library, item.title, item.year, isSeries) }
+    val list = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val firstPlayable = groups.firstNotNullOfOrNull { g -> g.streams.firstOrNull { it.playable } }
+    // Where "Sources" scrolls to: after the header, the episodes and your Telegram files.
+    val sourcesIndex = 1 + (if (isSeries) 2 else 0) + (if (owned.isNotEmpty()) 1 + owned.size else 0)
 
-    Box(Modifier.fillMaxSize()) {
-        backdrop?.let {
-            Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(420.dp))
-            Box(Modifier.fillMaxWidth().height(420.dp).background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
+    LazyColumn(Modifier.fillMaxSize().testTag("title-page"), state = list, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item(key = "header") {
+            val cast = m?.cast.orEmpty()
+            val directors = m?.directors ?: item.directors
+            TitleHeader(
+                m?.title ?: item.title, backdrop, onBack,
+                year = m?.year ?: item.year, runtimeMinutes = m?.runtimeMinutes ?: item.runtimeMinutes, rating = m?.rating ?: item.rating,
+                genres = m?.genres ?: item.genres, description = m?.description ?: item.description,
+                credits = listOfNotNull(
+                    directors.takeIf { it.isNotEmpty() }?.let { "Director: " + it.take(2).joinToString(", ") },
+                    cast.takeIf { it.isNotEmpty() }?.let { "Cast: " + it.take(5).joinToString(", ") },
+                ).joinToString("   ").ifBlank { null },
+                seed = item.title.hashCode(),
+                badges = {
+                    Chip(if (isSeries) "Series" else "Movie", Color.Black.copy(alpha = 0.6f), Color.White)
+                    if (owned.isNotEmpty()) Chip("Telegram", TelegramBlue, Color.White)
+                },
+                actions = {
+                    when {
+                        owned.isNotEmpty() && !isSeries -> PillButton("Play from Telegram", { onPlayLibrary(owned.first()) }, icon = Icons.Default.PlayArrow)
+                        firstPlayable != null -> PillButton("Play", { onPlayStream(m ?: CatalogMetadata(item.ref, item.title, item.year), episode, firstPlayable) }, icon = Icons.Default.PlayArrow)
+                    }
+                    if (streamId != null) PillButton("Sources", { scope.launch { list.animateScrollToItem(sourcesIndex) } }, primary = owned.isEmpty() && firstPlayable == null)
+                },
+            )
         }
-        LazyColumn(Modifier.fillMaxSize().testTag("title-page"), contentPadding = PaddingValues(32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                Spacer(Modifier.height(100.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                    val shape = if (LocalMangaStyle.current) MaterialTheme.shapes.medium else RoundedCornerShape(12.dp)
-                    Box(Modifier.width(200.dp).height(300.dp).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                        poster?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) } ?: MangaTitleArt(item.title, Modifier.fillMaxSize())
-                    }
-                    Column(Modifier.weight(1f).padding(top = 30.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Heading(m?.title ?: item.title, 38.sp, maxLines = 2)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            (m?.year ?: item.year)?.let { Text(it.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            (m?.runtimeMinutes ?: item.runtimeMinutes)?.let { Text("${it / 60}h ${it % 60}m".removePrefix("0h "), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            (m?.rating ?: item.rating)?.let { Badge("★ %.1f".format(it), color = Color(0xFFF5C518), onColor = Color.Black) }
-                            if (owned.isNotEmpty()) Badge("Telegram", color = Color(0xFF2AABEE), onColor = Color.White)
-                        }
-                        val genres = (m?.genres ?: item.genres)
-                        if (genres.isNotEmpty()) Text(genres.joinToString(" • "), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        (m?.description ?: item.description)?.let { Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 760.dp)) }
-                        val cast = m?.cast.orEmpty()
-                        if (cast.isNotEmpty()) Text("Cast: " + cast.take(6).joinToString(", "), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-            }
-            if (isSeries) {
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        seasons.keys.forEach { s -> FilterChip(s == season, { season = s; episode = null }, label = { Text("Season $s") }) }
-                    }
-                }
-                items(seasons[season].orEmpty(), key = { it.id }) { v ->
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (v == episode) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer)
-                            .clickable { episode = v }.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("${v.episode ?: "?"}", fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(v.title ?: "Episode ${v.episode}", fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            v.overview?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                        }
-                    }
+        if (isSeries) {
+            item(key = "seasons") {
+                Row(Modifier.padding(start = LocalNavInset.current + 16.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    seasons.keys.forEach { s -> FilterPill("Season $s", s == season) { season = s; episode = null } }
+                    if (seasons.isEmpty()) Text(if (m == null) "Loading episodes…" else "No episodes listed.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (owned.isNotEmpty()) {
-                item { Heading("Your Telegram files", 20.sp, Modifier.padding(top = 12.dp)) }
-                items(owned, key = { "own:" + it.key }) { t -> StreamRow(t.title, "${t.files.size} file(s) · ${resolutionLabel(t.bestResolution) ?: ""}", "Telegram") { onPlayLibrary(t) } }
-            }
-            if (streamId != null) {
-                item { Heading("Streams", 20.sp, Modifier.padding(top = 12.dp)) }
-                groups.forEach { g ->
-                    item(key = "g:" + g.addon) {
-                        Text(g.addon + (g.error?.let { " — not answering" } ?: if (g.streams.isEmpty()) " — nothing found" else ""), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    items(g.streams.withIndex().toList(), key = { "s:" + g.addon + it.index }) { (_, s) ->
-                        val label = s.name.replace('\n', ' ')
-                        when {
-                            s.playable -> StreamRow(label, listOfNotNull(s.description?.replace('\n', ' '), s.sizeBytes?.let { sizeLabel(it) }).joinToString(" · "), g.addon) {
-                                onPlayStream(m ?: CatalogMetadata(item.ref, item.title, item.year), episode, s)
-                            }
-                            s.isTorrent -> StreamRow(label, (s.description?.replace('\n', ' ') ?: "") + " · torrents are not in the Windows app yet", g.addon, enabled = false) {}
-                            else -> Unit
-                        }
-                    }
+            item(key = "episodes") {
+                androidx.compose.foundation.lazy.LazyRow(
+                    contentPadding = PaddingValues(start = LocalNavInset.current + 16.dp, end = 40.dp, top = 6.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(season?.let { seasons[it] }.orEmpty(), key = { it.id }) { v -> EpisodeCard(v, v == episode, posters) { episode = v } }
                 }
-                if (waiting) item { Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp)); Text("  Asking the add-ons…") } }
-            } else if (isSeries) item { Text("Pick an episode to see its streams.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp)) }
+            }
         }
+        if (owned.isNotEmpty()) {
+            item(key = "own-title") { SectionTitle("Your Telegram files") }
+            items(owned, key = { "own:" + it.key }) { t -> SourceCard(t.title, "${t.files.size} file(s) · ${resolutionLabel(t.bestResolution) ?: ""}", "Telegram", { onPlayLibrary(t) }) }
+        }
+        if (streamId != null) {
+            item(key = "streams-title") { SectionTitle("Streams") }
+            groups.forEach { g ->
+                item(key = "g:" + g.addon) {
+                    Text(
+                        g.addon + (g.error?.let { " — not answering" } ?: if (g.streams.isEmpty()) " — nothing found" else ""),
+                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = LocalNavInset.current + 16.dp, top = 8.dp),
+                    )
+                }
+                items(g.streams.withIndex().toList(), key = { "s:" + g.addon + it.index }) { (_, s) ->
+                    val label = s.name.replace('\n', ' ')
+                    when {
+                        s.playable -> SourceCard(label, listOfNotNull(s.description?.replace('\n', ' '), s.sizeBytes?.let { sizeLabel(it) }).joinToString(" · "), g.addon, {
+                            onPlayStream(m ?: CatalogMetadata(item.ref, item.title, item.year), episode, s)
+                        })
+                        s.isTorrent -> SourceCard(label, (s.description?.replace('\n', ' ') ?: "") + " · torrents are not in the Windows app yet", g.addon, {}, enabled = false)
+                        else -> Unit
+                    }
+                }
+            }
+            if (waiting) item(key = "waiting") {
+                Row(Modifier.padding(start = LocalNavInset.current + 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp)); Text("  Asking the add-ons…")
+                }
+            }
+        } else if (isSeries) item(key = "pick") {
+            Text("Pick an episode to see its streams.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = LocalNavInset.current + 16.dp, top = 12.dp))
+        }
+        item(key = "end") { Spacer(Modifier.height(40.dp)) }
     }
 }
 
+/** An episode: its still (when the add-on has one), number and name, the overview under it. */
 @Composable
-private fun StreamRow(title: String, detail: String, source: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Column {
-        Row(
-            Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+private fun EpisodeCard(v: CatalogVideo, selected: Boolean, posters: PosterService, onClick: () -> Unit) {
+    val still by produceState<ImageBitmap?>(null, v.thumbnail) { value = v.thumbnail?.let { posters.image(it) } }
+    val manga = LocalMangaStyle.current
+    val shape = if (manga) MaterialTheme.shapes.medium else RoundedCornerShape(14.dp)
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    Column(Modifier.width(280.dp).hoverable(hover).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(if ((selected || hovered) && !manga) Modifier.border(2.dp, if (selected) Color.White else Color.White.copy(alpha = 0.5f), shape) else Modifier),
         ) {
-            Icon(Icons.Default.PlayArrow, null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-            Column(Modifier.weight(1f)) {
-                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-                if (detail.isNotBlank()) Text(detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Text(source, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            still?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+            Chip("E${v.episode ?: "?"}", Color.Black.copy(alpha = 0.7f), Color.White, Modifier.align(Alignment.TopStart).padding(8.dp))
+            if (selected) Chip("Showing streams", Color.White, Color.Black, Modifier.align(Alignment.BottomStart).padding(8.dp))
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text(v.title ?: "Episode ${v.episode}", fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        v.overview?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
 }
 

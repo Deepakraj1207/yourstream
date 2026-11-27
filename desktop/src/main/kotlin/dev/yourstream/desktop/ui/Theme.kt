@@ -15,34 +15,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** The app's colours: warm paper on ink, like the Android app's classic style. */
-private val Ink = Color(0xFF161310)
-private val InkRaised = Color(0xFF221E1A)
-private val InkHigh = Color(0xFF2E2924)
-private val Paper = Color(0xFFE8E2D4)
+/**
+ * The classic style's colours, as in the Android app's classic look: a black page, white text and
+ * white buttons, greys for raised surfaces; a light page (white on black inverted) when dark is off.
+ */
+private val Black = Color(0xFF000000)
+private val Raised = Color(0xFF141414)
+private val RaisedHigh = Color(0xFF1F1F1F)
+private val RaisedHighest = Color(0xFF2A2A2A)
+private val White = Color(0xFFFFFFFF)
 private val Accent = Color(0xFFE50914)
 
 private val Dark = darkColorScheme(
-    primary = Paper, onPrimary = Ink,
-    secondary = Accent, onSecondary = Color.White,
-    secondaryContainer = Color(0xFF4A4038), onSecondaryContainer = Paper,
-    background = Ink, onBackground = Paper,
-    surface = Ink, onSurface = Paper,
-    surfaceVariant = InkRaised, onSurfaceVariant = Paper.copy(alpha = 0.72f),
-    surfaceContainer = InkRaised, surfaceContainerHigh = InkHigh, surfaceContainerHighest = InkHigh,
-    outline = Paper.copy(alpha = 0.28f), outlineVariant = Paper.copy(alpha = 0.14f),
+    primary = White, onPrimary = Black,
+    secondary = Accent, onSecondary = White,
+    secondaryContainer = RaisedHighest, onSecondaryContainer = White,
+    tertiary = Accent, onTertiary = White,
+    background = Black, onBackground = White,
+    surface = Black, onSurface = White,
+    surfaceVariant = Raised, onSurfaceVariant = White.copy(alpha = 0.62f),
+    surfaceContainerLowest = Black, surfaceContainerLow = Color(0xFF0B0B0B),
+    surfaceContainer = Raised, surfaceContainerHigh = RaisedHigh, surfaceContainerHighest = RaisedHighest,
+    inverseSurface = White, inverseOnSurface = Black,
+    outline = White.copy(alpha = 0.28f), outlineVariant = White.copy(alpha = 0.12f),
     error = Color(0xFFFF6B6B),
 )
 
 private val Light = lightColorScheme(
-    primary = Ink, onPrimary = Paper,
-    secondary = Accent, onSecondary = Color.White,
-    secondaryContainer = Color(0xFFC9BFA8), onSecondaryContainer = Ink,
-    background = Paper, onBackground = Ink,
-    surface = Paper, onSurface = Ink,
-    surfaceVariant = Color(0xFFDCD5C5), onSurfaceVariant = Ink.copy(alpha = 0.72f),
-    surfaceContainer = Color(0xFFDCD5C5), surfaceContainerHigh = Color(0xFFD2CAB8), surfaceContainerHighest = Color(0xFFD2CAB8),
-    outline = Ink.copy(alpha = 0.3f), outlineVariant = Ink.copy(alpha = 0.15f),
+    primary = Black, onPrimary = White,
+    secondary = Accent, onSecondary = White,
+    secondaryContainer = Color(0xFFE4E4E4), onSecondaryContainer = Black,
+    tertiary = Accent, onTertiary = White,
+    background = Color(0xFFF6F6F6), onBackground = Black,
+    surface = Color(0xFFF6F6F6), onSurface = Black,
+    surfaceVariant = Color(0xFFECECEC), onSurfaceVariant = Black.copy(alpha = 0.62f),
+    surfaceContainerLowest = White, surfaceContainerLow = Color(0xFFF1F1F1),
+    surfaceContainer = White, surfaceContainerHigh = Color(0xFFEAEAEA), surfaceContainerHighest = Color(0xFFDFDFDF),
+    inverseSurface = Black, inverseOnSurface = White,
+    outline = Black.copy(alpha = 0.3f), outlineVariant = Black.copy(alpha = 0.12f),
 )
 
 @Composable

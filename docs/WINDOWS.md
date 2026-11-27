@@ -1,19 +1,23 @@
 # YourStream for Windows
 
 The `desktop` module is YourStream as a Windows app (the same code also runs on Linux and macOS,
-but only a Windows installer is built): your Telegram library, Stremio / Nuvio add-ons (Discover
-and streams), a Nuvio-style player, the manga style, and in-app updates.
+but only a Windows installer is built): your Telegram library, Stremio / Nuvio add-ons (catalog
+rows and streams), Nuvio-style screens and player, the manga style, and in-app updates.
 
 ## What it does
 
 | Part | How |
 |---|---|
 | Sign in | Telegram's own login: phone number and code, two-step password, or a QR code scanned with Telegram on a phone. The session is stored by TDLib in the data folder. |
-| Chats | Pick the channels, groups or chats that hold your videos; they are indexed in the background while the app is open, and checked for new posts every 15 minutes. |
-| Library | Movies with their versions (4K first), series with seasons and episodes, search, a Movies/Series filter. Posters from Cinemeta, or TMDB with your key (Settings). |
-| Add-ons | Stremio / Nuvio add-ons, like on Android (the shared catalog:stremio and catalog:core code): install by link (https://…/manifest.json, stremio:// works too; plain http only on the local network), order, remove. Cinemeta is installed at first. |
-| Discover | The add-ons' catalogs as poster grids (Movies / Series, pick a catalog, Load more) and search across add-ons. A title's page shows its details, seasons and episodes, your Telegram files for it first, then every add-on's streams as they come. HTTP streams play in the player (with the stream's User-Agent / Referer); torrents are listed but not played on Windows yet. |
-| Style | Manga (default, like Android: Bangers lettering, inked panels, screentones, speed lines) or Classic; dark or light (Settings → Appearance). |
+| Layout | Like the Android app's Nuvio-style screens, for a big window: a floating glass sidebar (Home, Search, Library, Settings), full-bleed artwork that fades into a black page, rows of rounded posters that lift on hover, white pill buttons. Esc goes back a page. |
+| Home | A hero carousel across the top (the first add-on catalog's titles with artwork, or your latest Telegram titles; the next slide every 8 s, arrows and dots), then rows: Continue watching, Recently added · Telegram, and each add-on catalog ("Popular · Movies") with arrows on hover and See all. Add-on titles you have on Telegram carry a "Telegram" badge, and the hero offers Play for them. |
+| Search | One big field: your Telegram titles as you type, then every add-on's results, one row per add-on and kind ("Cinemeta · Movies"). |
+| Title pages | The artwork across the window with the title, year, runtime, rating, genres, overview and credits over it; Play (from Telegram when you have it, else the first playable stream) and Sources; for a series, season pills and episode cards with stills; then your Telegram files and each add-on's streams. |
+| Chats | Settings → Telegram chats: pick the channels, groups or chats that hold your videos; they are indexed in the background while the app is open, and checked for new posts every 15 minutes. |
+| Library | Movies with their versions (4K first), series with seasons and episodes, search, a Movies/Series filter. Posters from Cinemeta, or TMDB with your key (Settings → Posters). |
+| Add-ons | Settings → Add-ons: Stremio / Nuvio add-ons, like on Android (the shared catalog:stremio and catalog:core code): install by link (https://…/manifest.json, stremio:// works too; plain http only on the local network), order, remove. Cinemeta is installed at first. HTTP streams play in the player (with the stream's User-Agent / Referer); torrents are listed but not played on Windows yet. A row's See all opens the whole catalog as a grid (Movies / Series, another catalog, search, Load more). |
+| Settings | Sections in a list on the left: Appearance, Telegram chats, Add-ons, Player, Posters, Updates, Storage, Account. |
+| Style | Classic (black, white text and buttons) or Manga (default, like Android: Bangers lettering, inked panels, screentones, speed lines); dark or light (Settings → Appearance). |
 | Updates | The latest GitHub release is checked at start (and in Settings → Updates). A newer installer is downloaded, checked against `SHA256SUMS-windows.txt`, installed over the app (msiexec), and the app restarts. |
 | Playback | Streams while downloading: the app serves the Telegram file to VLC over `127.0.0.1` with byte ranges, so seeking anywhere works before the file is downloaded; the start and end of a title's file are fetched while its page is open, so Play starts at once. Nuvio-style player: title and source at the bottom left, thin seek bar, round play button, aspect / speed / subtitles / audio / sources / info panels, volume and time; controls hide while playing. Audio and subtitle tracks named by language and format (the pick is remembered); "Resumed from … · Start over". Shortcuts (handled by the window, so they always work): Space/K play-pause, ←/→ or J/L 10 s (Shift 60 s), Home/End, 0–9 jump, ↑/↓ or wheel volume, M mute, A next audio, S next subtitles, V subtitles on/off, [ ] = speed, Z aspect, N next episode, I info, F/F11 or double-click fullscreen, Esc, ?/H the list. |
 
@@ -114,7 +118,12 @@ job, which also builds the installer):
   language at start; closing never waits for VLC.
 * `PlayerScreenTest`: the player's overlay, the audio panel, and the window-level shortcuts.
 * `AddonsTest`: a small add-on served on 127.0.0.1: install, catalogs, details, streams (with the
-  stream's User-Agent), Discover and an add-on title page, and an add-on stream played by VLC.
+  stream's User-Agent), a catalog grid and an add-on title page, and an add-on stream played by VLC.
+* `HomeAndSearchTest`: the window's shell (sidebar) with a local add-on serving generated artwork
+  and a sample Telegram library: Home's hero and rows (Continue watching, Recently added, the
+  catalogs, See all, the Telegram badge and Play for titles you have), Search across Telegram and
+  add-ons, add-on movie and series pages (streams, episodes), and Settings' sections, in the classic
+  and manga styles. Screenshots go to `desktop/build/screenshots`.
 * `DesktopUpdatesTest`: a newer release found, the installer downloaded and checked against
   `SHA256SUMS-windows.txt` and installed; the same or an older version is up to date; a damaged
   download is deleted and nothing is installed.

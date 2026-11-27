@@ -62,24 +62,29 @@ fun LibraryScreen(titles: List<LibraryTitle>, posters: PosterService, indexing: 
             when (show) { Show.ALL -> true; Show.MOVIES -> !it.isSeries; Show.SERIES -> it.isSeries }
         }
     }
+    val inset = LocalNavInset.current
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Heading("Library", 26.sp)
+        Row(
+            Modifier.fillMaxWidth().padding(start = inset + 16.dp, end = 40.dp, top = 36.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PageTitle("Library")
+            if (titles.isNotEmpty()) Text("${titles.size} titles", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             Box(Modifier.weight(1f))
-            Show.entries.forEach { s -> FilterChip(selected = show == s, onClick = { show = s }, label = { Text(s.label) }) }
-            OutlinedTextField(
-                query, { query = it }, singleLine = true, placeholder = { Text("Search your library") },
-                leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.width(300.dp),
-            )
+            Show.entries.forEach { s -> FilterPill(s.label, show == s) { show = s } }
+            SearchField(query, { query = it }, "Search your library", Modifier.width(320.dp), height = 46.dp)
         }
         when {
-            titles.isEmpty() -> Empty(indexing, onAddChats)
-            shown.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Nothing matches \"$query\"", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            titles.isEmpty() -> EmptyNote(
+                if (indexing) "Reading your chats…" else "Your library is empty",
+                if (indexing) "Titles appear here as they are found." else "Choose the Telegram channels or groups that hold your videos.",
+            ) { if (!indexing) PillButton("Choose chats", onAddChats) }
+            shown.isEmpty() -> EmptyNote("Nothing matches", "Nothing in your library matches \"$query\".")
             else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(160.dp),
-                contentPadding = PaddingValues(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp),
+                columns = GridCells.Adaptive(168.dp),
+                contentPadding = PaddingValues(start = inset + 16.dp, end = 40.dp, top = 12.dp, bottom = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(26.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(shown, key = { it.key }) { t -> PosterCard(t, posters) { onOpen(t) } }
@@ -88,43 +93,22 @@ fun LibraryScreen(titles: List<LibraryTitle>, posters: PosterService, indexing: 
     }
 }
 
+/** A filter choice: a pill, filled when chosen. */
 @Composable
-private fun Empty(indexing: Boolean, onAddChats: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(if (indexing) "Reading your chats…" else "Your library is empty", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                if (indexing) "Titles appear here as they are found." else "Choose the Telegram channels or groups that hold your videos.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
-            )
-            if (!indexing) androidx.compose.material3.Button(onClick = onAddChats) { Text("Choose chats") }
-        }
-    }
+fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit) {
+    val manga = LocalMangaStyle.current
+    val shape = if (manga) MaterialTheme.shapes.small else RoundedCornerShape(50)
+    Text(
+        text, fontWeight = FontWeight.SemiBold,
+        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.then(if (manga && selected) Modifier.inkPanel(shape, shadow = 2.dp) else Modifier).clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 9.dp),
+    )
 }
 
 @Composable
-fun PosterCard(t: LibraryTitle, posters: PosterService, onClick: () -> Unit) {
-    val image by posterImage(t, posters)
-    val hover = remember { MutableInteractionSource() }
-    val hovered by hover.collectIsHoveredAsState()
-    Column(Modifier.hoverable(hover).clickable(onClick = onClick)) {
-        val shape = MaterialTheme.shapes.medium.takeIf { LocalMangaStyle.current } ?: RoundedCornerShape(10.dp)
-        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).scale(if (hovered) 1.03f else 1f).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            val img = image
-            if (img != null) Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            else if (LocalMangaStyle.current) MangaTitleArt(t.title, Modifier.fillMaxSize())
-            else Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-                Text(t.title, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-            }
-            Row(Modifier.align(Alignment.TopStart).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                resolutionLabel(t.bestResolution)?.let { Badge(it) }
-                if (t.isSeries) Badge("${t.files.size} ep", color = MaterialTheme.colorScheme.surfaceContainerHighest, onColor = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-        Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
-        t.year?.let { Text(it.toString(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
+fun PosterCard(t: LibraryTitle, posters: PosterService, onClick: () -> Unit) = TelegramCard(t, posters, onClick = onClick)
 
 /** The title's poster, looked up and loaded in the background (null until then, or when none). */
 @Composable

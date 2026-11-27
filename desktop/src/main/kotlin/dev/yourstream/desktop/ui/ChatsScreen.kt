@@ -67,14 +67,14 @@ fun ChatsScreen(chats: TelegramChatRepository, store: DesktopIndexStore, indexer
     val addedById = added.associateBy { it.chatId }
     val shown = list.chats.filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Heading("Chats", 26.sp)
+    Column(Modifier.fillMaxSize().padding(end = 40.dp)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Heading("Telegram chats", 26.sp)
             Box(Modifier.weight(1f))
             listOf(ChatFilter.CHANNELS to "Channels", ChatFilter.GROUPS to "Groups", ChatFilter.PRIVATE to "Private", ChatFilter.ALL to "All").forEach { (f, label) ->
-                FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(label) })
+                FilterPill(label, filter == f) { filter = f }
             }
-            OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Find a chat") }, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.width(260.dp))
+            SearchField(query, { query = it }, "Find a chat", Modifier.width(240.dp), height = 44.dp)
         }
         if (added.isNotEmpty()) {
             Text("In your library", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
@@ -87,7 +87,7 @@ fun ChatsScreen(chats: TelegramChatRepository, store: DesktopIndexStore, indexer
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(shown.filter { it.id !in addedById }, key = { it.id }) { chat ->
-                Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(chat.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)

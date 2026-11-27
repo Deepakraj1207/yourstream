@@ -1335,3 +1335,41 @@ Checked on the published files:
 
 Status: NEEDS REAL-DEVICE TESTING (the Windows app on a real PC: add-ons, the player's
 shortcuts, the manga style, and the in-app update from 0.14.1 to a later version).
+
+## Windows app looks like Nuvio desktop (27 Nov 2026)
+
+The user asked for the Windows app to look like Nuvio desktop. Nuvio Desktop's README has no
+screenshots or layout notes, and its code is GPL-3.0. Nothing was copied from it. The design
+follows the Android app's own Nuvio-style screens (hero carousel, glass navigation, title page,
+search), adapted to a large window.
+
+* **Shell:** a floating glass sidebar (Home, Search, Library, Settings) with tooltips. Title pages
+  and "See all" open as a page stack over the tab, and Esc goes back. Telegram chats and add-ons
+  moved into Settings. The update banner floats at the top.
+* **Home:** a full-bleed hero carousel (8 s, pauses on hover, arrows and dots). It shows the first
+  add-on catalog's titles with backdrops, or else the latest Telegram titles. Rows follow:
+  Continue watching (saved positions, latest first), Recently added · Telegram, and each add-on
+  catalog ("Popular · Movies"), with arrows on hover and See all. Add-on titles you have on
+  Telegram get a "Telegram" badge, and the hero offers Play for them. Loaded catalog pages are
+  kept while the app runs.
+* **Search:** one big field. Telegram titles show as you type. Every add-on is asked side by side
+  (catalog:core `searchSections`), one row per add-on and kind. The old search returned only the
+  first add-on that answered. Rows use the add-on's manifest name, not the placeholder name taken
+  from its link ("http:" for local add-ons).
+* **Title pages** (Telegram and add-on): full-bleed artwork with the title, details, overview,
+  credits, a white Play pill and Sources. Add-on series show season pills and episode cards with
+  stills; streams and files show as rounded source cards.
+* **Library, catalog grid, Settings:** the same cards and pills. Settings has a section list on the
+  left.
+* **Colours:** the classic style is now black with white text and buttons, like the Android
+  classic look. The manga style is unchanged and has a form of every new piece.
+* **Bug fixed:** an add-on series page looked up `seasons[null]` on a TreeMap before its episodes
+  loaded. That throws, so opening an add-on series could crash the Windows app, released v0.14.1
+  included.
+* **Tests:** HomeAndSearchTest (4 tests: Home, Search, add-on movie and series pages, Settings) uses
+  a local add-on with generated artwork and a sample library. ScreensTest's library search now
+  uses the new field. The desktop suite has 44 tests, all passing here; the new ones passed 3 of 3
+  runs on one CPU.
+* Cinemeta is not reachable from this environment, so the screenshots use generated artwork.
+* Status: NEEDS REAL-DEVICE TESTING (on a Windows PC with real add-ons and posters: hover, tooltip
+  and wheel behaviour, window sizes).

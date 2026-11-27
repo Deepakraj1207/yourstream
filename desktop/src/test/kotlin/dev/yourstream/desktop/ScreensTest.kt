@@ -3,6 +3,7 @@ package dev.yourstream.desktop
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.filter
@@ -137,7 +138,7 @@ class ScreensTest {
     fun searchNarrowsTheLibrary() = runDesktopComposeUiTest(1280, 820) {
         val titles = LibraryBuilder.build(sample)
         setContent { Themed { LibraryScreen(titles, posters, indexing = false, onOpen = {}, onAddChats = {}) } }
-        onNodeWithText("Search your library").performTextInput("documentary")
+        onNodeWithTag("search-field").performTextInput("documentary")
         onNodeWithText("Documentary").assertExists()
         onNodeWithText("Another Movie").assertDoesNotExist()
     }

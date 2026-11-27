@@ -128,6 +128,13 @@ class AddonService(private val http: HttpClient, private val settings: SettingsS
 
     suspend fun search(query: String, type: CatalogType? = null): List<CatalogItem> = withContext(Dispatchers.IO) { manager.search(query, type).value }
 
+    /** Every add-on asked side by side; results kept apart per add-on and type ("Cinemeta · Movies"). */
+    suspend fun searchSections(query: String): List<dev.yourstream.catalog.core.SearchSection> = withContext(Dispatchers.IO) {
+        // Named as the add-on's manifest names itself (the provider's own name is only a placeholder from its link).
+        val names = _addons.value.mapNotNull { a -> a.info?.provider?.value?.let { it to a.name } }.toMap()
+        manager.searchSections(query).sections.map { s -> s.copy(providerName = s.provider?.value?.let(names::get) ?: s.providerName) }
+    }
+
     suspend fun metadata(item: CatalogItem): CatalogMetadata = withContext(Dispatchers.IO) { manager.metadata(item).value }
 
     /** Streams for a movie ("tt0111161") or an episode ("tt0903747:1:2"), one add-on at a time. */

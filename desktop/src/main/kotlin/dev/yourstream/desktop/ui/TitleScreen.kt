@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import dev.yourstream.desktop.data.LibraryTitle
 import dev.yourstream.desktop.data.MediaRecord
 import dev.yourstream.desktop.data.resolutionLabel
@@ -53,54 +54,43 @@ import dev.yourstream.desktop.data.sizeLabel
 import dev.yourstream.desktop.library.Artwork
 import dev.yourstream.desktop.library.PosterService
 
-/** A title's page: artwork, overview and Play; for a series, its seasons and episodes. */
+/**
+ * A Telegram title's page, laid out like the Android app's (and Nuvio's): the artwork across the
+ * window with the title, details and Play over it; then the seasons and episodes, or the versions.
+ */
 @Composable
 fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord) -> Long, onBack: () -> Unit, onPlay: (MediaRecord, List<MediaRecord>) -> Unit) {
     val art by produceState(posters.cached(t) ?: Artwork(), t.key) { value = posters.artwork(t) }
     val backdrop by posterImage(t, posters, backdrop = true)
-    val poster by posterImage(t, posters)
-    Box(Modifier.fillMaxSize()) {
-        if (LocalMangaStyle.current && backdrop == null) Box(Modifier.fillMaxWidth().height(420.dp).clipToBounds().speedLines(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), seed = t.key.hashCode()))
-        backdrop?.let {
-            Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(420.dp))
-            Box(Modifier.fillMaxWidth().height(420.dp).background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
+    LazyColumn(Modifier.fillMaxSize().testTag("title-page"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item(key = "header") {
+            val first = if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull()
+            TitleHeader(
+                t.title, backdrop, onBack, year = t.year, rating = art.rating, description = art.overview, seed = t.key.hashCode(),
+                badges = {
+                    Chip("Telegram", TelegramBlue, Color.White)
+                    resolutionLabel(t.bestResolution)?.let { Chip(it, Color.White, Color.Black) }
+                    if (t.isSeries) Chip("${t.seasons.size} season" + if (t.seasons.size == 1) "" else "s", Color.Black.copy(alpha = 0.6f), Color.White)
+                },
+                actions = {
+                    if (first != null) {
+                        val resume = resumeMs(first) > 0
+                        val queue = if (t.isSeries) t.seasons.values.first().values.map { it.first() } else listOf(first)
+                        PillButton(if (resume) "Resume" else "Play", { onPlay(first, queue) }, icon = Icons.Default.PlayArrow)
+                    }
+                },
+            )
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(32.dp)) {
-            item {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                Spacer(Modifier.height(120.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                    val shape = if (LocalMangaStyle.current) MaterialTheme.shapes.medium else RoundedCornerShape(12.dp)
-                    Box(Modifier.width(200.dp).height(300.dp).inkPanel(shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                        poster?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                            ?: if (LocalMangaStyle.current) MangaTitleArt(t.title, Modifier.fillMaxSize()) else Unit
-                    }
-                    Column(Modifier.weight(1f).padding(top = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Heading(t.title, 40.sp, maxLines = 2)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            t.year?.let { Text(it.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            resolutionLabel(t.bestResolution)?.let { Badge(it) }
-                            art.rating?.let { Badge("★ %.1f".format(it), color = Color(0xFFF5C518), onColor = Color.Black) }
-                            Badge("Telegram", color = Color(0xFF2AABEE), onColor = Color.White)
-                        }
-                        if (art.overview.isNotBlank()) Text(art.overview, modifier = Modifier.widthIn(max = 760.dp), maxLines = 5, overflow = TextOverflow.Ellipsis)
-                        if (!t.isSeries) {
-                            val best = t.files.first()
-                            Button(onClick = { onPlay(best, listOf(best)) }, modifier = Modifier.padding(top = 8.dp)) {
-                                Icon(Icons.Default.PlayArrow, null)
-                                Text(if (resumeMs(best) > 0) "Resume" else "Play", modifier = Modifier.padding(start = 6.dp))
-                            }
-                        }
-                    }
+        if (t.isSeries) item(key = "episodes") { Episodes(t, resumeMs, onPlay) }
+        else {
+            item(key = "versions-title") { SectionTitle("Versions") }
+            items(t.files, key = { "${it.chatId}:${it.messageId}" }) { f ->
+                SourceCard(f.fileName.ifBlank { "Video" }, details(f), "Telegram", { onPlay(f, listOf(f)) }) {
+                    if (resumeMs(f) > 0) Chip("Resume", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
                 }
-                Spacer(Modifier.height(28.dp))
-            }
-            if (t.isSeries) item { Episodes(t, resumeMs, onPlay) }
-            else {
-                item { Heading("Versions", 20.sp, Modifier.padding(bottom = 8.dp)) }
-                items(t.files, key = { "${it.chatId}:${it.messageId}" }) { f -> VersionRow(f, resumeMs(f)) { onPlay(f, listOf(f)) } }
             }
         }
+        item(key = "end") { Spacer(Modifier.height(40.dp)) }
     }
 }
 
@@ -111,38 +101,19 @@ private fun Episodes(t: LibraryTitle, resumeMs: (MediaRecord) -> Long, onPlay: (
     val episodes = seasons[season].orEmpty()
     // Next-up order: the best version of each episode of this season.
     val queue = remember(episodes) { episodes.values.map { it.first() } }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            seasons.keys.forEach { s -> FilterChip(selected = s == season, onClick = { season = s }, label = { Text(if (s == 0) "Episodes" else "Season $s") }) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.padding(start = LocalNavInset.current + 16.dp, top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            seasons.keys.forEach { s -> FilterPill(if (s == 0) "Episodes" else "Season $s", s == season) { season = s } }
         }
         episodes.forEach { (number, versions) ->
             val best = versions.first()
-            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().clickable { onPlay(best, queue.dropWhile { it != best }) }) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(28.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (number == 0) best.fileName else "Episode $number", fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(details(best) + if (versions.size > 1) " · ${versions.size} versions" else "", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (resumeMs(best) > 0) Badge("Resume")
-                }
-            }
+            SourceCard(
+                if (number == 0) best.fileName else "Episode $number",
+                details(best) + if (versions.size > 1) " · ${versions.size} versions" else "",
+                "", { onPlay(best, queue.dropWhile { it != best }) },
+                leading = { Text(if (number == 0) "▶" else "$number", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            ) { if (resumeMs(best) > 0) Chip("Resume", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary) }
         }
-    }
-}
-
-@Composable
-private fun VersionRow(f: MediaRecord, resume: Long, onPlay: () -> Unit) {
-    Column {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Icon(Icons.Default.PlayArrow, null)
-            Column(Modifier.weight(1f)) {
-                Text(f.fileName.ifBlank { "Video" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(details(f), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (resume > 0) Badge("Resume")
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
