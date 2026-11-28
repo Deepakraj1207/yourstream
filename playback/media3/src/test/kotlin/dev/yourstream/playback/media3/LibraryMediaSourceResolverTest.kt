@@ -70,6 +70,19 @@ class LibraryMediaSourceResolverTest {
     )
 
     @Test
+    fun dataSaverPlaysTheSmallestVersion() {
+        val vs = listOf(
+            version(1, 2160, size = 20_000), version(2, 1080, size = 2_000), version(3, 720, size = 800),
+            version(4, 360, size = 50), version(5, 720, size = 600, deleted = true), version(6, 720, size = 800, duplicate = true),
+        )
+        assertEquals(listOf(1L, 2L, 3L, 4L, 6L), LibraryMediaSourceResolver.rank(vs, saver = false).map { it.mediaId }, "normally originals first, the best first")
+        assertEquals(listOf(3L, 6L, 2L, 1L, 4L), LibraryMediaSourceResolver.rank(vs, saver = true).map { it.mediaId },
+            "data saver: the smallest of 480p or more, originals before duplicates, tiny versions last, deleted skipped")
+        val saved = vs.map { if (it.mediaId == 1L) it.copy(downloadState = "COMPLETE") else it }
+        assertEquals(1L, LibraryMediaSourceResolver.rank(saved, saver = true).first().mediaId, "a version saved on the device costs no data")
+    }
+
+    @Test
     fun choosesTheBestVersionAndRefreshesTheFileFromTheMessage(): Unit = runBlocking {
         sim.addFile(42, TestMedia.file(TestMedia.SMALL_360P, dir))
         versions = listOf(version(1, 720), version(2, 1080, duplicate = true), version(3, 1080, deleted = true), version(4, 480), version(5, 2160, excluded = true))

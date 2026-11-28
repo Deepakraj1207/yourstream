@@ -1404,3 +1404,49 @@ The user asked for a clear cache option in both versions.
   * Windows: DesktopStorageTest (4) and the Settings test reaching Storage & cache. All 48 desktop
     tests pass (1 opt-in benchmark skipped).
 * Status: NEEDS REAL-DEVICE TESTING (freeing real TDLib caches on a phone and a PC).
+
+## Data saver on Android and Windows (28 Nov 2026)
+
+The user asked for a data saver mode after asking how to stream with little data and storage.
+Telegram files play as uploaded, with no smaller copies, so the version played decides most of the
+data a video uses.
+
+* `DataSaver` (`:playback:stream`, shared by both apps) holds:
+  * the mode (Off / On mobile data / Always) and a metered check (Android:
+    `ConnectivityManager.isActiveNetworkMetered`);
+  * the limits;
+  * the version order `smallestFirst`: on the device first, then the smallest of at least 480p,
+    then unknown sizes, then smaller ones (samples).
+* **Version picked by Play:**
+  * Android: `LibraryMediaSourceResolver.rank`. Play without a chosen version, the player's
+    version list and the title page's Telegram streams follow it. Originals stay before
+    duplicates. A resumed video keeps its version.
+  * Windows: `preferredVersion` / `playFile` / `episodeQueue` for the title page, episodes, the
+    next-episode queue and the hero's Play.
+* **Buffering (Android, `BufferManager`):**
+  * memory buffer at most 30 s;
+  * read-ahead 45 s playing, 15 s paused, floored at 1.2× the memory buffer (≈36 s);
+  * 12 MB when the bitrate is unknown;
+  * no next-episode prefetch, even on Wi-Fi.
+  * Found on the way: capping only the read-ahead at 45 s would still have fetched 54 s, because
+    of that floor. Hence the 30 s memory cap.
+* **Windows streamer** (`StreamingConfig.readAheadFor`): 45 s of the bitrate (at least 4 MB), or
+  12 MB when unknown. `StartWarmer` fetches nothing.
+* **Stream cache** (both apps): 500 MB instead of 2 GB, oldest first. It is not cleared on exit,
+  so resuming costs no data.
+* **Settings:**
+  * Android: Settings → Playback → Streaming → Data saver (a choice dialog; settings search finds
+    it under "data saver" and "mobile data").
+  * Windows: Settings → Player → Data saver (on/off; the desktop does not tell metered networks
+    apart).
+* **Tests:**
+  * DataSaverTest (4: when on, version order, read-ahead, cache budget);
+  * BufferManagerTest.dataSaverBuffersLessAndNeverPrefetches;
+  * LibraryMediaSourceResolverTest.dataSaverPlaysTheSmallestVersion;
+  * LibraryTest.dataSaverPlaysTheSmallestVersion (Windows);
+  * ScreensTest.dataSaverIsChosenInSettings;
+  * the Windows Settings test reaches the toggle.
+  * Suites passing here: playback:stream (17), playback:adaptive (16), playback:media3 (45),
+    ui:screens (184), app (6), desktop (49, 1 opt-in skipped).
+* Status: NEEDS REAL-DEVICE TESTING (data used per hour on a phone on mobile data, smooth playback
+  with the shorter buffer on a weak connection).

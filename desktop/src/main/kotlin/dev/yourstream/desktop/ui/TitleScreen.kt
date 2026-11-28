@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
 import dev.yourstream.desktop.data.LibraryTitle
 import dev.yourstream.desktop.data.MediaRecord
+import dev.yourstream.desktop.data.episodeQueue
+import dev.yourstream.desktop.data.playFile
+import dev.yourstream.desktop.data.preferredVersion
 import dev.yourstream.desktop.data.resolutionLabel
 import dev.yourstream.desktop.data.sizeLabel
 import dev.yourstream.desktop.library.Artwork
@@ -64,7 +67,7 @@ fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord)
     val backdrop by posterImage(t, posters, backdrop = true)
     LazyColumn(Modifier.fillMaxSize().testTag("title-page"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item(key = "header") {
-            val first = if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull()
+            val first = t.playFile()
             TitleHeader(
                 t.title, backdrop, onBack, year = t.year, rating = art.rating, description = art.overview, seed = t.key.hashCode(),
                 badges = {
@@ -75,7 +78,7 @@ fun TitleScreen(t: LibraryTitle, posters: PosterService, resumeMs: (MediaRecord)
                 actions = {
                     if (first != null) {
                         val resume = resumeMs(first) > 0
-                        val queue = if (t.isSeries) t.seasons.values.first().values.map { it.first() } else listOf(first)
+                        val queue = if (t.isSeries) episodeQueue(t.seasons.values.first()) else listOf(first)
                         PillButton(if (resume) "Resume" else "Play", { onPlay(first, queue) }, icon = Icons.Default.PlayArrow)
                     }
                 },
@@ -100,13 +103,13 @@ private fun Episodes(t: LibraryTitle, resumeMs: (MediaRecord) -> Long, onPlay: (
     var season by remember(t.key) { mutableStateOf(seasons.keys.first()) }
     val episodes = seasons[season].orEmpty()
     // Next-up order: the best version of each episode of this season.
-    val queue = remember(episodes) { episodes.values.map { it.first() } }
+    val queue = remember(episodes) { episodeQueue(episodes) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.padding(start = LocalNavInset.current + 16.dp, top = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             seasons.keys.forEach { s -> FilterPill(if (s == 0) "Episodes" else "Season $s", s == season) { season = s } }
         }
         episodes.forEach { (number, versions) ->
-            val best = versions.first()
+            val best = preferredVersion(versions)
             SourceCard(
                 if (number == 0) best.fileName else "Episode $number",
                 details(best) + if (versions.size > 1) " · ${versions.size} versions" else "",

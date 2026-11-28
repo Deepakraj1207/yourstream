@@ -331,6 +331,9 @@ private fun SettingsDialogs(dialog: SettingsDialog, host: SettingsHost, onClose:
             { onPrefs(prefs.copy(theme = it)) }, onClose)
         SettingsDialog.BUFFER -> Choose(stringResource(R.string.settings_buffer), AppSettings.BUFFER_OPTIONS.map { it to bufferLabel(it) }, prefs.streamBufferSeconds,
             { onPrefs(prefs.copy(streamBufferSeconds = it)) }, onClose)
+        SettingsDialog.DATA_SAVER -> Choose(stringResource(R.string.settings_data_saver),
+            dev.yourstream.playback.stream.DataSaver.Mode.entries.map { it to dataSaverLabel(it) }, prefs.dataSaver,
+            { onPrefs(prefs.copy(dataSaver = it)) }, onClose)
         SettingsDialog.TORRENT_CONSENT -> TorrentConsentDialog(onEnable = { onPrefs(prefs.copy(torrentStreaming = true)) }, onClose = onClose)
         SettingsDialog.RESET -> androidx.compose.material3.AlertDialog(
             onDismissRequest = onClose,

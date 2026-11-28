@@ -5,6 +5,8 @@ import dev.yourstream.core.common.NoOpLogger
 import dev.yourstream.desktop.data.DesktopIndexStore
 import dev.yourstream.desktop.data.LibraryBuilder
 import dev.yourstream.desktop.data.MediaRecord
+import dev.yourstream.desktop.data.episodeQueue
+import dev.yourstream.desktop.data.playFile
 import dev.yourstream.desktop.data.resolutionLabel
 import dev.yourstream.media.api.model.IndexMode
 import dev.yourstream.media.api.model.IndexRunResult
@@ -78,6 +80,25 @@ class LibraryTest {
 
     private fun record(title: String, year: Int? = null, season: Int? = null, episode: Int? = null, res: Int? = 1080, id: Long = title.hashCode().toLong()) =
         MediaRecord(1, id, id, id.toInt(), "r$id", "$title.mkv", 1_000_000, video = true, title = title, titleKey = title.lowercase(), year = year, season = season, episode = episode, resolution = res)
+
+    private fun sized(title: String, res: Int, mb: Long, id: Long, season: Int? = null, episode: Int? = null) =
+        MediaRecord(1, id, id, id.toInt(), "r$id", "$title $res.mkv", mb shl 20, video = true, title = title, titleKey = title.lowercase(),
+            year = 2024.takeIf { season == null }, season = season, episode = episode, resolution = res)
+
+    @Test
+    fun dataSaverPlaysTheSmallestVersion() {
+        val titles = LibraryBuilder.build(listOf(
+            sized("Film", 2160, 20_000, 1), sized("Film", 1080, 2_000, 2), sized("Film", 720, 800, 3), sized("Film", 360, 60, 4),
+            sized("Show", 1080, 1_500, 11, 1, 1), sized("Show", 720, 400, 12, 1, 1), sized("Show", 1080, 1_400, 13, 1, 2),
+        ))
+        val film = titles.first { it.title == "Film" }
+        assertEquals(2160, film.playFile(saver = false)!!.resolution, "normally the best version")
+        assertEquals(720, film.playFile(saver = true)!!.resolution, "data saver: the smallest of 480p or more, not the 360p sample")
+        val show = titles.first { it.title == "Show" }
+        assertEquals(listOf(1080, 1080), episodeQueue(show.seasons.getValue(1), saver = false).map { it.resolution })
+        assertEquals(listOf(720, 1080), episodeQueue(show.seasons.getValue(1), saver = true).map { it.resolution }, "each episode's smallest")
+        assertEquals(12L, show.playFile(saver = true)!!.messageId)
+    }
 
     @Test
     fun remakesStayApartAndSearchIgnoresAccents() {

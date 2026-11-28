@@ -23,6 +23,8 @@ data class DesktopSettings(
     val volume: Int = 100,
     /** Installed Stremio / Nuvio add-ons (manifest links), in order. Cinemeta at first, as on Android. */
     val addons: List<String> = listOf("https://v3-cinemeta.strem.io/manifest.json"),
+    /** Data saver: the smallest version plays, less is downloaded ahead, nothing in advance (see DataSaver). */
+    val dataSaver: Boolean = false,
 )
 
 /** settings.json in the data folder. Written whole (to a temporary file, then renamed). */

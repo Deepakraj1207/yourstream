@@ -166,6 +166,16 @@ private fun Appearance(graph: AppGraph) {
 @Composable
 private fun Player(graph: AppGraph) {
     val vlc = remember { Vlc.available(graph.logger) }
+    val settings by graph.settings.settings.collectAsState()
+    Card {
+        Toggle(
+            "Data saver",
+            "Plays the smallest version of a title, downloads less ahead of the player (about 45 s instead of minutes), " +
+                "fetches nothing before you press Play, and keeps 500 MB of streamed videos instead of 2 GB. " +
+                "Telegram files play as they were posted, so the version you play decides most of the data.",
+            settings.dataSaver,
+        ) { on -> graph.settings.update { it.copy(dataSaver = on) } }
+    }
     Card {
         Text(if (vlc) "VLC found: videos play in the app." else "VLC was not found. Install VLC (64-bit) to play videos.", fontWeight = FontWeight.SemiBold)
         if (!vlc) PillButton("Get VLC", { runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(Vlc.DOWNLOAD_URL)) } }, primary = false)

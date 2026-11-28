@@ -503,6 +503,11 @@
     <string name="settings_app_decoders">Prefer the app\'s audio decoders</string>
     <string name="settings_app_decoders_detail">FFmpeg before the device\'s own decoders. Try this if a film plays without sound (AC-3, DTS, TrueHD).</string>
     <string name="settings_buffer">Buffer ahead</string>
+    <string name="settings_data_saver">Data saver</string>
+    <string name="settings_data_saver_value">%1$s · plays the smallest version, buffers less, keeps 500 MB of streamed videos</string>
+    <string name="settings_data_saver_off">Off</string>
+    <string name="settings_data_saver_mobile">On mobile data</string>
+    <string name="settings_data_saver_always">Always</string>
     <string name="settings_buffer_value">%1$s · add-on and torrent streams</string>
     <plurals name="settings_minutes">
         <item quantity="one">%d minute</item>

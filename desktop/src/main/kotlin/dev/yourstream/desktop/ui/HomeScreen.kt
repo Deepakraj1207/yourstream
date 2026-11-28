@@ -151,7 +151,7 @@ private fun heroSlides(
                 backdrop = { item.backdropUrl?.let { posters.image(it) } },
                 year = item.year, genres = item.genres, runtimeMinutes = item.runtimeMinutes, rating = item.rating, description = item.description,
                 telegram = own != null,
-                onPlay = own?.takeIf { !it.isSeries }?.let { t -> { onPlay(t, t.files.first()) } },
+                onPlay = own?.takeIf { !it.isSeries }?.let { t -> { onPlay(t, dev.yourstream.desktop.data.preferredVersion(t.files)) } },
                 onDetails = { onOpenItem(item) },
             )
         } else recent.take(HERO_SLIDES).map { t ->
@@ -159,7 +159,7 @@ private fun heroSlides(
                 key = t.key, title = t.title, kind = if (t.isSeries) "Series" else "Movie",
                 backdrop = { posters.artwork(t).let { a -> posters.image(a.backdrop.ifEmpty { a.poster }) } },
                 year = t.year, rating = posters.cached(t)?.rating, description = posters.cached(t)?.overview, telegram = true,
-                onPlay = if (t.isSeries) null else ({ onPlay(t, t.files.first()) }),
+                onPlay = if (t.isSeries) null else ({ onPlay(t, dev.yourstream.desktop.data.preferredVersion(t.files)) }),
                 onDetails = { onOpenTitle(t) },
             )
         }

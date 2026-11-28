@@ -77,3 +77,20 @@ fun sizeLabel(bytes: Long): String = when {
     bytes >= 1L shl 20 -> "${bytes shr 20} MB"
     else -> "${bytes shr 10} KB"
 }
+
+/**
+ * The version Play plays among [versions] (best first, as the library lists them): the first, or
+ * with data saver on ([saver]) the smallest suitable one (see DataSaver.smallestFirst).
+ */
+fun preferredVersion(versions: List<MediaRecord>, saver: Boolean = dev.yourstream.playback.stream.DataSaver.active): MediaRecord =
+    if (!saver || versions.size < 2) versions.first()
+    else dev.yourstream.playback.stream.DataSaver.smallestFirst(versions, onDevice = { false }, height = { it.resolution }, size = { it.sizeBytes }).first()
+
+/** What Play starts for a title: a movie's preferred version, or a series' first episode's. */
+fun LibraryTitle.playFile(saver: Boolean = dev.yourstream.playback.stream.DataSaver.active): MediaRecord? =
+    if (isSeries) seasons.values.firstOrNull()?.values?.firstOrNull()?.let { preferredVersion(it, saver) }
+    else files.takeIf { it.isNotEmpty() }?.let { preferredVersion(it, saver) }
+
+/** A season's episodes in order, each as the version Play would pick: the "next episode" queue. */
+fun episodeQueue(episodes: Map<Int, List<MediaRecord>>, saver: Boolean = dev.yourstream.playback.stream.DataSaver.active): List<MediaRecord> =
+    episodes.values.map { preferredVersion(it, saver) }

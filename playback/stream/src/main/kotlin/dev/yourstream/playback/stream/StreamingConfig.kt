@@ -43,9 +43,12 @@ data class StreamingConfig(
     /** Read the partially downloaded file directly (fast); readPart is the fallback. */
     val directFileReads: Boolean = true,
 ) {
-    fun readAheadFor(hints: StreamHints): Long {
-        val bitrate = hints.bytesPerSecond ?: return defaultReadAheadBytes
-        return (bitrate * readAheadSeconds).coerceIn(minReadAheadBytes, maxReadAheadBytes)
+    /** The window for a new session; smaller while [DataSaver] is on ([saver]). */
+    fun readAheadFor(hints: StreamHints, saver: Boolean = DataSaver.active): Long {
+        val bitrate = hints.bytesPerSecond
+            ?: return if (saver) minOf(defaultReadAheadBytes, DataSaver.UNKNOWN_BITRATE_READ_AHEAD_BYTES) else defaultReadAheadBytes
+        val seconds = if (saver) minOf(readAheadSeconds.toLong(), DataSaver.READ_AHEAD_SECONDS) else readAheadSeconds.toLong()
+        return (bitrate * seconds).coerceIn(if (saver) minWindowBytes * 4 else minReadAheadBytes, maxReadAheadBytes)
     }
 
     companion object {

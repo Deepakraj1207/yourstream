@@ -43,6 +43,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.yourstream.desktop.data.LibraryBuilder
 import dev.yourstream.desktop.data.LibraryTitle
+import dev.yourstream.desktop.data.playFile
 import dev.yourstream.desktop.ui.CatalogTitleScreen
 import dev.yourstream.desktop.ui.DiscoverScreen
 import dev.yourstream.desktop.ui.HomeCache
@@ -176,7 +177,7 @@ fun App(graph: AppGraph, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
     // A Telegram title's page is open: fetch the start and end of what Play would play.
     val openTitle = (page as? Page.Title)?.title?.let { o -> titles.firstOrNull { it.key == o.key } ?: o }
     LaunchedEffect(openTitle?.key) {
-        val first = openTitle?.let { t -> if (t.isSeries) t.seasons.values.firstOrNull()?.values?.firstOrNull()?.firstOrNull() else t.files.firstOrNull() }
+        val first = openTitle?.playFile()
         if (first != null) graph.warmer.warm(first.fileId, first.sizeBytes) else graph.warmer.stop()
     }
 

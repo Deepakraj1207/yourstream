@@ -364,3 +364,23 @@ Record device, Android version, network and result in `docs/IMPLEMENTATION_PROGR
   knows under the indexed id can be played.
 - **Cache scope.** `StreamCache` tracks only files streamed since the app started. Older partial
   files remain until TDLib or Android clears the cache directory.
+
+## Data saver
+
+Telegram files play as they were posted: there are no smaller copies to switch to. So the data a
+video uses is the size of the version played times how much of it is watched. Data saver
+(`DataSaver` in `:playback:stream`; Android: Settings → Playback → Streaming → Data saver: Off /
+On mobile data / Always; Windows: Settings → Player → Data saver) uses as little as streaming
+allows while it is on:
+
+| | Normal | Data saver |
+|---|---|---|
+| Version Play picks | best: highest resolution, largest file | on the device first (no data), then the smallest of at least 480p; smaller ones (samples, trailers) only when nothing else is there |
+| Memory buffer (Android) | 50–150 s | 30 s |
+| Download ahead of the player | 2–5 min (90 s / 30 s paused on mobile data) | ≈45 s playing, ≈36 s paused (Android); 45 s of the bitrate, or 12 MB when unknown (Windows) |
+| Next episode / title page prefetch | on Wi-Fi | never |
+| Streamed parts kept | 2 GB | 500 MB, oldest first (kept, not cleared, so resuming costs no data) |
+
+"On mobile data" asks the system whether the connection is metered whenever playback needs to
+know (`ConnectivityManager.isActiveNetworkMetered`). Windows has on / off only. A video that is
+resumed plays the version it was playing.

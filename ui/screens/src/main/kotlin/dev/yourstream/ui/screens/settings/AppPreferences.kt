@@ -157,6 +157,8 @@ data class AppSettings(
     val streamBufferSeconds: Int = 120,
     /** Audio: the app's FFmpeg decoders before the device's own (for films that play without sound). */
     val appAudioDecodersFirst: Boolean = false,
+    /** Data saver: off, on mobile data, or always (see [dev.yourstream.playback.stream.DataSaver]). */
+    val dataSaver: dev.yourstream.playback.stream.DataSaver.Mode = dev.yourstream.playback.stream.DataSaver.Mode.OFF,
 ) {
     val seekMs: Long get() = seekSeconds * 1000L
 
@@ -181,8 +183,15 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
     private val _settings = MutableStateFlow(load().also(::apply))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
-    /** Settings that live below the UI (network, decoders) take effect right away. */
+    init {
+        // Data saver "on mobile data" asks the system whenever playback needs to know.
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        dev.yourstream.playback.stream.DataSaver.metered = { connectivity?.isActiveNetworkMetered ?: false }
+    }
+
+    /** Settings that live below the UI (network, decoders, data saver) take effect right away. */
     private fun apply(s: AppSettings) {
+        dev.yourstream.playback.stream.DataSaver.mode = s.dataSaver
         dev.yourstream.core.network.SecureDns.always = s.secureDns
         dev.yourstream.core.network.SecureDns.fallback = s.secureDnsFallback
         dev.yourstream.ui.core.ImageRouting.useProxies = s.imageProxies
@@ -248,6 +257,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
             .putBoolean("home_catalogs", s.homeRows.catalogs)
             .putInt("stream_buffer", s.streamBufferSeconds)
             .putBoolean("ffmpeg_first", s.appAudioDecodersFirst)
+            .putString("data_saver", s.dataSaver.name)
             .apply()
         apply(s)
         _settings.value = s
@@ -333,6 +343,7 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         ),
         streamBufferSeconds = prefs.getInt("stream_buffer", 120).takeIf { it in AppSettings.BUFFER_OPTIONS } ?: 120,
         appAudioDecodersFirst = prefs.getBoolean("ffmpeg_first", false),
+        dataSaver = enumOr(prefs.getString("data_saver", null), dev.yourstream.playback.stream.DataSaver.Mode.OFF),
     )
 }
 

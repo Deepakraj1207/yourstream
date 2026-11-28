@@ -168,10 +168,22 @@ class LibraryMediaSourceResolver @Inject constructor(
         /** Best version: not deleted/excluded, an original before a duplicate, then highest resolution, then largest. */
         fun chooseVersion(versions: List<MediaVersion>): MediaVersion? = rank(versions).firstOrNull()
 
-        /** All usable versions, best first. */
-        fun rank(versions: List<MediaVersion>): List<MediaVersion> = versions
-            .filter { !it.isDeleted && !it.isExcluded }
-            .sortedWith(compareBy<MediaVersion> { it.isDuplicate }.thenByDescending { it.resolution ?: 0 }.thenByDescending { it.sizeBytes })
+        /**
+         * All usable versions, best first: the highest resolution, the largest file. With data
+         * saver on ([saver]): the one on this device first, then the smallest (see
+         * [dev.yourstream.playback.stream.DataSaver.smallestFirst]). Originals before duplicates either way.
+         */
+        fun rank(versions: List<MediaVersion>, saver: Boolean = dev.yourstream.playback.stream.DataSaver.active): List<MediaVersion> {
+            val usable = versions.filter { !it.isDeleted && !it.isExcluded }
+            return if (!saver) usable.sortedWith(compareBy<MediaVersion> { it.isDuplicate }.thenByDescending { it.resolution ?: 0 }.thenByDescending { it.sizeBytes })
+            else dev.yourstream.playback.stream.DataSaver.smallestFirst(
+                usable.sortedBy { it.isDuplicate }, // stable: originals stay before duplicates of the same size
+                onDevice = { it.isLocal || it.downloadState == DOWNLOADED }, height = { it.resolution }, size = { it.sizeBytes },
+            )
+        }
+
+        /** The index's download state of a file that is completely on the device. */
+        private const val DOWNLOADED = "COMPLETE"
     }
 }
 

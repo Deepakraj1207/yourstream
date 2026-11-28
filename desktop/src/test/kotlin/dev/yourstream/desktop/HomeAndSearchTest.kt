@@ -327,6 +327,8 @@ class HomeAndSearchTest {
                 onNodeWithTag("addon-link").assertExists()
                 onNodeWithTag("settings:UPDATES").performClick()
                 onNodeWithText("Check for updates").assertExists()
+                onNodeWithTag("settings:PLAYER").performClick()
+                onNodeWithText("Data saver").assertExists()
                 onNodeWithTag("settings:STORAGE").performClick()
                 waitUntil(timeoutMillis = 10_000) { onAllNodes(hasText("YourStream uses 0 B for caches")).fetchSemanticsNodes().isNotEmpty() }
                 onNodeWithTag("storage-clear-all").assertExists()

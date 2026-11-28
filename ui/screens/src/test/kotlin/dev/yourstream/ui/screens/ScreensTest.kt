@@ -303,6 +303,18 @@ class ScreensTest {
     }
 
     @Test
+    fun dataSaverIsChosenInSettings() {
+        var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
+        set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it })) }
+        compose.onNodeWithTag("settings-search").performTextInput("mobile data")
+        compose.onNodeWithText("Off · plays the smallest version", substring = true).assertExists()
+        compose.onNodeWithTag("pref-data-saver").performClick()
+        compose.onNodeWithTag("choice:On mobile data").performClick()
+        assertEquals(dev.yourstream.playback.stream.DataSaver.Mode.MOBILE_DATA, prefs.dataSaver)
+        compose.onNodeWithText("On mobile data · plays the smallest version", substring = true).assertExists()
+    }
+
+    @Test
     fun settingsSearchFindsAndChangesASettingInPlace() {
         var prefs by androidx.compose.runtime.mutableStateOf(dev.yourstream.ui.screens.settings.AppSettings())
         set { SettingsScreen(SettingsHost(SettingsUiState("Asha", true, 3, ""), "1.2.0", prefs = prefs, onPrefs = { prefs = it })) }

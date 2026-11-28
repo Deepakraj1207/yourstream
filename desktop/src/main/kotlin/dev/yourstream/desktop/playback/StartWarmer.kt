@@ -27,7 +27,8 @@ class StartWarmer(
     @Synchronized
     fun warm(fileId: Int, size: Long) {
         job?.cancel()
-        if (size <= 0) return
+        // Data saver: nothing is fetched before Play is pressed.
+        if (size <= 0 || dev.yourstream.playback.stream.DataSaver.active) return
         job = scope.launch {
             delay(400) // only for a page that stays open, not one passed on the way
             fetch(fileId, 0, minOf(headBytes, size))

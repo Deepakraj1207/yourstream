@@ -13,7 +13,8 @@ import kotlinx.coroutines.sync.withLock
  * Only files that were *not* already complete before streaming are tracked, and never one the
  * user asked to keep ([keep]: Download on a title): a file downloaded on purpose is never deleted
  * here, even when it was played while still downloading. When the tracked total exceeds [budgetBytes], the
- * least recently streamed, inactive files lose their local copy (never the newest one).
+ * least recently streamed, inactive files lose their local copy (never the newest one). With
+ * [DataSaver] on, the budget is at most [DataSaver.CACHE_BUDGET_BYTES].
  */
 class StreamCache(
     private val repo: TelegramFileRepository,
@@ -28,6 +29,9 @@ class StreamCache(
 
     val trackedBytes: Long get() = entries.values.sumOf { it.bytes }
 
+    /** The budget now: [budgetBytes], or less while [DataSaver] is on. */
+    private val budget: Long get() = if (DataSaver.active) minOf(budgetBytes, DataSaver.CACHE_BUDGET_BYTES) else budgetBytes
+
     /** Records a finished streaming session and evicts the oldest copies above the budget. Returns evicted ids. */
     suspend fun recordAndTrim(file: TelegramFile, wasCompleteBefore: Boolean, activeFileIds: Set<Int>): List<Int> = lock.withLock {
         if (!wasCompleteBefore && file.downloadedSize > 0 && !keep(file)) {
@@ -38,7 +42,7 @@ class StreamCache(
         // The most recently streamed copy is always kept (the user may come straight back to it).
         val newest = entries.values.maxByOrNull { it.lastUsed }?.fileId
         val iterator = entries.values.sortedBy { it.lastUsed }.iterator()
-        while (trackedBytes > budgetBytes && iterator.hasNext()) {
+        while (trackedBytes > budget && iterator.hasNext()) {
             val e = iterator.next()
             if (e.fileId in activeFileIds || e.fileId == newest) continue
             repo.deleteLocalCopy(e.fileId)

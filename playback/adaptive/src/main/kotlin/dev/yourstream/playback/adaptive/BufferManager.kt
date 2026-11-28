@@ -1,5 +1,7 @@
 package dev.yourstream.playback.adaptive
 
+import dev.yourstream.playback.stream.DataSaver
+
 import kotlin.math.pow
 
 enum class PlaybackPhase { IDLE, STARTING, PLAYING, PAUSED, BUFFERING, SEEKING, ENDED }
@@ -112,6 +114,8 @@ data class BufferConfig(
 class BufferManager(
     private val device: DeviceProfile = DeviceProfile(),
     private val config: BufferConfig = BufferConfig(),
+    /** Data saver on now (Settings; see [DataSaver]): a shorter buffer and read-ahead, no prefetch. */
+    private val dataSaver: () -> Boolean = { DataSaver.active },
 ) {
     private val trend = BufferTrend(config.trendWindowMs)
     private val rebuffers = ArrayDeque<Long>()
@@ -152,6 +156,13 @@ class BufferManager(
             val cap = budget * 1000 / bitrate
             if (cap < maxBuffer) { maxBuffer = maxOf(cap, 5_000); reasons += "memory cap ${maxBuffer / 1000}s" }
             if (minBuffer > maxBuffer - 2_000) minBuffer = (maxBuffer - 2_000).coerceAtLeast(2_000)
+        }
+        // 2b. Data saver: a short RAM buffer (the disk read-ahead is never under 1.2 × the RAM
+        //     buffer, so this keeps the download near the data saver's read-ahead).
+        val saver = dataSaver()
+        if (saver && maxBuffer > DataSaver.RAM_BUFFER_SECONDS * 1000) {
+            maxBuffer = DataSaver.RAM_BUFFER_SECONDS * 1000
+            if (minBuffer > maxBuffer - 2_000) minBuffer = maxBuffer - 2_000
         }
 
         // 3. Start / resume thresholds. With the network slower than the video (headroom h < 1) the
@@ -211,22 +222,28 @@ class BufferManager(
             reasons += "risk $risk (trend ${"%.2f".format(slope ?: 0.0)}, empty in ${timeToEmptyMs?.div(1000)}s)"
         }
 
-        // 5. Disk read-ahead: playback time by tier, limited on metered networks, never less than the RAM buffer.
+        // 5. Disk read-ahead: playback time by tier, limited on metered networks and with data
+        //    saver, never less than the RAM buffer.
         var seconds = tier.readAheadSeconds
         if (network.isMetered && risk == RebufferRisk.NONE) {
             seconds = minOf(seconds, if (sample.phase == PlaybackPhase.PAUSED) config.pausedMeteredReadAheadSeconds else config.meteredReadAheadSeconds)
             reasons += "metered"
         }
+        if (saver && risk == RebufferRisk.NONE) {
+            seconds = minOf(seconds, if (sample.phase == PlaybackPhase.PAUSED) DataSaver.PAUSED_READ_AHEAD_SECONDS else DataSaver.READ_AHEAD_SECONDS)
+            reasons += "data saver"
+        }
         if (risk != RebufferRisk.NONE) seconds *= 2
         if (exploring) seconds = minOf(seconds, config.exploreMaxBufferMs / 1000)
-        val readAhead = if (bitrate == null) config.unknownBitrateReadAheadBytes else
-            maxOf(bitrate * seconds, bitrate * maxBuffer / 1000 * 12 / 10).coerceIn(config.minReadAheadBytes, config.maxReadAheadBytes)
+        val readAhead = if (bitrate == null) {
+            if (saver) minOf(config.unknownBitrateReadAheadBytes, DataSaver.UNKNOWN_BITRATE_READ_AHEAD_BYTES) else config.unknownBitrateReadAheadBytes
+        } else maxOf(bitrate * seconds, bitrate * maxBuffer / 1000 * 12 / 10).coerceIn(config.minReadAheadBytes, config.maxReadAheadBytes)
 
         // 6. Prefetch only with bandwidth to spare.
         val prefetch = risk == RebufferRisk.NONE && !network.isOffline &&
             (effectiveQuality == NetworkQuality.GOOD || (effectiveQuality == NetworkQuality.FAIR && (headroom ?: 0.0) >= 2.0)) &&
             (headroom == null || headroom >= 1.5) &&
-            (!network.isMetered || config.allowMeteredPrefetch) &&
+            (!network.isMetered || config.allowMeteredPrefetch) && !saver &&
             sample.phase in setOf(PlaybackPhase.PLAYING, PlaybackPhase.PAUSED)
 
         val fastSeek = sample.droppedFramesPerSecond > 3.0 || (device.lowRam && device.cpuCores <= 4)

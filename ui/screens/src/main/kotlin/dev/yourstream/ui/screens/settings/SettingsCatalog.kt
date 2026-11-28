@@ -68,7 +68,7 @@ enum class SettingsPage(val section: SettingsSection, @StringRes val title: Int,
 }
 
 /** Choices that open a dialog. */
-enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, BUFFER, RESET, TORRENT_CONSENT }
+enum class SettingsDialog { SEEK, FIT, HOLD, SUBTITLE, STYLE, THEME, BUFFER, RESET, TORRENT_CONSENT, DATA_SAVER }
 
 /** What a setting's row works with: the settings bundle, and the dialogs it may open. */
 class SettingsRows internal constructor(val host: SettingsHost, internal val open: (SettingsDialog) -> Unit) {
@@ -225,6 +225,10 @@ internal val SETTINGS: List<SettingEntry> = buildList {
             change(prefs.copy(appAudioDecodersFirst = it))
         }
     })
+    add(entry("data-saver", pl, R.string.settings_group_streaming, R.string.settings_data_saver, "data saver mobile data low data usage smaller version storage") {
+        SettingRow(stringResource(R.string.settings_data_saver), dataSaverSummary(prefs.dataSaver), AppIcons.Speed,
+            tag = "pref-data-saver") { open(SettingsDialog.DATA_SAVER) }
+    })
     add(entry("buffer", pl, R.string.settings_group_streaming, R.string.settings_buffer, "cache buffering preload") {
         SettingRow(stringResource(R.string.settings_buffer), stringResource(R.string.settings_buffer_value, bufferLabel(prefs.streamBufferSeconds)), AppIcons.Speed,
             tag = "pref-buffer") { open(SettingsDialog.BUFFER) }
@@ -314,6 +318,20 @@ internal fun pageSummary(page: SettingsPage, host: SettingsHost): String = when 
     SettingsPage.ABOUT -> host.updateLine ?: host.appVersion?.let { stringResource(R.string.settings_version, it) } ?: stringResource(page.detail)
     else -> layoutSummary(page, host) ?: stringResource(page.detail)
 }
+
+@Composable
+internal fun dataSaverLabel(m: dev.yourstream.playback.stream.DataSaver.Mode) = stringResource(
+    when (m) {
+        dev.yourstream.playback.stream.DataSaver.Mode.OFF -> R.string.settings_data_saver_off
+        dev.yourstream.playback.stream.DataSaver.Mode.MOBILE_DATA -> R.string.settings_data_saver_mobile
+        dev.yourstream.playback.stream.DataSaver.Mode.ALWAYS -> R.string.settings_data_saver_always
+    },
+)
+
+/** "On mobile data · smallest version, less buffering, 500 MB kept"; "Off · …what it would do". */
+@Composable
+internal fun dataSaverSummary(m: dev.yourstream.playback.stream.DataSaver.Mode) =
+    stringResource(R.string.settings_data_saver_value, dataSaverLabel(m))
 
 internal fun speedLabel(s: Float) = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
 

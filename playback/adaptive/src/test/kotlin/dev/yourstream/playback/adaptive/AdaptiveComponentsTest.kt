@@ -162,6 +162,21 @@ class BufferManagerTest {
     }
 
     @Test
+    fun dataSaverBuffersLessAndNeverPrefetches() {
+        val normal = BufferManager(dataSaver = { false }).update(sample(0, 20_000), net(4 * MB, NetworkQuality.GOOD))
+        val mobile = BufferManager(dataSaver = { false }).update(sample(0, 20_000), net(4 * MB, NetworkQuality.GOOD, metered = true))
+        val saver = BufferManager(dataSaver = { true }).update(sample(0, 20_000), net(4 * MB, NetworkQuality.GOOD))
+        val paused = BufferManager(dataSaver = { true }).update(sample(0, 20_000, PlaybackPhase.PAUSED), net(4 * MB, NetworkQuality.GOOD))
+        assertTrue(normal.prefetchAllowed)
+        assertFalse(saver.prefetchAllowed, "nothing fetched in advance, even on Wi-Fi")
+        assertEquals(30_000, saver.maxBufferMs, "a short memory buffer")
+        assertEquals(bitrate * 45, saver.readAheadBytes, "45 s ahead while playing")
+        assertTrue(saver.readAheadBytes < mobile.readAheadBytes && mobile.readAheadBytes < normal.readAheadBytes)
+        assertEquals(bitrate * 30 * 12 / 10, paused.readAheadBytes, "paused: no more than the memory buffer")
+        assertTrue("data saver" in saver.reason)
+    }
+
+    @Test
     fun stallsRaiseTheResumeThresholdAndBetterNetworksNeedToHold() {
         val m = BufferManager()
         val first = m.update(sample(0, 5_000), net(1 * MB, NetworkQuality.GOOD)).resumeAfterRebufferMs

@@ -1,5 +1,7 @@
 package dev.yourstream.desktop
 
+import kotlinx.coroutines.launch
+
 import dev.yourstream.core.common.Clock
 import dev.yourstream.core.common.Logger
 import dev.yourstream.core.network.HttpClients
@@ -109,6 +111,16 @@ class AppGraph(val build: BuildInfo = BuildInfo.load(), val dataDir: File = AppP
 
     /** Updates from GitHub releases (see DesktopUpdates). */
     val updates = dev.yourstream.desktop.update.DesktopUpdates(build.version, File(dataDir, "updates"), logger)
+
+    init {
+        // Data saver (Settings → Player) for playback: on or off (the desktop does not tell metered networks apart).
+        scope.launch {
+            settings.settings.collect { s ->
+                dev.yourstream.playback.stream.DataSaver.mode =
+                    if (s.dataSaver) dev.yourstream.playback.stream.DataSaver.Mode.ALWAYS else dev.yourstream.playback.stream.DataSaver.Mode.OFF
+            }
+        }
+    }
 
     /** The caches on disk, measured and cleared in Settings → Storage (see DesktopStorage). */
     val storage = dev.yourstream.desktop.data.DesktopStorage(dataDir, files, posters, updates, { warmer.stop() }, logger)
