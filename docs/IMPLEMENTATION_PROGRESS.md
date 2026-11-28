@@ -1450,3 +1450,22 @@ data a video uses.
     ui:screens (184), app (6), desktop (49, 1 opt-in skipped).
 * Status: NEEDS REAL-DEVICE TESTING (data used per hour on a phone on mobile data, smooth playback
   with the shorter buffer on a weak connection).
+
+## v0.15.0 release (28 Nov 2026)
+
+Released on the user's instruction ("yes" to releasing the Windows redesign, Clear cache and Data
+saver as v0.15.0). Release run 46134538531, at commit `4631eaf` (`main` and `develop` identical).
+- Contents: the Nuvio-style Windows layout, with the add-on series crash fix that v0.14.1 lacks;
+  Clear cache on both apps; Data saver on both apps.
+
+Checked on the published files:
+- `releases/latest` is v0.15.0 (tag at `4631eaf`), not a pre-release and not a draft, with 8
+  assets.
+- The arm64 APK's SHA-256 (`340578ff…a438`) matches `SHA256SUMS.txt`. `aapt2` shows versionCode
+  36 and versionName 0.15.0. `apksigner` shows the pinned certificate (`35249306…07b2`).
+- `YourStream-v0.15.0-windows-x64.msi` is 145,072,298 bytes. Its SHA-256 in
+  `SHA256SUMS-windows.txt` (`afd397d9…0d66`) equals GitHub's digest of the file. The release
+  run's Windows "Desktop tests" step passed before the installer was built.
+
+Status: NEEDS REAL-DEVICE TESTING (the Windows layout with real artwork on a PC; Data saver's
+data use on a phone on mobile data; Clear cache freeing real TDLib caches).
