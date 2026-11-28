@@ -1,3 +1,26 @@
+## What's new in 0.15.0
+
+Both apps:
+- **Data saver.** Telegram videos play exactly as they were posted, so the version you play
+  decides most of the data it uses. With Data saver on, Play picks the smallest version of a
+  title (at least 480p; one already saved on your device first), the app downloads only about
+  45 seconds ahead of the player instead of several minutes, nothing is fetched before you press
+  Play, and 500 MB of streamed videos are kept instead of 2 GB. Android: Settings → Playback →
+  Data saver (Off, On mobile data, or Always). Windows: Settings → Player → Data saver.
+- **Clear cache.** One button frees the space used by streamed videos, posters and other caches.
+  Your library, watch history, settings and sign-in are kept, and nothing is deleted from
+  Telegram. Android: on the main Settings page (and at the top of Storage); if you saved videos
+  for offline viewing, they are kept. Windows: Settings → Storage & cache, with each cache's size.
+
+Windows app:
+- **New look, like Nuvio on the desktop:** a floating sidebar (Home, Search, Library, Settings),
+  a Home page with a large carousel and rows (Continue watching, Recently added from Telegram,
+  each add-on catalog with See all), a Search page that searches your Telegram titles and every
+  add-on at once, title pages with the artwork across the window, episode cards for series, and
+  Settings with a list of sections (Telegram chats and Add-ons are now there). The classic style
+  is now black and white; the manga style is still the default. Esc goes back a page.
+- Fixed: opening a series from an add-on could close the app.
+
 ## What's new in 0.14.1
 
 - **Windows installer for 0.14.0's features.** The 0.14.0 release went out without its Windows
